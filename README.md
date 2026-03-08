@@ -1,0 +1,2 @@
+# Solace-Synth
+Synthesizer project

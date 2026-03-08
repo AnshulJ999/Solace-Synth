@@ -47,8 +47,9 @@ juce_add_plugin("${PROJECT_NAME}"
     COMPANY_NAME "${COMPANY_NAME}"
     BUNDLE_ID "${BUNDLE_ID}"
 
-    # Copy built plugin to system plugin folder after build (convenient for testing)
-    COPY_PLUGIN_AFTER_BUILD TRUE
+    # Don't auto-copy to system VST3 folder (requires admin privileges)
+    # To install: manually copy from build/SolaceSynth_artefacts/Release/VST3/
+    COPY_PLUGIN_AFTER_BUILD FALSE
 
     PLUGIN_MANUFACTURER_CODE ${PLUGIN_MANUFACTURER_CODE}
     PLUGIN_CODE ${PLUGIN_CODE}
@@ -86,7 +87,6 @@ target_compile_definitions("${PROJECT_NAME}"
     JUCE_WEB_BROWSER=1          # Enable WebView support
     JUCE_USE_CURL=0             # No need for CURL
     JUCE_VST3_CAN_REPLACE_VST2=0
-    JUCE_DISPLAY_SPLASH_SCREEN=0  # Using JUCE Starter commercial license
 
     # Build info available to code
     CMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE}"

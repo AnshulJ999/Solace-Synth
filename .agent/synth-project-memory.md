@@ -1,8 +1,8 @@
 # Solace Synth — Project Memory
 
 **Created:** 2026-03-08
-**Last Updated:** 2026-03-09 (Phase 4: multi-level logging + audio thread fix + slider CSS fix. Needs rebuild.)
-**Status:** Active - Phase 4 bridge verified working. Multi-level logging system added (trace/debug/info files). Audio thread safety fix applied. Needs rebuild + final verification.
+**Last Updated:** 2026-03-09 (Phase 4 COMPLETE. Starting Phase 5: First Sound.)
+**Status:** Active — Phase 4 fully verified. Bridge, logging, slider all working. Next: Phase 5 (oscillator + MIDI).
 
 ---
 
@@ -24,7 +24,7 @@ A free, open-source polyphonic soft synthesizer. Being built by Anshul (backend/
 - GitHub repo: **`AnshulJ999/Solace-Synth`** (created, owned by Anshul)
 - Local path: `G:\GitHub\Solace-Synth`
 - Project memory: `.agent/synth-project-memory.md` (hardlinked to `G:\GitHub\Personal-Stuff\Synth-Project\synth-project-memory.md`)
-- Repo status: Phase 4.1 debugging/logging in progress — bridge handshake verified, slider interaction still under investigation
+- Repo status: Phase 5 in progress — Phase 4 (WebView + bridge) fully verified and complete
 - The "SS" monogram logo from the original mockup works well with Solace Synth initials
 
 ---
@@ -311,14 +311,14 @@ An AI-first "vibe-coding" framework for building JUCE plugins. Provides structur
 - **Log files (multi-level):** `%TEMP%\SolaceSynth\`
   - `info.log` — INFO + WARN + ERROR (clean lifecycle view)
   - `debug.log` — DEBUG + INFO + WARN + ERROR (bridge calls)
-  - `trace.log` — everything including per-slider-move detail
+  - `trace.log` — everything from C++ side only (JS TRACE stays in UI panel, not forwarded)
 - **JS debug panel:** Visible in UI, shows all levels with color coding
   - Grey=TRACE, Blue=DEBUG, Green=INFO, Orange=WARN, Red=ERROR
-  - TRACE stays in panel only (not forwarded to C++ files)
-  - INFO+ forwarded to C++ files via bridge
+  - JS TRACE/DEBUG: panel only. JS INFO+: forwarded to C++ files via bridge.
 - **Audio thread safety:** No logging or I/O on audio thread. `parameterChanged()` bounces everything to message thread via `callAsync`.
-- **Logger class:** `Source/SolaceLogger.h` - custom `juce::Logger` subclass with 3 `FileLogger` instances
+- **Logger class:** `Source/SolaceLogger.h` — custom `juce::Logger` subclass with 3 `FileLogger` instances
 - **Usage:** `SolaceLog::trace()`, `SolaceLog::debug()`, `SolaceLog::info()`, `SolaceLog::warn()`, `SolaceLog::error()`
+- **Pre-release TODO:** Wrap all `SolaceLog::` calls in `#ifdef SOLACE_LOGGING_ENABLED` or `JUCE_DEBUG` guard before shipping. Logging is dev-only infrastructure.
 - **COPY_PLUGIN_AFTER_BUILD:** FALSE (requires admin for C:\Program Files\Common Files\VST3)
 - **Known Issue:** Em dash (—) doesn't render in JUCE's default font — use plain dashes in JUCE text
 - **Initialization Plan:** `.agent/plans/Solace Synth — Initialization Plan.md`
@@ -370,20 +370,25 @@ An AI-first "vibe-coding" framework for building JUCE plugins. Provides structur
        - **Fix:** rewrote bridge.js to use correct `__juce__invoke` event pattern
        - Also added try/catch in main.js init to surface errors in status bar
   - **Production note:** UI files served from disk via `SOLACE_DEV_UI_PATH`. For release, must embed via `juce_add_binary_data()`
-  - **Status: bridge handshake verified. All logged issues fixed. Needs rebuild for final verification.**
-  - **Latest changes (not yet rebuilt):**
-    - Replaced vertical slider (writing-mode CSS hack) with standard horizontal slider
-    - Added visible debug log panel in UI with log levels and color coding
-    - Multi-level logging: SolaceLogger with 3 files (trace/debug/info) in %TEMP%/SolaceSynth/
-    - Fixed audio thread real-time safety: moved Logger call out of `parameterChanged()` into `callAsync` lambda
-    - JS log levels: TRACE stays in panel only, INFO+ forwarded to C++ files
-    - `SolaceLog::trace/debug/info/warn/error` convenience functions across codebase
-  - **Future concern (pre-release):** FileLogger uses `setCurrentLogger()` globally — if two plugin instances are open simultaneously, second instance overwrites first's logger pointer. Not a concern for solo dev testing.
+- [x] **Phase 4: WebView Integration** — COMPLETE (2026-03-09)
+  - WebBrowserComponent with ResourceProvider, WebView2 backend
+  - C++↔JS bridge: setParameter/uiReady/log (JS→C++) + parameterChanged/syncAllParameters (C++→JS)
+  - UI/index.html with masterVolume slider, bridge.js, main.js, styles.css
+  - Full bug history documented above (9 bugs fixed)
+  - Multi-level logging: SolaceLogger (trace/debug/info files)
+  - Audio thread safety verified (no disk I/O on audio thread)
+  - **Verified in trace.log:** round-trip values 0.08, 0.30, 0.44, 0.64, 0.78 all correct
+  - **Production note:** UI files served from disk via `SOLACE_DEV_UI_PATH`. For release, must embed via `juce_add_binary_data()`
 
 ### Next Up
-- [ ] Rebuild and verify Phase 4 (slider works + logs visible)
-- [ ] Phase 5: First Sound (single oscillator responds to MIDI)
+- [ ] **Phase 5: First Sound** — `juce::Synthesiser` + `SolaceVoice` + `SolaceSound`, wire MIDI in processBlock
 - [ ] GitHub Actions CI + pluginval (automated testing)
+
+### Pre-Release Backlog (do before shipping)
+- [ ] Conditional logging guard (`SOLACE_LOGGING_ENABLED` or `JUCE_DEBUG`)
+- [ ] Multi-instance logger safety (currently global `setCurrentLogger`)
+- [ ] Embed UI files via `juce_add_binary_data()` instead of disk path
+- [ ] Full Figma UI implementation
 
 ### Pending — Spec Gaps (need decisions before DSP implementation)
 - [ ] **Define full LFO target list** and velocity mod target list

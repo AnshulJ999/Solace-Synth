@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solace Synth</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app">
+        <!-- Header -->
+        <header class="header">
+            <h1 class="logo">Solace Synth</h1>
+            <span class="version">v0.1.0</span>
+        </header>
+
+        <!-- Master Volume Control — Phase 4 test parameter -->
+        <section class="panel" id="master-panel">
+            <h2 class="panel-title">Master</h2>
+            <div class="slider-group">
+                <label class="slider-label" for="masterVolume">Level</label>
+                <div class="slider-container">
+                    <input type="range"
+                           id="masterVolume"
+                           class="vertical-slider"
+                           min="0"
+                           max="1"
+                           step="0.01"
+                           value="0.8"
+                           orient="vertical">
+                    <div class="slider-value" id="masterVolume-value">0.80</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Status bar -->
+        <footer class="status-bar">
+            <span id="status-text">Connecting to engine...</span>
+        </footer>
+    </div>
+
+    <script src="bridge.js"></script>
+    <script src="main.js"></script>
+</body>
+</html>

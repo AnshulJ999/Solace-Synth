@@ -332,7 +332,7 @@ An AI-first "vibe-coding" framework for building JUCE plugins. Provides structur
 - [x] JUCE inclusion method confirmed: **CMake FetchContent** (not submodule)
 - [x] JUCE licensing confirmed: **Starter (free commercial)** — NOT AGPLv3
 - [x] CMakeLists.txt strategy confirmed: **based on pamplejuce patterns** (not a repo clone)
-- [x] Neural DSP UI research completed — confirmed they use JUCE + custom OpenGL. WebView is the right choice for our team.
+- [x] Neural DSP UI research completed — believed to use JUCE + custom OpenGL rendering. WebView is the right choice for our team.
 - [x] Initialization plan approved — 5-phase approach (scaffolding → JUCE setup → Hello World → WebView → First Sound)
 - [x] **Phase 0: Dev environment** — VS2026 + CMake 4.2.3 installed and verified
 - [x] **Phase 1: Repo scaffolding** — .gitignore, README.md created

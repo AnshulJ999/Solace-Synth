@@ -1,8 +1,8 @@
 # Solace Synth — Project Memory
 
 **Created:** 2026-03-08
-**Last Updated:** 2026-03-09
-**Status:** Active — Initialization plan approved, dev environment setup in progress
+**Last Updated:** 2026-03-09 (Phase 3 Hello World build successful)
+**Status:** Active — Phase 3 Hello World complete (VST3 + Standalone build and run). Next: Phase 4 WebView.
 
 ---
 
@@ -290,7 +290,26 @@ An AI-first "vibe-coding" framework for building JUCE plugins. Provides structur
 | GPL-3.0 | Helm, Surge XT, Vital, OB-Xd | Fine if our synth is also open-source |
 | AGPLv3 | JUCE 8 (open-source tier) | Fine for open-source projects |
 
-**Decision:** License is not a constraint. Plan is to open-source — GPL-3.0 is fine. MIT sources preferred for templates/references.
+**Decision:** Using JUCE Starter (free commercial license) — project can use any license. License choice deferred until repo goes public.
+
+---
+
+## 🏗️ Build System Details
+
+- **Dev Environment:** Windows 11, Visual Studio 2026 (MSVC 19.50), CMake 4.2.3, Git
+- **CMake Generator:** Visual Studio 18 2026 (auto-detected)
+- **JUCE Version:** 8.0.4 (via FetchContent)
+- **Build Outputs:**
+  - VST3: `build/SolaceSynth_artefacts/Release/VST3/Solace Synth.vst3`
+  - Standalone: `build/SolaceSynth_artefacts/Release/Standalone/Solace Synth.exe`
+- **Build Commands:**
+  ```
+  cmake -B build
+  cmake --build build --config Release
+  ```
+- **COPY_PLUGIN_AFTER_BUILD:** FALSE (requires admin for C:\Program Files\Common Files\VST3)
+- **Known Issue:** Em dash (—) doesn't render in JUCE's default font — use plain dashes in JUCE text
+- **Initialization Plan:** `.agent/plans/Solace Synth — Initialization Plan.md`
 
 ---
 
@@ -315,14 +334,12 @@ An AI-first "vibe-coding" framework for building JUCE plugins. Provides structur
 - [x] CMakeLists.txt strategy confirmed: **based on pamplejuce patterns** (not a repo clone)
 - [x] Neural DSP UI research completed — confirmed they use JUCE + custom OpenGL. WebView is the right choice for our team.
 - [x] Initialization plan approved — 5-phase approach (scaffolding → JUCE setup → Hello World → WebView → First Sound)
+- [x] **Phase 0: Dev environment** — VS2026 + CMake 4.2.3 installed and verified
+- [x] **Phase 1: Repo scaffolding** — .gitignore, README.md created
+- [x] **Phase 2: JUCE project setup** — CMakeLists.txt (FetchContent), PluginProcessor (with APVTS), PluginEditor (placeholder)
+- [x] **Phase 3: Hello World** — VST3 + Standalone build and run successfully (2026-03-09)
 
-### In Progress
-- [/] **Dev environment setup** — Installing VS2026 + CMake 4.2.3 (user action)
-
-### Pending — Repo Initialization
-- [ ] Phase 1: Repo scaffolding (.gitignore, README, folder structure)
-- [ ] Phase 2: JUCE project setup (CMakeLists.txt, PluginProcessor, PluginEditor)
-- [ ] Phase 3: Hello World VST3 (empty plugin compiles and loads)
+### Next Up
 - [ ] Phase 4: WebView Hello World (JUCE loads HTML in plugin window, C++↔JS bridge works)
 - [ ] Phase 5: First Sound (single oscillator responds to MIDI)
 - [ ] GitHub Actions CI + pluginval (automated testing)

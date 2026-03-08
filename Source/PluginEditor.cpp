@@ -7,7 +7,7 @@ SolaceSynthEditor::SolaceSynthEditor (SolaceSynthProcessor& p)
     : AudioProcessorEditor (&p), processorRef (p)
 {
     // Title label — placeholder UI for Phase 3
-    titleLabel.setText ("Solace Synth — WebView UI coming soon",
+    titleLabel.setText ("Solace Synth - WebView UI coming soon",
                         juce::dontSendNotification);
     titleLabel.setFont (juce::FontOptions (24.0f));
     titleLabel.setJustificationType (juce::Justification::centred);

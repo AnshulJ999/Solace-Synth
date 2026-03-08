@@ -1,8 +1,8 @@
 # Solace Synth — Project Memory
 
 **Created:** 2026-03-08
-**Last Updated:** 2026-03-09 (Phase 4 WebView bridge implemented + 5 fixes applied)
-**Status:** Active — Phase 4 code complete, awaiting rebuild verification. Next: rebuild + verify, then Phase 5 First Sound.
+**Last Updated:** 2026-03-09 (Phase 4 JS bridge fix applied — awaiting re-test)
+**Status:** Active — Phase 4 builds, WebView renders, JS bridge API mismatch fixed. Awaiting relaunch verification. Next: Phase 5 First Sound.
 
 ---
 
@@ -24,7 +24,7 @@ A free, open-source polyphonic soft synthesizer. Being built by Anshul (backend/
 - GitHub repo: **`AnshulJ999/Solace-Synth`** (created, owned by Anshul)
 - Local path: `G:\GitHub\Solace-Synth`
 - Project memory: `.agent/synth-project-memory.md` (hardlinked to `G:\GitHub\Personal-Stuff\Synth-Project\synth-project-memory.md`)
-- Repo status: Initialization plan approved — scaffolding and JUCE setup pending dev environment
+- Repo status: Phase 4 (WebView integration) in progress — build verified, JS bridge fix pending re-test
 - The "SS" monogram logo from the original mockup works well with Solace Synth initials
 
 ---
@@ -221,10 +221,11 @@ CMake (not Projucer — CMake is the modern JUCE 7+ standard)
 
 ### Dev Environment
 - Windows 11
-- Visual Studio 2026 (or 2022) with "Desktop development with C++" workload
-- CMake 4.2.3 (latest stable)
+- Visual Studio 2026 with "Desktop development with C++" workload — installed and verified
+- CMake 4.2.3 (latest stable) — installed and verified
 - Git (already installed)
-- **Status: Installation in progress**
+- WebView2 NuGet package 1.0.1901.177 — installed via PowerShell (required for JUCE WebView2 support)
+- **Status: Fully operational**
 
 ### Key References / Learning Resources
 - **[synth-plugin-book](https://github.com/hollance/synth-plugin-book)** — MIT, 206⭐ — companion code for "Code Your Own Synth Plug-Ins With C++ and JUCE" — closest match to our synth type
@@ -338,17 +339,30 @@ An AI-first "vibe-coding" framework for building JUCE plugins. Provides structur
 - [x] **Phase 1: Repo scaffolding** — .gitignore, README.md created
 - [x] **Phase 2: JUCE project setup** — CMakeLists.txt (FetchContent), PluginProcessor (with APVTS), PluginEditor (placeholder)
 - [x] **Phase 3: Hello World** — VST3 + Standalone build and run successfully (2026-03-09)
-- [x] **Phase 4: WebView Integration** — implemented (2026-03-09)
+- [/] **Phase 4: WebView Integration** — in progress (2026-03-09)
   - WebBrowserComponent with ResourceProvider, WebView2 backend
   - C++↔JS bridge: setParameter/uiReady/log (JS→C++) + parameterChanged/syncAllParameters (C++→JS)
   - UI/index.html with masterVolume slider, bridge.js, main.js, styles.css
-  - First draft had build break (`NEEDS_WEBVIEW2` missing) + 4 code quality issues
-  - All 5 fixes applied: NEEDS_WEBVIEW2, SOLACE_DEV_UI_PATH, SafePointer, visibilityChanged resync, DBG braces
-  - **Production note:** UI files served from disk via SOLACE_DEV_UI_PATH. For release, must embed via `juce_add_binary_data()`
-  - **Status: awaiting rebuild verification**
+  - **Bug history (all fixed):**
+    1. Build break: `NEEDS_WEBVIEW2 TRUE` missing in CMakeLists.txt → added
+    2. WebView2 NuGet package not installed → installed via PowerShell
+    3. `JUCE_USE_WIN_WEBVIEW2=1` compile definition missing → added
+    4. Asset loading: exe-relative `UI/` lookup fails in VST3 hosts → replaced with `SOLACE_DEV_UI_PATH` compile-time path
+    5. Use-after-free: raw `this` in `callAsync` → replaced with `SafePointer`
+    6. Visibility drift: events dropped when editor hidden → added `visibilityChanged()` resync
+    7. C4390 warning: `DBG` macro on single-line `if` → added braces
+    8. Heap alloc: unnecessary `new` for paramsArray → stack-allocated
+    9. **JS bridge API mismatch (root cause of "Connecting to engine..." stuck):**
+       - bridge.js called `window.__JUCE__.backend.getNativeFunction()` which doesn't exist
+       - JUCE 8's low-level backend only exposes `emitEvent`/`addEventListener`
+       - `getNativeFunction` is in JUCE's ES module index.js, not on the backend object
+       - **Fix:** rewrote bridge.js to use correct `__juce__invoke` event pattern
+       - Also added try/catch in main.js init to surface errors in status bar
+  - **Production note:** UI files served from disk via `SOLACE_DEV_UI_PATH`. For release, must embed via `juce_add_binary_data()`
+  - **Status: JS bridge fix applied, awaiting relaunch verification (no rebuild needed — only JS files changed)**
 
 ### Next Up
-- [ ] Rebuild and verify Phase 4 (standalone + optionally VST3 host)
+- [ ] Relaunch standalone EXE to verify Phase 4 JS bridge fix
 - [ ] Phase 5: First Sound (single oscillator responds to MIDI)
 - [ ] GitHub Actions CI + pluginval (automated testing)
 

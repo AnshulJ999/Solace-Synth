@@ -1,7 +1,7 @@
 /* ============================================================================
  * Solace Synth - Main UI Logic
  *
- * This file handles:
+ * Handles:
  *   - Initializing the bridge
  *   - Binding UI controls to the bridge
  *   - Updating the UI when parameters change from C++ (automation/presets)
@@ -68,29 +68,35 @@
     }
 
     // ========================================================================
-    // Initialize
+    // Initialize — with proper error handling so failures are visible
     // ========================================================================
     async function init() {
-        // Initialize the bridge
-        const bridgeOk = SolaceBridge.init();
+        try {
+            // Initialize the bridge
+            const bridgeOk = SolaceBridge.init();
 
-        if (!bridgeOk) {
-            setStatus("Running in browser preview mode (no C++ backend)");
-            bindControls(); // Still bind for standalone testing
-            return;
-        }
+            if (!bridgeOk) {
+                setStatus("Running in browser preview mode (no C++ backend)");
+                bindControls(); // Still bind for standalone testing
+                return;
+            }
 
-        // Bind UI controls to parameters
-        bindControls();
+            // Bind UI controls to parameters
+            bindControls();
 
-        // Signal to C++ that we're ready (triggers parameter sync)
-        const ready = await SolaceBridge.signalUiReady();
+            // Signal to C++ that we're ready (triggers parameter sync)
+            const ready = await SolaceBridge.signalUiReady();
 
-        if (ready) {
-            setStatus("Connected to Solace Synth engine");
-            SolaceBridge.log("UI initialization complete");
-        } else {
-            setStatus("Failed to connect to engine");
+            if (ready) {
+                setStatus("Connected to Solace Synth engine");
+                SolaceBridge.log("UI initialization complete");
+            } else {
+                setStatus("Bridge connected but uiReady failed");
+            }
+        } catch (error) {
+            // Make errors visible instead of silently dying
+            console.error("[Solace Synth] Init error:", error);
+            setStatus("Error: " + error.message);
         }
     }
 

@@ -1,8 +1,8 @@
 # Solace Synth — Project Memory
 
 **Created:** 2026-03-08
-**Last Updated:** 2026-03-09 (Phase 4 JS bridge fix applied — awaiting re-test)
-**Status:** Active — Phase 4 builds, WebView renders, JS bridge API mismatch fixed. Awaiting relaunch verification. Next: Phase 5 First Sound.
+**Last Updated:** 2026-03-09 (Phase 4: bridge verified, slider fix + logging added, needs rebuild)
+**Status:** Active - Phase 4 bridge handshake verified. Slider CSS fix + FileLogger + debug panel added. Needs rebuild + retest.
 
 ---
 
@@ -308,6 +308,8 @@ An AI-first "vibe-coding" framework for building JUCE plugins. Provides structur
   cmake -B build
   cmake --build build --config Release
   ```
+- **Log file:** `%TEMP%\SolaceSynth\SolaceSynth.log` (FileLogger, works in both Debug and Release)
+- **JS debug panel:** Visible in the UI, shows timestamped bridge messages
 - **COPY_PLUGIN_AFTER_BUILD:** FALSE (requires admin for C:\Program Files\Common Files\VST3)
 - **Known Issue:** Em dash (—) doesn't render in JUCE's default font — use plain dashes in JUCE text
 - **Initialization Plan:** `.agent/plans/Solace Synth — Initialization Plan.md`
@@ -359,10 +361,16 @@ An AI-first "vibe-coding" framework for building JUCE plugins. Provides structur
        - **Fix:** rewrote bridge.js to use correct `__juce__invoke` event pattern
        - Also added try/catch in main.js init to surface errors in status bar
   - **Production note:** UI files served from disk via `SOLACE_DEV_UI_PATH`. For release, must embed via `juce_add_binary_data()`
-  - **Status: JS bridge fix applied, awaiting relaunch verification (no rebuild needed — only JS files changed)**
+  - **Status: bridge handshake verified. Slider CSS fixed (horizontal). Logging added. Needs rebuild.**
+  - **Latest changes (not yet rebuilt):**
+    - Replaced vertical slider (writing-mode CSS hack) with standard horizontal slider
+    - Added visible debug log panel in UI (shows timestamped bridge messages)
+    - Added FileLogger to PluginProcessor (writes to %TEMP%/SolaceSynth/SolaceSynth.log)
+    - Added Logger::writeToLog calls to all bridge handlers in PluginEditor.cpp
+    - JS main.js has full diagnostic logging at every boundary
 
 ### Next Up
-- [ ] Relaunch standalone EXE to verify Phase 4 JS bridge fix
+- [ ] Rebuild and verify Phase 4 (slider works + logs visible)
 - [ ] Phase 5: First Sound (single oscillator responds to MIDI)
 - [ ] GitHub Actions CI + pluginval (automated testing)
 

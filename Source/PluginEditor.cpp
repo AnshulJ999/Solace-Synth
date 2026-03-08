@@ -215,22 +215,23 @@ void SolaceSynthEditor::handleSetParameter (
         auto* param = processorRef.getAPVTS().getParameter (paramId);
         if (param != nullptr)
         {
-            // setValueNotifyingHost expects normalized 0-1 range
-            // convertTo0to1 converts from the parameter's natural range
-            param->setValueNotifyingHost (
-                param->convertTo0to1 (value));
+            auto normalized = param->convertTo0to1 (value);
+            juce::Logger::writeToLog ("[Bridge JS->C++] setParameter: " + paramId
+                + " rawValue=" + juce::String (value, 4)
+                + " normalized=" + juce::String (normalized, 4));
 
+            param->setValueNotifyingHost (normalized);
             completion (juce::var (true));
         }
         else
         {
-            DBG ("Solace Synth: Unknown parameter: " + paramId);
+            juce::Logger::writeToLog ("[Bridge JS->C++] setParameter: UNKNOWN param '" + paramId + "'");
             completion (juce::var (false));
         }
     }
     else
     {
-        DBG ("Solace Synth: setParameter requires 2 args (paramId, value)");
+        juce::Logger::writeToLog ("[Bridge JS->C++] setParameter: wrong arg count (" + juce::String (args.size()) + ")");
         completion (juce::var (false));
     }
 }
@@ -240,7 +241,7 @@ void SolaceSynthEditor::handleUiReady (
     const juce::Array<juce::var>& /*args*/,
     juce::WebBrowserComponent::NativeFunctionCompletion completion)
 {
-    DBG ("Solace Synth: UI is ready");
+    juce::Logger::writeToLog ("[Bridge JS->C++] uiReady received");
     webViewReady = true;
 
     // Hide fallback, show WebView
@@ -249,6 +250,7 @@ void SolaceSynthEditor::handleUiReady (
     // Send the current state of all parameters to JS
     sendAllParametersToJS();
 
+    juce::Logger::writeToLog ("[Bridge JS->C++] uiReady complete - parameters synced");
     completion (juce::var (true));
 }
 
@@ -259,7 +261,7 @@ void SolaceSynthEditor::handleLog (
 {
     if (! args.isEmpty())
     {
-        DBG ("Solace Synth [JS]: " + args[0].toString());
+        juce::Logger::writeToLog ("[JS] " + args[0].toString());
     }
 
     completion (juce::var (true));
@@ -275,7 +277,9 @@ void SolaceSynthEditor::sendParameterToJS (const juce::String& paramId, float va
     if (webView == nullptr || ! webViewReady)
         return;
 
-    // Create a JSON object: { paramId: "masterVolume", value: 0.8 }
+    juce::Logger::writeToLog ("[Bridge C++->JS] parameterChanged: " + paramId
+        + " value=" + juce::String (value, 4));
+
     auto* obj = new juce::DynamicObject();
     obj->setProperty ("paramId", paramId);
     obj->setProperty ("value", value);
@@ -327,6 +331,10 @@ void SolaceSynthEditor::parameterChanged (const juce::String& parameterID, float
     // This is called from the audio thread - we must bounce to the message thread.
     // Use SafePointer to guard against use-after-free if the editor is destroyed
     // before the async lambda runs.
+    juce::Logger::writeToLog ("[APVTS] parameterChanged: " + parameterID
+        + " newValue=" + juce::String (newValue, 4)
+        + " (from audio thread, will async to message thread)");
+
     auto safeThis = juce::Component::SafePointer<SolaceSynthEditor> (this);
 
     juce::MessageManager::callAsync ([safeThis, parameterID, newValue]()

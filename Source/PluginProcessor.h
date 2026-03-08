@@ -58,6 +58,9 @@ private:
     // Parameter tree — defines all automatable parameters
     juce::AudioProcessorValueTreeState apvts;
 
+    // File-based logger — output goes to %TEMP%/SolaceSynth/SolaceSynth.log
+    std::unique_ptr<juce::FileLogger> fileLogger;
+
     // Creates the parameter layout (called once in constructor)
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 

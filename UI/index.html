@@ -14,23 +14,30 @@
             <span class="version">v0.1.0</span>
         </header>
 
-        <!-- Master Volume Control — Phase 4 test parameter -->
+        <!-- Master Volume Control - Phase 4 test parameter -->
         <section class="panel" id="master-panel">
             <h2 class="panel-title">Master</h2>
             <div class="slider-group">
                 <label class="slider-label" for="masterVolume">Level</label>
-                <div class="slider-container">
+                <div class="slider-container-horizontal">
+                    <span class="slider-value-side">0</span>
                     <input type="range"
                            id="masterVolume"
-                           class="vertical-slider"
+                           class="horizontal-slider"
                            min="0"
                            max="1"
                            step="0.01"
-                           value="0.8"
-                           orient="vertical">
-                    <div class="slider-value" id="masterVolume-value">0.80</div>
+                           value="0.8">
+                    <span class="slider-value-side">1</span>
                 </div>
+                <div class="slider-value" id="masterVolume-value">0.80</div>
             </div>
+        </section>
+
+        <!-- Debug log panel - shows last few bridge messages -->
+        <section class="panel" id="debug-panel">
+            <h2 class="panel-title">Bridge Log</h2>
+            <div id="debug-log" class="debug-log"></div>
         </section>
 
         <!-- Status bar -->

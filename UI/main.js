@@ -4,8 +4,15 @@
  * Handles:
  *   - Initializing the bridge
  *   - Binding UI controls to the bridge
- *   - Diagnostic logging (visible in the debug panel)
+ *   - Diagnostic logging with levels (TRACE, DEBUG, INFO, WARN, ERROR)
  *   - Updating the UI when parameters change from C++ (automation/presets)
+ *
+ * Log levels:
+ *   TRACE — every slider move, every event (UI panel only, NOT sent to C++)
+ *   DEBUG — bridge calls, parameter changes (UI panel + C++ file)
+ *   INFO  — lifecycle events (UI panel + C++ file)
+ *   WARN  — suspicious but non-fatal (UI panel + C++ file)
+ *   ERROR — something broke (UI panel + C++ file)
  *
  * IMPORTANT: The UI only reflects and requests state changes.
  * C++ APVTS is always the source of truth.
@@ -26,90 +33,104 @@
     // Track if we're currently receiving a C++ update (to avoid echo loops)
     let isUpdatingFromCpp = false;
 
-    // Max log entries to keep
-    const MAX_LOG_ENTRIES = 50;
+    // Max log entries to keep in the UI panel
+    const MAX_LOG_ENTRIES = 80;
+
+    // Log levels
+    const LOG_LEVEL = {
+        TRACE: 0,
+        DEBUG: 1,
+        INFO:  2,
+        WARN:  3,
+        ERROR: 4
+    };
 
     // ========================================================================
-    // Debug logging - visible in the UI debug panel
+    // Logging system — visible panel + optional C++ forwarding
     // ========================================================================
-    function logDebug(message, source) {
+    function log(level, message) {
         if (!debugLog) return;
 
-        const entry = document.createElement("div");
-        entry.className = "log-entry " + (source || "");
-        const timestamp = new Date().toLocaleTimeString("en-US", {
+        var levelName = "TRACE";
+        var cssClass = "";
+        switch (level) {
+            case LOG_LEVEL.TRACE: levelName = "TRACE"; cssClass = "from-trace"; break;
+            case LOG_LEVEL.DEBUG: levelName = "DEBUG"; cssClass = "from-js";    break;
+            case LOG_LEVEL.INFO:  levelName = "INFO";  cssClass = "from-cpp";   break;
+            case LOG_LEVEL.WARN:  levelName = "WARN";  cssClass = "from-warn";  break;
+            case LOG_LEVEL.ERROR: levelName = "ERROR"; cssClass = "error";      break;
+        }
+
+        var entry = document.createElement("div");
+        entry.className = "log-entry " + cssClass;
+        var timestamp = new Date().toLocaleTimeString("en-US", {
             hour12: false,
             hour: "2-digit",
             minute: "2-digit",
             second: "2-digit",
             fractionalSecondDigits: 3
         });
-        entry.textContent = "[" + timestamp + "] " + message;
+        entry.textContent = "[" + timestamp + "] [" + levelName + "] " + message;
 
         debugLog.appendChild(entry);
 
-        // Keep only the last N entries
+        // Keep panel at a reasonable size
         while (debugLog.children.length > MAX_LOG_ENTRIES) {
             debugLog.removeChild(debugLog.firstChild);
         }
 
-        // Auto-scroll to bottom
+        // Auto-scroll
         debugLog.scrollTop = debugLog.scrollHeight;
 
-        // Also forward to C++ logs via bridge
-        if (SolaceBridge.isJuceAvailable()) {
-            SolaceBridge.log(message);
+        // Forward INFO+ to C++ logs (TRACE/DEBUG stay in panel only to avoid noise)
+        if (level >= LOG_LEVEL.INFO && SolaceBridge.isJuceAvailable()) {
+            SolaceBridge.log("[" + levelName + "] " + message);
         }
     }
+
+    // Convenience wrappers
+    function logTrace(msg) { log(LOG_LEVEL.TRACE, msg); }
+    function logDebug(msg) { log(LOG_LEVEL.DEBUG, msg); }
+    function logInfo(msg)  { log(LOG_LEVEL.INFO,  msg); }
+    function logWarn(msg)  { log(LOG_LEVEL.WARN,  msg); }
+    function logError(msg) { log(LOG_LEVEL.ERROR, msg); }
 
     // ========================================================================
     // Bind UI controls to the bridge
     // ========================================================================
     function bindControls() {
         if (!masterSlider) {
-            logDebug("ERROR: masterVolume slider not found!", "error");
+            logError("masterVolume slider element not found in DOM!");
             return;
         }
 
         // When user moves the slider -> send to C++
-        masterSlider.addEventListener("input", (e) => {
-            if (isUpdatingFromCpp) {
-                logDebug("BLOCKED: input event while isUpdatingFromCpp=true", "from-js");
-                return;
-            }
+        masterSlider.addEventListener("input", function(e) {
+            if (isUpdatingFromCpp) return;
 
-            const value = parseFloat(e.target.value);
-            logDebug("JS input event: value=" + value.toFixed(4), "from-js");
+            var value = parseFloat(e.target.value);
+            logTrace("Slider input: value=" + value.toFixed(4));
             updateValueDisplay("masterVolume", value);
             SolaceBridge.setParameter("masterVolume", value);
         });
 
-        // When user starts dragging the slider
-        masterSlider.addEventListener("mousedown", () => {
-            logDebug("JS mousedown on slider", "from-js");
-        });
-
-        masterSlider.addEventListener("mouseup", () => {
-            logDebug("JS mouseup on slider", "from-js");
-        });
-
         // Listen for C++ parameter changes -> update slider
-        SolaceBridge.onParameterChanged("masterVolume", (value) => {
-            logDebug("C++ -> JS: masterVolume = " + value.toFixed(4), "from-cpp");
+        SolaceBridge.onParameterChanged("masterVolume", function(value) {
+            logTrace("C++ -> JS: masterVolume = " + value.toFixed(4));
             isUpdatingFromCpp = true;
             masterSlider.value = value;
             updateValueDisplay("masterVolume", value);
             isUpdatingFromCpp = false;
         });
 
-        logDebug("Controls bound", "from-js");
+        logDebug("Controls bound to bridge");
     }
 
     // ========================================================================
     // Update the value display text for a parameter
     // ========================================================================
     function updateValueDisplay(paramId, value) {
-        const display = document.getElementById(paramId + "-value");
+        var display = document.getElementById(paramId + "-value");
         if (display) {
             display.textContent = value.toFixed(2);
         }
@@ -128,11 +149,11 @@
     // Initialize - with proper error handling
     // ========================================================================
     async function init() {
-        logDebug("=== Solace Synth UI Init ===", "from-js");
+        logInfo("=== Solace Synth UI Init ===");
 
         try {
-            const bridgeOk = SolaceBridge.init();
-            logDebug("Bridge init: " + (bridgeOk ? "OK" : "NO BACKEND"), "from-js");
+            var bridgeOk = SolaceBridge.init();
+            logInfo("Bridge init: " + (bridgeOk ? "OK (JUCE backend detected)" : "No backend (browser preview)"));
 
             if (!bridgeOk) {
                 setStatus("Running in browser preview mode (no C++ backend)");
@@ -144,20 +165,20 @@
             bindControls();
 
             // Signal to C++ that we're ready (triggers parameter sync)
-            logDebug("Calling uiReady...", "from-js");
-            const ready = await SolaceBridge.signalUiReady();
-            logDebug("uiReady result: " + ready, "from-js");
+            logInfo("Sending uiReady signal...");
+            var ready = await SolaceBridge.signalUiReady();
+            logInfo("uiReady response: " + ready);
 
             if (ready) {
                 setStatus("Connected to Solace Synth engine");
-                logDebug("Bridge handshake complete!", "from-js");
+                logInfo("Phase 4 bridge handshake complete!");
             } else {
                 setStatus("Bridge connected but uiReady returned false");
-                logDebug("uiReady returned false", "error");
+                logWarn("uiReady returned false - check C++ logs");
             }
         } catch (error) {
             console.error("[Solace Synth] Init error:", error);
-            logDebug("INIT ERROR: " + error.message, "error");
+            logError("Init failed: " + error.message);
             setStatus("Error: " + error.message);
         }
     }

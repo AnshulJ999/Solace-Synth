@@ -184,6 +184,14 @@ html, body {
     color: #4CAF50;
 }
 
+.debug-log .log-entry.from-trace {
+    color: #9E9E9E;
+}
+
+.debug-log .log-entry.from-warn {
+    color: #FF9800;
+}
+
 .debug-log .log-entry.error {
     color: #f44336;
 }

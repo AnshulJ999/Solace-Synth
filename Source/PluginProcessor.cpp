@@ -10,22 +10,18 @@ SolaceSynthProcessor::SolaceSynthProcessor()
                         .withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
       apvts (*this, nullptr, "PARAMETERS", createParameterLayout())
 {
-    // Set up file-based logging so we can capture debug output
-    // Log file: %TEMP%/SolaceSynth/SolaceSynth.log
-    auto logFile = juce::File::getSpecialLocation (juce::File::tempDirectory)
-                       .getChildFile ("SolaceSynth")
-                       .getChildFile ("SolaceSynth.log");
+    // Set up multi-level file logging
+    // Log files: %TEMP%/SolaceSynth/ (trace.log, debug.log, info.log)
+    solaceLogger = std::make_unique<SolaceLogger>();
+    juce::Logger::setCurrentLogger (solaceLogger.get());
 
-    fileLogger = std::make_unique<juce::FileLogger> (logFile, "Solace Synth Log", 1024 * 512); // 512KB max
-    juce::Logger::setCurrentLogger (fileLogger.get());
-
-    juce::Logger::writeToLog ("=== Solace Synth started ===");
-    juce::Logger::writeToLog ("Log file: " + logFile.getFullPathName());
+    SolaceLog::info ("=== Solace Synth started ===");
+    SolaceLog::info ("Log directory: " + solaceLogger->getLogDirectory());
 }
 
 SolaceSynthProcessor::~SolaceSynthProcessor()
 {
-    juce::Logger::writeToLog ("=== Solace Synth shutting down ===");
+    SolaceLog::info ("=== Solace Synth shutting down ===");
     juce::Logger::setCurrentLogger (nullptr);
 }
 

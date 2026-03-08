@@ -2,6 +2,7 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_dsp/juce_dsp.h>
+#include "SolaceLogger.h"
 
 // ============================================================================
 // Solace Synth — Audio Processor (DSP Engine)
@@ -58,8 +59,8 @@ private:
     // Parameter tree — defines all automatable parameters
     juce::AudioProcessorValueTreeState apvts;
 
-    // File-based logger — output goes to %TEMP%/SolaceSynth/SolaceSynth.log
-    std::unique_ptr<juce::FileLogger> fileLogger;
+    // File-based logger — output goes to %TEMP%/SolaceSynth/ (trace.log, debug.log, info.log)
+    std::unique_ptr<SolaceLogger> solaceLogger;
 
     // Creates the parameter layout (called once in constructor)
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();

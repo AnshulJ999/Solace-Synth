@@ -1,8 +1,8 @@
 # Solace Synth — Project Memory
 
 **Created:** 2026-03-08
-**Last Updated:** 2026-03-09 (Phase 5: First Sound — SolaceVoice/SolaceSound/Synthesiser implemented, needs rebuild)
-**Status:** Active — Phase 4 complete. Phase 5 code written (juce::Synthesiser + SolaceVoice sine oscillator). Awaiting rebuild + MIDI test.
+**Last Updated:** 2026-03-09 (Phase 5 COMPLETE — First Sound verified working)
+**Status:** Active — Phases 0-5 complete. Working sine synth with MIDI keyboard. Next: Phase 6 (DSP — ADSR + oscillator types + filter) or UI design phase.
 
 ---
 
@@ -24,7 +24,7 @@ A free, open-source polyphonic soft synthesizer. Being built by Anshul (backend/
 - GitHub repo: **`AnshulJ999/Solace-Synth`** (created, owned by Anshul)
 - Local path: `G:\GitHub\Solace-Synth`
 - Project memory: `.agent/synth-project-memory.md` (hardlinked to `G:\GitHub\Personal-Stuff\Synth-Project\synth-project-memory.md`)
-- Repo status: Phase 5 in progress — Phase 4 (WebView + bridge) fully verified and complete
+- Repo status: **Phases 0-5 complete** — working polyphonic sine synth with WebView UI, bridge, MIDI keyboard
 - The "SS" monogram logo from the original mockup works well with Solace Synth initials
 
 ---
@@ -381,14 +381,14 @@ An AI-first "vibe-coding" framework for building JUCE plugins. Provides structur
   - **Production note:** UI files served from disk via `SOLACE_DEV_UI_PATH`. For release, must embed via `juce_add_binary_data()`
 
 ### Next Up
-- [ ] **Phase 5: First Sound** — code written, needs rebuild + MIDI test
+- [x] **Phase 5: First Sound** — COMPLETE (2026-03-09)
   - `Source/DSP/SolaceSound.h` — `SynthesiserSound` tag class (all notes/channels)
-  - `Source/DSP/SolaceVoice.h` — `SynthesiserVoice` with sine oscillator, velocity, tail-off
-  - `PluginProcessor.h` — `juce::Synthesiser synth` member added
-  - `PluginProcessor.cpp` — constructor adds 8 voices + 1 sound; `prepareToPlay` sets sample rate; `processBlock` clears buffer, calls `synth.renderNextBlock()`, applies masterVolume
-  - **Build:** `cmake --build build --config Release`
-  - **Test:** Launch standalone → open Audio/MIDI settings → press A/S/D/F keys or MIDI keyboard → should hear sine tone at correct pitch, controlled by volume slider
-  - **Verification:** `info.log` should show: started → Synthesiser ready: 8 voices → prepareToPlay sampleRate=...
+  - `Source/DSP/SolaceVoice.h` — `SynthesiserVoice` with sine oscillator, velocity scaling, exponential tail-off on release
+  - `PluginProcessor.h` — `juce::Synthesiser synth` + `juce::MidiKeyboardState keyboardState` added; `juce_audio_utils` included
+  - `PluginProcessor.cpp` — 8 SolaceVoice + 1 SolaceSound in constructor; `prepareToPlay` sets sample rate; `processBlock`: clear → `keyboardState.processNextMidiBuffer()` → `synth.renderNextBlock()` → apply masterVolume
+  - `PluginEditor.h/cpp` — `juce::MidiKeyboardComponent midiKeyboard` added as 80px strip at bottom of window; auto-grabs keyboard focus 500ms after launch
+  - **Verified:** polyphonic sine tones play correctly. Mouse click on piano strip ✅. Computer keyboard (A/S/D/F/etc.) ✅. Polyphony ✅. Volume slider controls output level ✅.
+  - **Architecture note:** MidiKeyboardState lives in Processor (audio thread access). Editor holds MidiKeyboardComponent (UI thread). Cross-thread: documented as safe by JUCE.
 - [ ] GitHub Actions CI + pluginval (automated testing)
 
 ### Pre-Release Backlog (do before shipping)

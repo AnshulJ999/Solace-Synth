@@ -5,7 +5,10 @@
 // Constructor
 // ============================================================================
 SolaceSynthEditor::SolaceSynthEditor (SolaceSynthProcessor& p)
-    : AudioProcessorEditor (&p), processorRef (p)
+    : AudioProcessorEditor (&p), processorRef (p),
+      // MidiKeyboardComponent needs the MidiKeyboardState (from Processor)
+      // and the layout orientation.
+      midiKeyboard (p.getMidiKeyboardState(), juce::MidiKeyboardComponent::horizontalKeyboard)
 {
     // --- Fallback label (shown while WebView loads or if it fails) ---
     fallbackLabel.setText ("Loading Solace Synth UI...",
@@ -43,6 +46,17 @@ SolaceSynthEditor::SolaceSynthEditor (SolaceSynthProcessor& p)
         if (auto* paramWithID = dynamic_cast<juce::AudioProcessorParameterWithID*> (param))
             apvts.addParameterListener (paramWithID->getParameterID(), this);
     }
+
+    // --- On-screen MIDI keyboard ---
+    // Scroll to show octave 3-5 (middle range) by default
+    midiKeyboard.setAvailableRange (36, 96);   // C2 to C6
+    midiKeyboard.setScrollButtonsVisible (true);
+    addAndMakeVisible (midiKeyboard);
+    // Grab keyboard focus after a short delay so the user can play immediately.
+    // We use a lambda timer so we don't block the constructor.
+    juce::Timer::callAfterDelay (500, [this]() {
+        midiKeyboard.grabKeyboardFocus();
+    });
 
     // Set window size
     setSize (900, 600);
@@ -373,6 +387,11 @@ void SolaceSynthEditor::resized()
 {
     auto bounds = getLocalBounds();
 
+    // Reserve the bottom strip for the MIDI keyboard
+    auto keyboardBounds = bounds.removeFromBottom (keyboardHeight);
+    midiKeyboard.setBounds (keyboardBounds);
+
+    // Remaining area goes to the WebView / fallback
     fallbackLabel.setBounds (bounds);
 
     if (webView != nullptr)

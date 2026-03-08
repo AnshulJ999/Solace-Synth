@@ -161,14 +161,15 @@ void SolaceSynthProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     // We must clear it first, otherwise we accumulate garbage.
     buffer.clear();
 
+    // --- Inject on-screen keyboard MIDI ---
+    // MidiKeyboardState collects note events from the MidiKeyboardComponent
+    // (UI thread). We extract them here (audio thread) and merge them with
+    // any incoming hardware MIDI — so both sources trigger the Synthesiser.
+    keyboardState.processNextMidiBuffer (midiMessages, 0, buffer.getNumSamples(), true);
+
     // --- Render all active voices ---
-    // The Synthesiser scans midiMessages for note-on/off/CC events,
-    // routes them to the correct SolaceVoice instances, and renders
-    // all active voices into the buffer for this block.
-    //
-    // The startSample=0 + numSamples=buffer.getNumSamples() tells it
-    // to process the entire block. MIDI timestamps within the block
-    // are still respected for sample-accurate note triggering.
+    // The Synthesiser scans the now-merged midiMessages buffer for events,
+    // routes them to SolaceVoice instances, and renders audio for this block.
     synth.renderNextBlock (buffer, midiMessages, 0, buffer.getNumSamples());
 
     // --- Apply master volume from APVTS ---

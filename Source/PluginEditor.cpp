@@ -12,7 +12,7 @@ SolaceSynthEditor::SolaceSynthEditor (SolaceSynthProcessor& p)
                            juce::dontSendNotification);
     fallbackLabel.setFont (juce::FontOptions (20.0f));
     fallbackLabel.setJustificationType (juce::Justification::centred);
-    fallbackLabel.setColour (juce::Label::textColourId, juce::Colours::white);
+    fallbackLabel.setColour (juce::Label::textColourId, juce::Colours::grey);
     addAndMakeVisible (fallbackLabel);
 
     // --- Create WebView with our bridge configuration ---
@@ -28,7 +28,7 @@ SolaceSynthEditor::SolaceSynthEditor (SolaceSynthProcessor& p)
     }
     else
     {
-        // WebView not supported — show fallback
+        // WebView not supported - show fallback
         fallbackLabel.setText ("WebView is not available on this system.\n"
                                "Please install Microsoft Edge WebView2 Runtime.",
                                juce::dontSendNotification);
@@ -53,7 +53,7 @@ SolaceSynthEditor::SolaceSynthEditor (SolaceSynthProcessor& p)
 // ============================================================================
 SolaceSynthEditor::~SolaceSynthEditor()
 {
-    // Remove APVTS listeners
+    // Remove APVTS listeners FIRST to prevent any new async callbacks
     auto& apvts = processorRef.getAPVTS();
     auto params = apvts.processor.getParameters();
     for (auto* param : params)
@@ -64,7 +64,7 @@ SolaceSynthEditor::~SolaceSynthEditor()
 }
 
 // ============================================================================
-// WebView Options — configures the browser and the C++ <-> JS bridge
+// WebView Options - configures the browser and the C++ <-> JS bridge
 // ============================================================================
 juce::WebBrowserComponent::Options SolaceSynthEditor::createWebViewOptions()
 {
@@ -93,7 +93,7 @@ juce::WebBrowserComponent::Options SolaceSynthEditor::createWebViewOptions()
 
         // --- Native functions (JS -> C++) ---
 
-        // setParameter(paramId, value) — JS tells C++ to change a parameter
+        // setParameter(paramId, value) - JS tells C++ to change a parameter
         .withNativeFunction ("setParameter",
             [this] (const juce::Array<juce::var>& args,
                     juce::WebBrowserComponent::NativeFunctionCompletion completion)
@@ -101,7 +101,7 @@ juce::WebBrowserComponent::Options SolaceSynthEditor::createWebViewOptions()
                 handleSetParameter (args, std::move (completion));
             })
 
-        // uiReady() — JS signals that the page has loaded and is ready
+        // uiReady() - JS signals that the page has loaded and is ready
         .withNativeFunction ("uiReady",
             [this] (const juce::Array<juce::var>& args,
                     juce::WebBrowserComponent::NativeFunctionCompletion completion)
@@ -109,7 +109,7 @@ juce::WebBrowserComponent::Options SolaceSynthEditor::createWebViewOptions()
                 handleUiReady (args, std::move (completion));
             })
 
-        // log(message) — JS can send debug messages to C++ console
+        // log(message) - JS can send debug messages to C++ console
         .withNativeFunction ("log",
             [this] (const juce::Array<juce::var>& args,
                     juce::WebBrowserComponent::NativeFunctionCompletion completion)
@@ -119,35 +119,26 @@ juce::WebBrowserComponent::Options SolaceSynthEditor::createWebViewOptions()
 }
 
 // ============================================================================
-// Resource Provider — serves UI files from the project's UI/ directory
+// Resource Provider - serves UI files
+//
+// DEV MODE:  Uses SOLACE_DEV_UI_PATH (compile-time absolute path to UI/)
+//            Works in both standalone and VST3 hosts (path doesn't depend
+//            on the running executable's location).
+//
+// PRODUCTION: Will eventually use juce_add_binary_data() to embed files.
+//             The ResourceProvider lambda stays the same, just the data
+//             source changes from disk to BinaryData::.
 // ============================================================================
 std::optional<juce::WebBrowserComponent::Resource>
 SolaceSynthEditor::resourceRequested (const juce::String& path)
 {
-    // The UI files live in UI/ relative to the executable
-    // In a dev build, the exe is deep in build/SolaceSynth_artefacts/...
-    // We walk up to find the project root containing the UI/ folder
-
-    auto exeDir = juce::File::getSpecialLocation (
-        juce::File::currentExecutableFile).getParentDirectory();
-
-    // Walk up to find UI/ directory (handles nested build output paths)
-    juce::File uiDir;
-    auto searchDir = exeDir;
-    for (int i = 0; i < 8; ++i)
-    {
-        auto candidate = searchDir.getChildFile ("UI");
-        if (candidate.isDirectory())
-        {
-            uiDir = candidate;
-            break;
-        }
-        searchDir = searchDir.getParentDirectory();
-    }
+    // Use the compile-time dev path (defined in CMakeLists.txt)
+    // This is an absolute path like "G:/GitHub/Solace-Synth/UI"
+    juce::File uiDir (SOLACE_DEV_UI_PATH);
 
     if (! uiDir.isDirectory())
     {
-        DBG ("Solace Synth: UI/ directory not found! Searched from: " + exeDir.getFullPathName());
+        DBG ("Solace Synth: UI/ directory not found at: " + uiDir.getFullPathName());
         return std::nullopt;
     }
 
@@ -181,16 +172,16 @@ SolaceSynthEditor::loadFileAsResource (const juce::File& file)
     auto ext = file.getFileExtension().toLowerCase();
     juce::String mimeType = "application/octet-stream";
 
-    if (ext == ".html") mimeType = "text/html";
-    else if (ext == ".css")  mimeType = "text/css";
-    else if (ext == ".js")   mimeType = "application/javascript";
-    else if (ext == ".json") mimeType = "application/json";
-    else if (ext == ".png")  mimeType = "image/png";
-    else if (ext == ".jpg" || ext == ".jpeg") mimeType = "image/jpeg";
-    else if (ext == ".svg")  mimeType = "image/svg+xml";
-    else if (ext == ".woff") mimeType = "font/woff";
-    else if (ext == ".woff2") mimeType = "font/woff2";
-    else if (ext == ".ttf")  mimeType = "font/ttf";
+    if      (ext == ".html")                    mimeType = "text/html";
+    else if (ext == ".css")                     mimeType = "text/css";
+    else if (ext == ".js")                      mimeType = "application/javascript";
+    else if (ext == ".json")                    mimeType = "application/json";
+    else if (ext == ".png")                     mimeType = "image/png";
+    else if (ext == ".jpg" || ext == ".jpeg")   mimeType = "image/jpeg";
+    else if (ext == ".svg")                     mimeType = "image/svg+xml";
+    else if (ext == ".woff")                    mimeType = "font/woff";
+    else if (ext == ".woff2")                   mimeType = "font/woff2";
+    else if (ext == ".ttf")                     mimeType = "font/ttf";
 
     // Read file contents
     juce::MemoryBlock mb;
@@ -224,9 +215,8 @@ void SolaceSynthEditor::handleSetParameter (
         auto* param = processorRef.getAPVTS().getParameter (paramId);
         if (param != nullptr)
         {
-            // setValueNotifyingHost normalizes the value to 0-1 range
-            // But our parameters are already in their natural range,
-            // so we need to convert to normalized
+            // setValueNotifyingHost expects normalized 0-1 range
+            // convertTo0to1 converts from the parameter's natural range
             param->setValueNotifyingHost (
                 param->convertTo0to1 (value));
 
@@ -268,7 +258,9 @@ void SolaceSynthEditor::handleLog (
     juce::WebBrowserComponent::NativeFunctionCompletion completion)
 {
     if (! args.isEmpty())
+    {
         DBG ("Solace Synth [JS]: " + args[0].toString());
+    }
 
     completion (juce::var (true));
 }
@@ -291,7 +283,7 @@ void SolaceSynthEditor::sendParameterToJS (const juce::String& paramId, float va
     webView->emitEventIfBrowserIsVisible ("parameterChanged", juce::var (obj));
 }
 
-// Push ALL parameter values to JS (called on uiReady and after preset load)
+// Push ALL parameter values to JS (called on uiReady, preset load, and visibility regain)
 void SolaceSynthEditor::sendAllParametersToJS()
 {
     if (webView == nullptr || ! webViewReady)
@@ -299,8 +291,8 @@ void SolaceSynthEditor::sendAllParametersToJS()
 
     auto& apvts = processorRef.getAPVTS();
 
-    // Build an array of { paramId, value } objects
-    auto* paramsArray = new juce::Array<juce::var>();
+    // Build an array of { paramId, value } objects on the stack (no heap allocation)
+    juce::Array<juce::var> paramsArray;
 
     for (auto* param : apvts.processor.getParameters())
     {
@@ -312,33 +304,54 @@ void SolaceSynthEditor::sendAllParametersToJS()
             // Get the denormalized (real-world) value
             auto* rangedParam = apvts.getParameter (paramWithID->getParameterID());
             if (rangedParam != nullptr)
+            {
                 obj->setProperty ("value", rangedParam->convertFrom0to1 (rangedParam->getValue()));
+            }
             else
+            {
                 obj->setProperty ("value", param->getValue());
+            }
 
-            paramsArray->add (juce::var (obj));
+            paramsArray.add (juce::var (obj));
         }
     }
 
-    webView->emitEventIfBrowserIsVisible ("syncAllParameters", juce::var (*paramsArray));
-
-    delete paramsArray;
+    webView->emitEventIfBrowserIsVisible ("syncAllParameters", juce::var (paramsArray));
 }
 
 // ============================================================================
-// APVTS Listener — fires when parameters change from automation/presets/host
+// APVTS Listener - fires when parameters change from automation/presets/host
 // ============================================================================
 void SolaceSynthEditor::parameterChanged (const juce::String& parameterID, float newValue)
 {
-    // This is called from the audio thread — we must bounce to the message thread
-    juce::MessageManager::callAsync ([this, parameterID, newValue]()
+    // This is called from the audio thread - we must bounce to the message thread.
+    // Use SafePointer to guard against use-after-free if the editor is destroyed
+    // before the async lambda runs.
+    auto safeThis = juce::Component::SafePointer<SolaceSynthEditor> (this);
+
+    juce::MessageManager::callAsync ([safeThis, parameterID, newValue]()
     {
-        sendParameterToJS (parameterID, newValue);
+        if (auto* self = safeThis.getComponent())
+            self->sendParameterToJS (parameterID, newValue);
     });
 }
 
 // ============================================================================
-// Paint — background behind WebView (visible during load)
+// Visibility Changed - resync parameters when editor becomes visible again
+//
+// Why: emitEventIfBrowserIsVisible() drops events when hidden, so if
+// automation/presets change parameters while the editor is hidden, the JS
+// UI misses those updates. We fix this by pushing all current values when
+// the editor becomes visible again.
+// ============================================================================
+void SolaceSynthEditor::visibilityChanged()
+{
+    if (isVisible() && webViewReady)
+        sendAllParametersToJS();
+}
+
+// ============================================================================
+// Paint - background behind WebView (visible during load)
 // ============================================================================
 void SolaceSynthEditor::paint (juce::Graphics& g)
 {
@@ -346,7 +359,7 @@ void SolaceSynthEditor::paint (juce::Graphics& g)
 }
 
 // ============================================================================
-// Resized — fill the entire window with the WebView
+// Resized - fill the entire window with the WebView
 // ============================================================================
 void SolaceSynthEditor::resized()
 {

@@ -29,6 +29,7 @@ public:
 
     void paint (juce::Graphics&) override;
     void resized() override;
+    void visibilityChanged() override;
 
 private:
     SolaceSynthProcessor& processorRef;

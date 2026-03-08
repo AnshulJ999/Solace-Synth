@@ -63,6 +63,7 @@ juce_add_plugin("${PROJECT_NAME}"
 
     # WebView support — required for our HTML/CSS/JS UI
     NEEDS_WEB_BROWSER TRUE
+    NEEDS_WEBVIEW2 TRUE       # Required for ResourceProvider + WebView2 backend on Windows
 
     PRODUCT_NAME "${PRODUCT_NAME}"
 )
@@ -92,6 +93,10 @@ target_compile_definitions("${PROJECT_NAME}"
     CMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE}"
     VERSION="${PROJECT_VERSION}"
     PRODUCT_NAME_WITHOUT_VERSION="${PROJECT_NAME}"
+
+    # Dev-only: absolute path to UI/ folder for resource serving
+    # In production, UI files will be embedded via juce_add_binary_data()
+    SOLACE_DEV_UI_PATH="${CMAKE_SOURCE_DIR}/UI"
 )
 
 # ============================================================================

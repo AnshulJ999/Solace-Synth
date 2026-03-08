@@ -1,8 +1,8 @@
 # Solace Synth — Project Memory
 
 **Created:** 2026-03-08
-**Last Updated:** 2026-03-09 (Phase 3 Hello World build successful)
-**Status:** Active — Phase 3 Hello World complete (VST3 + Standalone build and run). Next: Phase 4 WebView.
+**Last Updated:** 2026-03-09 (Phase 4 WebView bridge implemented + 5 fixes applied)
+**Status:** Active — Phase 4 code complete, awaiting rebuild verification. Next: rebuild + verify, then Phase 5 First Sound.
 
 ---
 
@@ -338,9 +338,17 @@ An AI-first "vibe-coding" framework for building JUCE plugins. Provides structur
 - [x] **Phase 1: Repo scaffolding** — .gitignore, README.md created
 - [x] **Phase 2: JUCE project setup** — CMakeLists.txt (FetchContent), PluginProcessor (with APVTS), PluginEditor (placeholder)
 - [x] **Phase 3: Hello World** — VST3 + Standalone build and run successfully (2026-03-09)
+- [x] **Phase 4: WebView Integration** — implemented (2026-03-09)
+  - WebBrowserComponent with ResourceProvider, WebView2 backend
+  - C++↔JS bridge: setParameter/uiReady/log (JS→C++) + parameterChanged/syncAllParameters (C++→JS)
+  - UI/index.html with masterVolume slider, bridge.js, main.js, styles.css
+  - First draft had build break (`NEEDS_WEBVIEW2` missing) + 4 code quality issues
+  - All 5 fixes applied: NEEDS_WEBVIEW2, SOLACE_DEV_UI_PATH, SafePointer, visibilityChanged resync, DBG braces
+  - **Production note:** UI files served from disk via SOLACE_DEV_UI_PATH. For release, must embed via `juce_add_binary_data()`
+  - **Status: awaiting rebuild verification**
 
 ### Next Up
-- [ ] Phase 4: WebView Hello World (JUCE loads HTML in plugin window, C++↔JS bridge works)
+- [ ] Rebuild and verify Phase 4 (standalone + optionally VST3 host)
 - [ ] Phase 5: First Sound (single oscillator responds to MIDI)
 - [ ] GitHub Actions CI + pluginval (automated testing)
 

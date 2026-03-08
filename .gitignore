@@ -1,41 +1,81 @@
-# Prerequisites
-*.d
+# ============================================================================
+# Solace Synth — .gitignore
+# Based on pamplejuce patterns + VS2026 + CMake + JUCE additions
+# ============================================================================
 
-# Compiled Object files
-*.slo
-*.lo
-*.o
-*.obj
+# --- CMake ---
+CMakeLists.txt.user
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps/
 
-# Precompiled Headers
-*.gch
-*.pch
+# --- Build output ---
+build/
+Builds/
+out/
+Install/
 
-# Linker files
-*.ilk
+# --- Visual Studio ---
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.vcxproj.user
+*.ncb
+*.opendb
+*.opensdf
+*.sdf
+*.VC.db
+*.VC.VC.opendb
+x64/
+x86/
+Debug/
+Release/
+RelWithDebInfo/
+MinSizeRel/
 
-# Debugger Files
-*.pdb
+# --- CLion ---
+.idea/
+cmake-build-debug/
+cmake-build-release/
+cmake-build-relwithdebinfo/
 
-# Compiled Dynamic libraries
+# --- VS Code ---
+.vscode/
+
+# --- Running CTest ---
+Testing/
+
+# --- OS files ---
+**/.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# --- JUCE build artifacts ---
+*.vst3
+*.component
+*.au
+*.aax
+
+# --- Compiled binaries ---
+*.exe
+*.dll
 *.so
 *.dylib
-*.dll
-
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
-
-# Executables
-*.exe
-*.out
 *.app
 
-# debug information files
+# --- Packaging output ---
+packaging/Output/*
+
+# --- Debug files ---
+*.pdb
+*.ilk
 *.dwo

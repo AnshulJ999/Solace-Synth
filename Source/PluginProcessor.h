@@ -3,17 +3,20 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_dsp/juce_dsp.h>
 #include "SolaceLogger.h"
+#include "DSP/SolaceVoice.h"
+#include "DSP/SolaceSound.h"
 
 // ============================================================================
 // Solace Synth — Audio Processor (DSP Engine)
 //
 // This is the heart of the plugin. It handles:
 // - Audio processing (oscillators, filters, envelopes, etc.)
-// - MIDI input
+// - MIDI input (via juce::Synthesiser — polyphonic note management)
 // - Parameter management via AudioProcessorValueTreeState
 // - State save/load for DAW recall
 //
-// Currently: skeleton that passes silence. DSP will be added in later phases.
+// Phase 5: juce::Synthesiser with SolaceVoice (sine wave) and SolaceSound
+// processes MIDI in processBlock. MIDI note-on → note plays. Note-off → tail.
 // ============================================================================
 
 class SolaceSynthProcessor : public juce::AudioProcessor
@@ -58,6 +61,12 @@ public:
 private:
     // Parameter tree — defines all automatable parameters
     juce::AudioProcessorValueTreeState apvts;
+
+    // Polyphonic synthesiser engine
+    // Manages a pool of SolaceVoice instances and routes MIDI to them.
+    // Call setCurrentPlaybackSampleRate() in prepareToPlay.
+    // Call renderNextBlock() in processBlock (after clearing the buffer).
+    juce::Synthesiser synth;
 
     // File-based logger — output goes to %TEMP%/SolaceSynth/ (trace.log, debug.log, info.log)
     std::unique_ptr<SolaceLogger> solaceLogger;

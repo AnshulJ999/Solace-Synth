@@ -1,8 +1,8 @@
 # Solace Synth — Project Memory
 
 **Created:** 2026-03-08
-**Last Updated:** 2026-03-09 (Phase 4 COMPLETE. Starting Phase 5: First Sound.)
-**Status:** Active — Phase 4 fully verified. Bridge, logging, slider all working. Next: Phase 5 (oscillator + MIDI).
+**Last Updated:** 2026-03-09 (Phase 5: First Sound — SolaceVoice/SolaceSound/Synthesiser implemented, needs rebuild)
+**Status:** Active — Phase 4 complete. Phase 5 code written (juce::Synthesiser + SolaceVoice sine oscillator). Awaiting rebuild + MIDI test.
 
 ---
 
@@ -381,7 +381,14 @@ An AI-first "vibe-coding" framework for building JUCE plugins. Provides structur
   - **Production note:** UI files served from disk via `SOLACE_DEV_UI_PATH`. For release, must embed via `juce_add_binary_data()`
 
 ### Next Up
-- [ ] **Phase 5: First Sound** — `juce::Synthesiser` + `SolaceVoice` + `SolaceSound`, wire MIDI in processBlock
+- [ ] **Phase 5: First Sound** — code written, needs rebuild + MIDI test
+  - `Source/DSP/SolaceSound.h` — `SynthesiserSound` tag class (all notes/channels)
+  - `Source/DSP/SolaceVoice.h` — `SynthesiserVoice` with sine oscillator, velocity, tail-off
+  - `PluginProcessor.h` — `juce::Synthesiser synth` member added
+  - `PluginProcessor.cpp` — constructor adds 8 voices + 1 sound; `prepareToPlay` sets sample rate; `processBlock` clears buffer, calls `synth.renderNextBlock()`, applies masterVolume
+  - **Build:** `cmake --build build --config Release`
+  - **Test:** Launch standalone → open Audio/MIDI settings → press A/S/D/F keys or MIDI keyboard → should hear sine tone at correct pitch, controlled by volume slider
+  - **Verification:** `info.log` should show: started → Synthesiser ready: 8 voices → prepareToPlay sampleRate=...
 - [ ] GitHub Actions CI + pluginval (automated testing)
 
 ### Pre-Release Backlog (do before shipping)

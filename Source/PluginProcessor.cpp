@@ -17,6 +17,20 @@ SolaceSynthProcessor::SolaceSynthProcessor()
 
     SolaceLog::info ("=== Solace Synth started ===");
     SolaceLog::info ("Log directory: " + solaceLogger->getLogDirectory());
+
+    // --- Phase 5: Polyphonic Synthesiser Setup ---
+    // Add voices. Each SolaceVoice can play one note at a time.
+    // Number of voices = maximum polyphony. 8 is a good starting point.
+    constexpr int numVoices = 8;
+    for (int i = 0; i < numVoices; ++i)
+        synth.addVoice (new SolaceVoice());
+
+    // Add our sound descriptor.
+    // SolaceSound::appliesToNote() and appliesToChannel() return true for all inputs,
+    // so any note on any channel will trigger a SolaceVoice.
+    synth.addSound (new SolaceSound());
+
+    SolaceLog::info ("Synthesiser ready: " + juce::String (numVoices) + " voices, SolaceSound");
 }
 
 SolaceSynthProcessor::~SolaceSynthProcessor()
@@ -111,13 +125,20 @@ void SolaceSynthProcessor::changeProgramName (int index, const juce::String& new
 // ============================================================================
 void SolaceSynthProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    // TODO: Initialize DSP modules here (oscillators, filters, envelopes)
-    juce::ignoreUnused (sampleRate, samplesPerBlock);
+    // The Synthesiser must know the sample rate before rendering.
+    // This converts MIDI note frequencies to the correct angleDelta per sample.
+    synth.setCurrentPlaybackSampleRate (sampleRate);
+
+    SolaceLog::info ("prepareToPlay: sampleRate=" + juce::String (sampleRate)
+        + " samplesPerBlock=" + juce::String (samplesPerBlock));
+
+    juce::ignoreUnused (samplesPerBlock);
 }
 
 void SolaceSynthProcessor::releaseResources()
 {
-    // TODO: Free DSP resources if needed
+    // The Synthesiser manages its own voice state; nothing extra to free here.
+    // Add cleanup here if future modules (reverb, filter, etc.) need it.
 }
 
 bool SolaceSynthProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
@@ -133,15 +154,29 @@ bool SolaceSynthProcessor::isBusesLayoutSupported (const BusesLayout& layouts) c
 void SolaceSynthProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                                           juce::MidiBuffer& midiMessages)
 {
-    juce::ignoreUnused (midiMessages);
     juce::ScopedNoDenormals noDenormals;
 
-    auto totalNumOutputChannels = getTotalNumOutputChannels();
+    // --- Clear output buffer ---
+    // The Synthesiser uses addSample() so it mixes INTO the buffer.
+    // We must clear it first, otherwise we accumulate garbage.
+    buffer.clear();
 
-    // Clear all channels — silence for now
-    // TODO: Replace with actual synth DSP (oscillator → filter → envelope → output)
-    for (int channel = 0; channel < totalNumOutputChannels; ++channel)
-        buffer.clear (channel, 0, buffer.getNumSamples());
+    // --- Render all active voices ---
+    // The Synthesiser scans midiMessages for note-on/off/CC events,
+    // routes them to the correct SolaceVoice instances, and renders
+    // all active voices into the buffer for this block.
+    //
+    // The startSample=0 + numSamples=buffer.getNumSamples() tells it
+    // to process the entire block. MIDI timestamps within the block
+    // are still respected for sample-accurate note triggering.
+    synth.renderNextBlock (buffer, midiMessages, 0, buffer.getNumSamples());
+
+    // --- Apply master volume from APVTS ---
+    // Get the current (possibly automated) value and scale all channels.
+    auto masterVolume = apvts.getRawParameterValue ("masterVolume")->load();
+
+    for (int channel = 0; channel < getTotalNumOutputChannels(); ++channel)
+        buffer.applyGain (channel, 0, buffer.getNumSamples(), masterVolume);
 }
 
 // ============================================================================

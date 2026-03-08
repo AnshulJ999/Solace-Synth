@@ -1,8 +1,8 @@
-# Synth Project — Memory File
+# Solace Synth — Project Memory
 
 **Created:** 2026-03-08
 **Last Updated:** 2026-03-09
-**Status:** Active — Name confirmed, repo created, WebView confirmed, ready to initialize
+**Status:** Active — Initialization plan approved, dev environment setup in progress
 
 ---
 
@@ -23,7 +23,8 @@ A free, open-source polyphonic soft synthesizer. Being built by Anshul (backend/
 **Solace Synth** — confirmed name as of March 2026.
 - GitHub repo: **`AnshulJ999/Solace-Synth`** (created, owned by Anshul)
 - Local path: `G:\GitHub\Solace-Synth`
-- Repo status: Initialized with placeholder README only — not yet set up with JUCE/CMake
+- Project memory: `.agent/synth-project-memory.md` (hardlinked to `G:\GitHub\Personal-Stuff\Synth-Project\synth-project-memory.md`)
+- Repo status: Initialization plan approved — scaffolding and JUCE setup pending dev environment
 - The "SS" monogram logo from the original mockup works well with Solace Synth initials
 
 ---
@@ -189,7 +190,14 @@ Anshul rebuilds plugin → Full test in DAW → Feedback to friend → Repeat
 - Industry standard for VST/AU/standalone from one codebase
 - Built-in MIDI, polyphony voice management, filter/DSP classes, GUI + WebView
 - Huge community, best documentation
-- Licensing: Free Starter plan for open-source/free software (AGPLv3 on GitHub); verify JUCE 8 Starter revenue cap at juce.com/get-juce before starting
+
+### JUCE Licensing — CONFIRMED
+**Using JUCE Starter (Free Commercial License)**, NOT AGPLv3.
+- JUCE Starter is free for individuals/companies under $50K annual revenue
+- This means the Solace Synth project can use ANY license we choose — MIT, GPL, proprietary, or undecided
+- We do NOT have to use AGPLv3 for our project
+- If the project ever exceeds $50K revenue, a paid JUCE license would be needed
+- **Project license: DEFERRED** — will decide when going public. Repo is currently private.
 
 ### Build Approach
 **Build from scratch** with references. Not forking an existing synth.
@@ -201,8 +209,22 @@ Anshul rebuilds plugin → Full test in DAW → Feedback to friend → Repeat
 ### Build System
 CMake (not Projucer — CMake is the modern JUCE 7+ standard)
 
+### JUCE Inclusion Method — CONFIRMED
+**CMake FetchContent** (not git submodule). Reasons:
+- Simpler — 4 lines in CMakeLists.txt, no submodule commands to learn
+- Keeps repo small (JUCE ~100MB not committed)
+- Downside: needs internet on first build — not an issue for this team
+- Switching to submodules later is trivial if needed
+
+### CMakeLists.txt Strategy
+**Based on pamplejuce patterns, not a clone.** We write our own CMakeLists.txt informed by pamplejuce's patterns — correct JUCE module list, compiler flags, `juce_add_plugin()` call structure — but configured specifically for Solace Synth (our plugin name, FetchContent, our folder structure).
+
 ### Dev Environment
-Windows 11, Visual Studio 2022 (C++ dev tools), CMake 3.22+, Git, PowerShell 7+
+- Windows 11
+- Visual Studio 2026 (or 2022) with "Desktop development with C++" workload
+- CMake 4.2.3 (latest stable)
+- Git (already installed)
+- **Status: Installation in progress**
 
 ### Key References / Learning Resources
 - **[synth-plugin-book](https://github.com/hollance/synth-plugin-book)** — MIT, 206⭐ — companion code for "Code Your Own Synth Plug-Ins With C++ and JUCE" — closest match to our synth type
@@ -211,6 +233,10 @@ Windows 11, Visual Studio 2022 (C++ dev tools), CMake 3.22+, Git, PowerShell 7+
 - **[Odin2](https://github.com/TheWaveWarden/odin2)** — Custom license, 743⭐ — modern JUCE codebase to study for UI component architecture
 - **[Wavetable (FigBug)](https://github.com/FigBug/Wavetable)** — BSD-3-Clause, 191⭐ — permissive license, actively maintained, good general reference
 - **[awesome-juce](https://github.com/sudara/awesome-juce)** — master list of all JUCE plugins, modules, templates
+
+### UI Research Notes
+- **Neural DSP (reference for premium UI):** Uses JUCE + custom OpenGL GPU rendering + a large team of professional C++ graphics engineers. NOT WebView. Their premium feel comes from GPU-accelerated rendering — a Tier 1 approach requiring expert C++ graphics devs.
+- **For Solace Synth:** WebView (Tier 3) gives access to the same visual design language (shadows, rounded cards, smooth color palettes, modern typography) without needing OpenGL expertise. The result looks premium — it just won't have Neural DSP's silky 120fps knob-spinning animations, which is irrelevant for a slider-based UI anyway.
 
 ---
 
@@ -275,27 +301,42 @@ An AI-first "vibe-coding" framework for building JUCE plugins. Provides structur
 - [x] Initial research: framework, approach, reference repos, licensing
 - [x] Framework confirmed: JUCE 8
 - [x] Build approach: from scratch with references, not a fork
-- [x] License education and decision (not a hard requirement, GPL-3.0 fine)
+- [x] License education and decision — using JUCE Starter (free commercial), project license deferred
 - [x] APC deep-dive evaluation (verdict: good scaffolding, zero synth DSP)
 - [x] Vision doc v0.1 completed
 - [x] V1 / V2 scope defined
-- [x] Figma → plugin UI workflow discussed and decided (WebView recommended)
+- [x] Figma → plugin UI workflow discussed and decided
 - [x] Team roles defined: Anshul = backend DSP, friend = UI/design + HTML/CSS frontend
-- [x] Naming candidates shortlisted
+- [x] Project name confirmed: **Solace Synth**
+- [x] GitHub repo created: **AnshulJ999/Solace-Synth** (G:\GitHub\Solace-Synth)
+- [x] UI framework confirmed: **WebView (HTML/CSS/JS in JUCE 8)**
+- [x] JUCE inclusion method confirmed: **CMake FetchContent** (not submodule)
+- [x] JUCE licensing confirmed: **Starter (free commercial)** — NOT AGPLv3
+- [x] CMakeLists.txt strategy confirmed: **based on pamplejuce patterns** (not a repo clone)
+- [x] Neural DSP UI research completed — confirmed they use JUCE + custom OpenGL. WebView is the right choice for our team.
+- [x] Initialization plan approved — 5-phase approach (scaffolding → JUCE setup → Hello World → WebView → First Sound)
 
-### Pending
-- [x] **Project name confirmed: Solace Synth**
-- [x] **GitHub repo created: AnshulJ999/Solace-Synth** (G:\GitHub\Solace-Synth)
-- [x] **UI framework confirmed: WebView (HTML/CSS/JS in JUCE 8)**
-- [ ] **Define full LFO target list** and velocity mod target list (spec gap)
+### In Progress
+- [/] **Dev environment setup** — Installing VS2026 + CMake 4.2.3 (user action)
+
+### Pending — Repo Initialization
+- [ ] Phase 1: Repo scaffolding (.gitignore, README, folder structure)
+- [ ] Phase 2: JUCE project setup (CMakeLists.txt, PluginProcessor, PluginEditor)
+- [ ] Phase 3: Hello World VST3 (empty plugin compiles and loads)
+- [ ] Phase 4: WebView Hello World (JUCE loads HTML in plugin window, C++↔JS bridge works)
+- [ ] Phase 5: First Sound (single oscillator responds to MIDI)
+- [ ] GitHub Actions CI + pluginval (automated testing)
+
+### Pending — Spec Gaps (need decisions before DSP implementation)
+- [ ] **Define full LFO target list** and velocity mod target list
 - [ ] **Waveform list confirmed** (suggest: Sine, Saw, Square, Triangle, Noise)
 - [ ] **Filter HP decision** — include in V1 or defer to V2?
-- [ ] Set up dev environment: JUCE 8, CMake, Visual Studio 2022
-- [ ] Prototype: single oscillator → ADSR → filter → standalone output (proof of concept)
+
+### Pending — Implementation (after initialization)
+- [ ] Prototype: single oscillator → ADSR → filter → standalone output
 - [ ] Implement polyphonic voice architecture
 - [ ] Implement LFO modulation routing
 - [ ] Implement unison engine
-- [ ] WebView bridge (C++ ↔ JS parameter relay) — if WebView path confirmed
 
 ---
 
@@ -303,12 +344,14 @@ An AI-first "vibe-coding" framework for building JUCE plugins. Provides structur
 
 1. ~~Final project name?~~ → **RESOLVED: Solace Synth**
 2. ~~WebView vs native JUCE?~~ → **RESOLVED: WebView confirmed**
-3. **Does friend know HTML/CSS?** Critical for WebView collaboration — not yet confirmed
-4. **"Computer-friendly UI" — does it imply an onscreen keyboard?**
-5. **Filter HP in V1?** Strongly recommend yes — trivial to add with State Variable Filter
-6. **Portamento:** Polyphonic glide is complex — keep firmly in V2
-7. **Preset system architecture:** Use `AudioProcessorValueTreeState` from day one — preset load/save is almost free if designed in early
-8. **Neural DSP / BIAS FX 2 precedent noted:** BIAS FX 2 uses HTML/CSS WebView for its premium UI — validates this approach for commercial-quality results
+3. ~~JUCE license?~~ → **RESOLVED: Starter (free commercial), project license deferred**
+4. ~~JUCE inclusion method?~~ → **RESOLVED: CMake FetchContent**
+5. **Does friend know HTML/CSS?** Critical for WebView collaboration — not yet confirmed
+6. **"Computer-friendly UI" — does it imply an onscreen keyboard?**
+7. **Filter HP in V1?** Strongly recommend yes — trivial to add with State Variable Filter
+8. **Portamento:** Polyphonic glide is complex — keep firmly in V2
+9. **Preset system architecture:** Use `AudioProcessorValueTreeState` from day one — preset load/save is almost free if designed in early
+10. **Neural DSP / BIAS FX 2 precedent noted:** BIAS FX 2 uses HTML/CSS WebView for its premium UI — validates this approach for commercial-quality results
 
 ---
 

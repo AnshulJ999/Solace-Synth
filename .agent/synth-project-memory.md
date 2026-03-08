@@ -1,8 +1,8 @@
 # Solace Synth — Project Memory
 
 **Created:** 2026-03-08
-**Last Updated:** 2026-03-09 (Phase 4: bridge verified, slider fix + logging added, needs rebuild)
-**Status:** Active - Phase 4 bridge handshake verified. Slider CSS fix + FileLogger + debug panel added. Needs rebuild + retest.
+**Last Updated:** 2026-03-09 (Phase 4.1 logging pass reviewed - rebuild blocked by running EXE)
+**Status:** Active - Phase 4 bridge handshake verified. Slider CSS fix + FileLogger + debug panel added. Close running standalone EXE, rebuild, then retest slider behavior with logs.
 
 ---
 
@@ -24,7 +24,7 @@ A free, open-source polyphonic soft synthesizer. Being built by Anshul (backend/
 - GitHub repo: **`AnshulJ999/Solace-Synth`** (created, owned by Anshul)
 - Local path: `G:\GitHub\Solace-Synth`
 - Project memory: `.agent/synth-project-memory.md` (hardlinked to `G:\GitHub\Personal-Stuff\Synth-Project\synth-project-memory.md`)
-- Repo status: Phase 4 (WebView integration) in progress — build verified, JS bridge fix pending re-test
+- Repo status: Phase 4.1 debugging/logging in progress — bridge handshake verified, slider interaction still under investigation
 - The "SS" monogram logo from the original mockup works well with Solace Synth initials
 
 ---
@@ -361,13 +361,18 @@ An AI-first "vibe-coding" framework for building JUCE plugins. Provides structur
        - **Fix:** rewrote bridge.js to use correct `__juce__invoke` event pattern
        - Also added try/catch in main.js init to surface errors in status bar
   - **Production note:** UI files served from disk via `SOLACE_DEV_UI_PATH`. For release, must embed via `juce_add_binary_data()`
-  - **Status: bridge handshake verified. Slider CSS fixed (horizontal). Logging added. Needs rebuild.**
+  - **Status: bridge handshake verified. Slider CSS fixed (horizontal). Logging added. Needs 1 bug fix then rebuild.**
   - **Latest changes (not yet rebuilt):**
-    - Replaced vertical slider (writing-mode CSS hack) with standard horizontal slider
-    - Added visible debug log panel in UI (shows timestamped bridge messages)
-    - Added FileLogger to PluginProcessor (writes to %TEMP%/SolaceSynth/SolaceSynth.log)
+    - Replaced vertical slider (writing-mode CSS hack) with standard horizontal slider (no rebuild needed)
+    - Added visible debug log panel in UI (shows timestamped bridge messages, color-coded: blue=JS, green=C++, red=error)
+    - Added FileLogger to PluginProcessor (writes to %TEMP%\SolaceSynth\SolaceSynth.log, 512KB cap, works in Release)
     - Added Logger::writeToLog calls to all bridge handlers in PluginEditor.cpp
     - JS main.js has full diagnostic logging at every boundary
+  - **⚠️ Bug to fix before next rebuild:** `parameterChanged()` in PluginEditor.cpp calls `Logger::writeToLog()` BEFORE `callAsync` — this is disk I/O on the audio thread (real-time safety violation, causes xruns). Fix: move the log call inside the callAsync lambda body (message thread). 1-line change.
+  - **Future concern (pre-release):** FileLogger uses `setCurrentLogger()` globally — if two plugin instances are open simultaneously, second instance overwrites first's logger pointer. Not a concern for solo dev testing.
+  - **Latest review note (2026-03-09):**
+    - Fresh rebuild reached final link step but failed because `build/SolaceSynth_artefacts/Release/Standalone/Solace Synth.exe` was still open/locked by a running process
+    - Current logging is for debugging only; `Logger::writeToLog` is also called from the APVTS listener path, so it should be removed or reduced before real DSP/performance work
 
 ### Next Up
 - [ ] Rebuild and verify Phase 4 (slider works + logs visible)

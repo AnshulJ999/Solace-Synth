@@ -217,9 +217,7 @@ SolaceSynthEditor::loadFileAsResource (const juce::File& file)
 // ============================================================================
 
 // Called when JS sends: setParameter("masterVolume", 0.75)
-void SolaceSynthEditor::handleSetParameter (
-    const juce::Array<juce::var>& args,
-    juce::WebBrowserComponent::NativeFunctionCompletion completion)
+bool SolaceSynthEditor::processSetParameter (const juce::Array<juce::var>& args)
 {
     if (args.size() >= 2)
     {
@@ -235,19 +233,26 @@ void SolaceSynthEditor::handleSetParameter (
                 + " normalized=" + juce::String (normalized, 4));
 
             param->setValueNotifyingHost (normalized);
-            completion (juce::var (true));
+            return true;
         }
         else
         {
             SolaceLog::error ("setParameter: unknown param '" + paramId + "'");
-            completion (juce::var (false));
+            return false;
         }
     }
     else
     {
         SolaceLog::error ("setParameter: wrong arg count (" + juce::String (args.size()) + ")");
-        completion (juce::var (false));
+        return false;
     }
+}
+
+void SolaceSynthEditor::handleSetParameter (
+    const juce::Array<juce::var>& args,
+    juce::WebBrowserComponent::NativeFunctionCompletion completion)
+{
+    completion (juce::var (processSetParameter (args)));
 }
 
 // Called when JS signals that the page has loaded

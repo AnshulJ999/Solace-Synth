@@ -60,6 +60,7 @@ private:
     void sendAllParametersToJS();
 
     // --- Bridge: JS -> C++ (registered as native functions) ---
+    bool processSetParameter (const juce::Array<juce::var>& args);
     void handleSetParameter (const juce::Array<juce::var>& args,
                              juce::WebBrowserComponent::NativeFunctionCompletion completion);
     void handleUiReady (const juce::Array<juce::var>& args,
@@ -69,6 +70,8 @@ private:
 
     // --- APVTS Listener (for automation/preset changes) ---
     void parameterChanged (const juce::String& parameterID, float newValue) override;
+
+    friend class SolaceSynthEditorTest;
 
     // --- Resource Provider ---
     std::optional<juce::WebBrowserComponent::Resource> resourceRequested (const juce::String& path);

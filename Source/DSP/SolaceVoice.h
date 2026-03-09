@@ -89,7 +89,10 @@ public:
     // ========================================================================
     void prepare (const juce::dsp::ProcessSpec& spec)
     {
-        setCurrentPlaybackSampleRate (spec.sampleRate);
+        // Note: setCurrentPlaybackSampleRate() is NOT called here.
+        // juce::Synthesiser::setCurrentPlaybackSampleRate() (called first in
+        // PluginProcessor::prepareToPlay) already propagates the sample rate
+        // to every voice it owns. Calling it again here would be redundant.
         ampEnvelope.prepare (spec.sampleRate);
     }
 

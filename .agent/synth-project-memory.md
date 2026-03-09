@@ -1,8 +1,8 @@
 # Solace Synth — Project Memory
 
 **Created:** 2026-03-08
-**Last Updated:** 2026-03-09 (Phase 6.1 — Amp ADSR envelope implemented, code written, pending build verification)
-**Status:** Active — Phases 0-5 complete + Phase 7.2 UI scaffold (rev2). Phase 6.1 code complete, awaiting build + manual verification.
+**Last Updated:** 2026-03-10 (Phase 6.1 complete — Amp ADSR + two post-review fixes; next: Phase 6.2)
+**Status:** Active — Phases 0-5 complete + Phase 6.1 complete + Phase 7.2 UI scaffold (rev2). Next: Phase 6.2 (waveforms + Osc1 tuning).
 
 ---
 
@@ -460,7 +460,15 @@ Do NOT implement features suggested solely by Claude Code/Codex reviews without 
 - [ ] **Plugin title in UI:** "Solace Soft Synth" (Figma) vs "Solace Synth" (shorter)? Ask designer.
 
 ### Pending — Implementation (after Phase 5)
-- [x] Phase 6.1: Amp ADSR (`SolaceADSR.h` + velocity scaling) — code written, pending build
+- [x] **Phase 6.1: Amp ADSR** — COMPLETE (2026-03-10)
+  - `Source/DSP/SolaceADSR.h` — thin wrapper around `juce::ADSR`: prepare / setParameters / trigger / release / getNextSample / isActive / reset
+  - `SolaceVoiceParams` struct — holds `const std::atomic<float>*` pointers; grows cleanly with each phase
+  - `SolaceVoice` rewritten — ADSR replaces manual tailOff, snapshots params at note-on, 16 voices, velocity scaling via `kVoiceGain`
+  - `createParameterLayout()` — 4 amp params: `ampAttack` (0.001–5s, def 0.01), `ampDecay` (0.001–5s, def 0.1), `ampSustain` (0–1, def 0.8), `ampRelease` (0.001–10s, def 0.3)
+  - `getTailLengthSeconds()` — fixed: now returns live `ampRelease` value (not 0.0); TODO 6.4: update to `max(ampRelease, filterEnvRelease)`
+  - Post-review fix 1: removed redundant `setCurrentPlaybackSampleRate()` in `voice->prepare()` — JUCE Synthesiser already propagates it
+  - Post-review fix 2: `getTailLengthSeconds()` was `return 0.0` — would have silently dropped release tails in DAW renders
+  - Build: successful (pre-fix). Manual listening test: pending (rebuild after fixes).
 - [ ] Phase 6.2: Oscillator waveforms + Osc1 tuning params
 - [ ] Phase 6.3: Filter (`SolaceFilter.h` using `LadderFilter`, LP24 default)
 - [ ] Phase 6.4: Filter Envelope

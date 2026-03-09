@@ -123,7 +123,16 @@ bool SolaceSynthProcessor::isMidiEffect() const
 
 double SolaceSynthProcessor::getTailLengthSeconds() const
 {
-    return 0.0;
+    // Return the current amp release time so DAW hosts keep driving the plugin
+    // long enough for the release tail to fully complete after transport stops
+    // or during offline renders. Without this, a host receiving 0.0 will cut
+    // audio immediately — the release phase is silently dropped in recordings.
+    //
+    // getRawParameterValue is const + noexcept in JUCE, safe to call here.
+    // Default: 0.3s. Max: 10.0s (matches ampRelease APVTS range upper bound).
+    // TODO (Phase 6.4): update to std::max(ampRelease, filterEnvRelease).
+    auto* release = apvts.getRawParameterValue ("ampRelease");
+    return release != nullptr ? static_cast<double> (release->load()) : 10.0;
 }
 
 // ============================================================================

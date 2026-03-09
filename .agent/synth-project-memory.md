@@ -477,7 +477,12 @@ Do NOT implement features suggested solely by Claude Code/Codex reviews without 
   - Build: successful. Waveforms audibly distinct — listening test passed.
   - Note: Naïve Saw/Square alias at high frequencies — intentional V1 behaviour. PolyBLEP tracked for V2.
 
-- [ ] Phase 6.3: Filter (`SolaceFilter.h` using `LadderFilter`, LP24 default)
+- [x] **Phase 6.3: Filter** — code complete (2026-03-10), awaiting build + listening test
+  - `Source/DSP/SolaceFilter.h` — NEW. Wrapper around `juce::dsp::LadderFilter<float>`. Per-sample via native `processSample(value, 0)` (no AudioBlock overhead). Modes: LP12 (0), LP24 (1, default), HP12 (2). Cutoff clamped [20, 20000 Hz]. Filter reset on voice steal.
+  - `Source/DSP/SolaceVoice.h` — added `SolaceFilter filter` member + `float baseCutoffHz`. Signal order: osc1 → filter → amp ADSR (correct subtractive order). `baseCutoffHz` stored at note-on for Phase 6.4 envelope modulation. Comment left inside renderNextBlock() showing exact 6.4 integration point.
+  - `PluginProcessor.cpp` — 3 new params: `filterCutoff` (20-20000Hz, NormalisableRange skew=0.3 for log feel, default 20000), `filterResonance` (0-1, default 0), `filterType` (int 0-2, default 1=LP24).
+  - Note: `filterCutoff` default 20000 Hz = fully open. Out-of-the-box the synth sounds identical to 6.2 until the cutoff is moved.
+
 - [ ] Phase 6.4: Filter Envelope
 - [ ] Phase 6.5: Second Oscillator + `oscMix` crossfader
 - [ ] Phase 6.6: LFO (3 targets, per-voice free-running)

@@ -35,6 +35,11 @@ SolaceSynthProcessor::SolaceSynthProcessor()
     voiceParams.osc1Transpose = apvts.getRawParameterValue ("osc1Transpose");
     voiceParams.osc1Tuning    = apvts.getRawParameterValue ("osc1Tuning");
 
+    // --- Phase 6.3: Filter ---
+    voiceParams.filterCutoff    = apvts.getRawParameterValue ("filterCutoff");
+    voiceParams.filterResonance = apvts.getRawParameterValue ("filterResonance");
+    voiceParams.filterType      = apvts.getRawParameterValue ("filterType");
+
     // Create 16 voices. We always create the maximum number up front — JUCE's
     // Synthesiser does not support safe voice addition/removal at runtime.
     // A polyphony cap (Phase 6.8) will be implemented inside startNote() later.
@@ -128,6 +133,29 @@ juce::AudioProcessorValueTreeState::ParameterLayout SolaceSynthProcessor::create
         "Osc1 Tuning",
         juce::NormalisableRange<float> (-100.0f, 100.0f, 0.01f),
         0.0f));
+
+    // --- Phase 6.3: Filter ---
+    // filterCutoff uses a skew factor of 0.3 to make the slider feel logarithmic
+    // (musical). Without skew, the slider spends ~90% of its travel above 10kHz
+    // and the lower half — the musically interesting range — feels unusable.
+    // The 4th argument to NormalisableRange is the skew factor (< 1 = log feel).
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (
+        juce::ParameterID { "filterCutoff", 1 },
+        "Filter Cutoff",
+        juce::NormalisableRange<float> (20.0f, 20000.0f, 0.1f, 0.3f),
+        20000.0f));  // default: fully open (no filtering)
+
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (
+        juce::ParameterID { "filterResonance", 1 },
+        "Filter Resonance",
+        juce::NormalisableRange<float> (0.0f, 1.0f, 0.01f),
+        0.0f));
+
+    // filterType: 0=LP12, 1=LP24 (default), 2=HP12
+    params.push_back (std::make_unique<juce::AudioParameterInt> (
+        juce::ParameterID { "filterType", 1 },
+        "Filter Type",
+        0, 2, 1));  // default: 1 = LP24
 
     return { params.begin(), params.end() };
 }
@@ -223,7 +251,7 @@ void SolaceSynthProcessor::prepareToPlay (double sampleRate, int samplesPerBlock
     SolaceLog::info ("prepareToPlay: sampleRate=" + juce::String (sampleRate)
         + " samplesPerBlock=" + juce::String (samplesPerBlock)
         + " voices=" + juce::String (synth.getNumVoices())
-        + " params registered: ampAttack/Decay/Sustain/Release, osc1Waveform/Octave/Transpose/Tuning");
+        + " params: amp(4) osc1(4) filter(3)");
 }
 
 void SolaceSynthProcessor::releaseResources()

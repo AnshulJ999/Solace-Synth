@@ -1,8 +1,8 @@
 # Solace Synth — Project Memory
 
 **Created:** 2026-03-08
-**Last Updated:** 2026-03-09 (Phase 7.1 + 7.2 — Design System + Layout Scaffold implemented)
-**Status:** Active — Phases 0-5 complete + Phase 7.1/7.2 UI scaffold complete. Next: Phase 6.1 (DSP — Amp ADSR, Claude Code) + Phase 7.3 (JS component logic).
+**Last Updated:** 2026-03-09 (Phase 7.2 rev2 — layout fixes, SVG placeholders, filterEnvDepth hidden)
+**Status:** Active — Phases 0-5 complete + Phase 7.2 UI scaffold (rev2). Layout significantly improved. Remaining: icon polish, layout fine-tuning, Phase 7.3 component extraction, Phase 6.1 DSP start.
 
 ---
 
@@ -403,8 +403,26 @@ An AI-first "vibe-coding" framework for building JUCE plugins. Provides structur
 - [x] **Plugin window:** Resizable (`setResizable(true, false)` + `setResizeLimits()`). CSS uses relative units. Fallback: 3 size presets.
 - [x] **UI theme:** Light / white background, orange accent sliders. Dark theme is a V2 nice-to-have.
 - [x] **LFO scope: per-voice, free-running.** Confirmed by Nabeel. Each `SolaceVoice` owns its own `SolaceLFO`. LFO runs continuously from voice allocation — do NOT reset phase in `startNote()`. This produces organic drift when playing chords (each voice's LFO is at a different phase).
-- [ ] **Filter Env Depth** — UI position: Filter section or Filter Configuration section? Ask designer.
-- [ ] **unisonDetune / unisonSpread** — visible in UI (add controls) or engine-only for V1? Ask designer.
+- [ ] **Filter Env Depth** — NOT in Figma design (confirmed 2026-03-09 by Anshul). Hidden in HTML (`hidden` attr on `#filter-env-depth-fader`). DO NOT surface this unless Nabeel explicitly adds it to the design. AI agents must not add it without approval.
+- [ ] **unisonDetune / unisonSpread** — confirmed PENDING. Not to be added to UI until designer decides. No controls in HTML. Do not add without approval.
+- [ ] **Plugin title in UI:** \"Solace Soft Synth\" (Figma) vs \"Solace Synth\" (shorter)? Ask designer.
+
+### ⚠️ SVG Icon Status — All Current Icons Are Placeholders
+`UI/assets/icons/` was created manually (2026-03-09). **ALL icons are hand-coded SVGs, not exported from Figma.**
+The Figma MCP (`figma-download_figma_images` tool) was called previously but did NOT write files to disk — it returns metadata only; actual file creation was never verified. This means:
+- `logo.svg` — placeholder SS monogram, not the real Figma logo
+- `waveform-sine-icon.svg` — hand-coded path, NOT Figma export
+- `waveform-square-icon.svg` — hand-coded path, NOT Figma export
+- `waveform-sawtooth-icon.svg` — placeholder, Nabeel needs to provide
+- `waveform-triangle-icon.svg` — placeholder, Nabeel needs to provide
+- `waveform-sh-icon.svg` — placeholder LFO only
+- `chevron-back/forward.svg`, `btn-left/right/menu.svg`, `arrow-dropdown.svg` — simple geometric placeholders
+
+**To get the real icons**, Nabeel or Anshul must manually export from Figma UI and drop in `UI/assets/icons/`.
+The Figma MCP cannot write files — it only returns data. AI agents cannot auto-download assets from Figma.
+
+### ⚠️ Agent Rule: Confirm Design Decisions With Anshul, Not AI Peers
+Do NOT implement features suggested solely by Claude Code/Codex reviews without Anshul's explicit approval. Example: `filterEnvDepth` was added based on Claude Code's review, then had to be hidden. Claude Code reviews are input, not authority.
 - [ ] **Plugin title in UI:** "Solace Soft Synth" (Figma) vs "Solace Synth" (shorter)? Ask designer.
 
 ### Pending — Implementation (after Phase 5)

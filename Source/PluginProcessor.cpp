@@ -40,6 +40,13 @@ SolaceSynthProcessor::SolaceSynthProcessor()
     voiceParams.filterResonance = apvts.getRawParameterValue ("filterResonance");
     voiceParams.filterType      = apvts.getRawParameterValue ("filterType");
 
+    // --- Phase 6.4: Filter Envelope ---
+    voiceParams.filterEnvDepth   = apvts.getRawParameterValue ("filterEnvDepth");
+    voiceParams.filterEnvAttack  = apvts.getRawParameterValue ("filterEnvAttack");
+    voiceParams.filterEnvDecay   = apvts.getRawParameterValue ("filterEnvDecay");
+    voiceParams.filterEnvSustain = apvts.getRawParameterValue ("filterEnvSustain");
+    voiceParams.filterEnvRelease = apvts.getRawParameterValue ("filterEnvRelease");
+
     // Create 16 voices. We always create the maximum number up front — JUCE's
     // Synthesiser does not support safe voice addition/removal at runtime.
     // A polyphony cap (Phase 6.8) will be implemented inside startNote() later.
@@ -157,6 +164,40 @@ juce::AudioProcessorValueTreeState::ParameterLayout SolaceSynthProcessor::create
         "Filter Type",
         0, 2, 1));  // default: 1 = LP24
 
+    // --- Phase 6.4: Filter Envelope ---
+    // filterEnvDepth is bipolar (-1.0 to +1.0): positive = cutoff sweeps up,
+    // negative = cutoff sweeps down. Default 0.0 = no envelope effect on launch.
+    // filterEnvSustain default 0.0: classic pluck response without extra config.
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (
+        juce::ParameterID { "filterEnvDepth", 1 },
+        "Filter Env Depth",
+        juce::NormalisableRange<float> (-1.0f, 1.0f, 0.01f),
+        0.0f));
+
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (
+        juce::ParameterID { "filterEnvAttack", 1 },
+        "Filter Env Attack",
+        juce::NormalisableRange<float> (0.001f, 5.0f, 0.001f),
+        0.01f));
+
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (
+        juce::ParameterID { "filterEnvDecay", 1 },
+        "Filter Env Decay",
+        juce::NormalisableRange<float> (0.001f, 5.0f, 0.001f),
+        0.3f));
+
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (
+        juce::ParameterID { "filterEnvSustain", 1 },
+        "Filter Env Sustain",
+        juce::NormalisableRange<float> (0.0f, 1.0f, 0.01f),
+        0.0f));
+
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (
+        juce::ParameterID { "filterEnvRelease", 1 },
+        "Filter Env Release",
+        juce::NormalisableRange<float> (0.001f, 10.0f, 0.001f),
+        0.3f));
+
     return { params.begin(), params.end() };
 }
 
@@ -191,10 +232,16 @@ double SolaceSynthProcessor::getTailLengthSeconds() const
     // audio immediately — the release phase is silently dropped in recordings.
     //
     // getRawParameterValue is const + noexcept in JUCE, safe to call here.
-    // Default: 0.3s. Max: 10.0s (matches ampRelease APVTS range upper bound).
-    // TODO (Phase 6.4): update to std::max(ampRelease, filterEnvRelease).
-    auto* release = apvts.getRawParameterValue ("ampRelease");
-    return release != nullptr ? static_cast<double> (release->load()) : 10.0;
+    // Returns whichever tail is longer: amp release or filter env release.
+    // This ensures DAW hosts keep driving the plugin long enough for the longer
+    // of the two release tails to complete after transport stops or during
+    // offline renders. Without this, a host receiving a shorter value would
+    // cut the audio early and silently drop the end of the release tail.
+    auto* ampRel = apvts.getRawParameterValue ("ampRelease");
+    auto* envRel = apvts.getRawParameterValue ("filterEnvRelease");
+    const double ampRelease = (ampRel != nullptr) ? static_cast<double> (ampRel->load()) : 10.0;
+    const double envRelease = (envRel != nullptr) ? static_cast<double> (envRel->load()) : 10.0;
+    return std::max (ampRelease, envRelease);
 }
 
 // ============================================================================
@@ -251,7 +298,7 @@ void SolaceSynthProcessor::prepareToPlay (double sampleRate, int samplesPerBlock
     SolaceLog::info ("prepareToPlay: sampleRate=" + juce::String (sampleRate)
         + " samplesPerBlock=" + juce::String (samplesPerBlock)
         + " voices=" + juce::String (synth.getNumVoices())
-        + " params: amp(4) osc1(4) filter(3)");
+        + " params: amp(4) osc1(4) filter(3) filterEnv(5)");
 }
 
 void SolaceSynthProcessor::releaseResources()

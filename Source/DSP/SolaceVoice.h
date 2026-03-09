@@ -48,6 +48,18 @@ struct SolaceVoiceParams
     const std::atomic<float>* filterCutoff    = nullptr;
     const std::atomic<float>* filterResonance = nullptr;
     const std::atomic<float>* filterType      = nullptr;
+
+    // --- Phase 6.4: Filter Envelope ---
+    // filterEnvDepth: float, -1.0 to +1.0. Controls direction and intensity:
+    //   +1.0 = full upward sweep (bright attack, dark sustain — classic pluck)
+    //    0.0 = no envelope effect (filter static at filterCutoff)
+    //   -1.0 = full downward sweep (dark attack, bright sustain — inverted)
+    // filterEnvAttack/Decay/Sustain/Release: same units as ampEnvelope.
+    const std::atomic<float>* filterEnvDepth   = nullptr;
+    const std::atomic<float>* filterEnvAttack  = nullptr;
+    const std::atomic<float>* filterEnvDecay   = nullptr;
+    const std::atomic<float>* filterEnvSustain = nullptr;
+    const std::atomic<float>* filterEnvRelease = nullptr;
 };
 
 // ============================================================================
@@ -68,23 +80,22 @@ struct SolaceVoiceParams
 //
 // Phase 6.3 — Filter (LadderFilter LP/HP):
 //   SolaceFilter wraps juce::dsp::LadderFilter<float> (Moog-style ladder).
-//   Per-sample design:
-//   LadderFilter::processSample() is protected in JUCE 8 — only callable by
-//   subclasses. SolaceFilter uses a 1-sample AudioBlock/ProcessContextReplacing
-//   to route one sample through LadderFilter::process() per call, which is the
-//   correct public API. This also drives the internal SmoothedValue (cutoff
-//   and resonance are smoothed on each sample call), preventing zipper noise
-//   when setCutoff() is called per-block or per-sample.
-//   AudioBlock is a non-owning pointer wrapper — no heap allocation.
-//   baseCutoffHz is stored so Phase 6.4 can compute modulatedCutoff in-loop.
+//   Per-sample via 1-sample AudioBlock (processSample is protected in JUCE 8).
+//   baseCutoffHz (knob) read per render-block; filter setCutoff() called per-sample
+//   so the filter envelope can modulate it every sample (see Phase 6.4).
 //
-// Signal flow (per sample):
+// Phase 6.4 — Filter Envelope:
+//   filterEnvelope is a second SolaceADSR that runs independently of the amp
+//   envelope. Each sample: modulatedCutoff = baseCutoffHz + envVal * depth * modRange.
+//   modRange = 10000 Hz constant (V1). filterEnvDepth (-1 to +1) controls direction.
+//   filter.setCutoff() clamps to [20, 20000] Hz — safe for any modulation value.
+//
+// Signal flow (per sample, Phase 6.4+):
 //   osc1.getNextSample()
-//     → filter.processSample()     ← filter applied BEFORE amp
-//       → * kVoiceGain
-//         → * velocityScale
-//           → * ampEnvelope.getNextSample()
-//             → output buffer
+//     → filter.setCutoff(baseCutoffHz + filterEnv * depth * 10000)  ← per sample
+//     → filter.processSample()                                       ← filtered
+//       → * kVoiceGain * velocityScale * ampEnvelope.getNextSample()
+//         → output buffer
 //
 // Architecture rules (audio thread):
 //   - No allocations, no locks, no logging, no I/O.
@@ -118,6 +129,13 @@ public:
         jassert (params.filterCutoff    != nullptr);
         jassert (params.filterResonance != nullptr);
         jassert (params.filterType      != nullptr);
+
+        // Phase 6.4
+        jassert (params.filterEnvDepth   != nullptr);
+        jassert (params.filterEnvAttack  != nullptr);
+        jassert (params.filterEnvDecay   != nullptr);
+        jassert (params.filterEnvSustain != nullptr);
+        jassert (params.filterEnvRelease != nullptr);
     }
 
     // ========================================================================
@@ -134,7 +152,8 @@ public:
     // ========================================================================
     void prepare (const juce::dsp::ProcessSpec& spec)
     {
-        ampEnvelope.prepare (spec.sampleRate);
+        ampEnvelope.prepare    (spec.sampleRate);
+        filterEnvelope.prepare (spec.sampleRate);
         filter.prepare (spec);  // SolaceFilter overrides numChannels to 1 internally
     }
 
@@ -169,14 +188,27 @@ public:
         osc1.setFrequency (baseHz, getSampleRate());
 
         // --- Filter (Phase 6.3) ---
-        // Snapshot filter params from APVTS. Mode and resonance are static for
-        // the note's lifetime (changed by setMode/setResonance below).
-        // baseCutoffHz is stored as a member so Phase 6.4 can compute modulated
-        // cutoff relative to it each sample inside renderNextBlock().
-        baseCutoffHz = params.filterCutoff->load();
+        // filterType is snapshotted at note-on — mode changes mid-note cause a
+        // transient click (state-vector discontinuity). Cutoff and resonance are
+        // read live per-block in renderNextBlock(), so knob moves are audible.
         filter.setMode      (static_cast<int> (params.filterType->load()));
         filter.setResonance (params.filterResonance->load());
-        filter.setCutoff    (baseCutoffHz);  // static cutoff for Phase 6.3
+        // baseCutoffHz is updated per-block in renderNextBlock(); initialise it
+        // here so it holds a valid value on the very first block of this note.
+        baseCutoffHz = params.filterCutoff->load();
+        filter.setCutoff (baseCutoffHz);
+
+        // --- Filter Envelope (Phase 6.4) ---
+        // Snapshotted at note-on — ADSR shape is fixed for the note's lifetime.
+        // filterEnvDepth is read per-sample in renderNextBlock() (it is a float
+        // the user may sweep mid-note, and reading it per-sample is cheap).
+        filterEnvelope.setParameters (
+            params.filterEnvAttack->load(),
+            params.filterEnvDecay->load(),
+            params.filterEnvSustain->load(),
+            params.filterEnvRelease->load()
+        );
+        filterEnvelope.trigger();
 
         // --- Amplitude Envelope (Phase 6.1) ---
         // Snapshotting at note-on means envelope shape is fixed for this note.
@@ -201,13 +233,18 @@ public:
     {
         if (allowTailOff)
         {
+            // Soft note-off: both envelopes begin their release stage together.
+            // The voice stays alive until ampEnvelope.isActive() returns false —
+            // the filter envelope continues running naturally throughout the release.
             ampEnvelope.release();
+            filterEnvelope.release();
         }
         else
         {
-            // Hard cut. Reset filter state to prevent transient pop when this
-            // voice is immediately reused for a new note.
+            // Hard cut (voice stolen). Reset all state so this voice can be
+            // immediately reused without transient pops or stale envelope values.
             ampEnvelope.reset();
+            filterEnvelope.reset();
             filter.reset();
             clearCurrentNote();
         }
@@ -216,19 +253,21 @@ public:
     // ========================================================================
     // renderNextBlock — fill the output buffer for this voice.
     //
-    // Signal flow per sample:
-    //   osc1 → filter → kVoiceGain × velocityScale × ampEnv → output
+    // Signal flow (Phase 6.4+, per sample):
+    //   baseCutoffHz + filterEnv * depth * modRange → filter.setCutoff()
+    //   osc1 → filter.processSample() → * kVoiceGain * velocityScale * ampEnv
+    //   → addSample() into output buffer
     //
-    // Filter runs BEFORE amp envelope. This is the correct subtractive synth
-    // order: oscillator generates the raw waveform, filter removes harmonics,
-    // amp envelope shapes the final volume. Running amp after filter also means
-    // the filter continues to self-resonate during the release phase correctly.
+    // Filter runs BEFORE amp envelope — correct subtractive order:
+    //   filter self-resonance decays naturally during amp release phase.
     //
-    // Phase 6.4 integration point: to add filter envelope modulation, insert
-    // a setCutoff() call inside the sample loop using the envelope value:
-    //   float modCutoff = juce::jlimit(20f, 20000f, baseCutoffHz + envVal * depth * range);
-    //   filter.setCutoff(modCutoff);
-    // before the filter.processSample() call. SolaceFilter is ready for this.
+    // Per-block (before the sample loop):
+    //   - baseCutoffHz and filterResonance read from APVTS atomics (live knob response)
+    //   - filterEnvDepth read from APVTS atomic (cheap float load, user may sweep mid-note)
+    //
+    // Per-sample (inside the loop):
+    //   - filterEnvelope.getNextSample() → modulated cutoff → filter.setCutoff()
+    //   - ampEnvelope.getNextSample()    → final amplitude scale
     //
     // CRITICAL: addSample() not setSample() — voices mix into shared buffer.
     // CRITICAL: startSample offset respected — note may begin mid-block.
@@ -241,43 +280,57 @@ public:
         if (! ampEnvelope.isActive() && ! isVoiceActive())
             return;
 
-        // --- Live filter parameter refresh (once per render block) ---
-        // Read filterCutoff and filterResonance from APVTS atomics so that
-        // moving knobs while a note is held is immediately audible on that voice.
-        // LadderFilter uses SmoothedValue internally, so per-block updates are
-        // interpolated between blocks — no zipper noise.
+        // --- Per-block parameter refresh ---
+        // Read live APVTS values once per block (not per sample) to give
+        // immediate knob response without atomic load overhead per sample.
         //
-        // filterType is NOT updated here: switching modes mid-note causes a
-        // transient click (the mode changes the state-variable topology). It
-        // stays at the note-on snapshot value for V1.
+        // filterType excluded — mode changes mid-note cause a transient click
+        // (state-vector discontinuity). Stays at note-on snapshot for V1.
         baseCutoffHz = params.filterCutoff->load();
-        filter.setCutoff    (baseCutoffHz);
         filter.setResonance (params.filterResonance->load());
+
+        // filterEnvDepth is read per-block too. It is a continuous float the
+        // user may sweep mid-note; per-block resolution is plenty fine.
+        const float envDepth = params.filterEnvDepth->load();
+
+        // modRange: maximum Hz the filter envelope can add or subtract.
+        // 10000 Hz gives dramatic sweeps while keeping headroom on both edges.
+        // V1 constant — could become an APVTS param in V2 if needed.
+        constexpr float kModRange = 10000.0f;
 
         while (--numSamples >= 0)
         {
             // 1. Oscillator: raw waveform sample in [-1, +1]
             float oscSample = osc1.getNextSample();
 
-            // 2. Filter: shape the spectrum (osc → filter → amp is correct order)
-            //    Phase 6.4: add filter.setCutoff(modulatedCutoff) here before this line.
+            // 2. Filter envelope modulation — computed per sample so the sweep
+            //    is smooth (no stepping artefacts). filterEnvelope.getNextSample()
+            //    returns 0.0 → 1.0 (ADSR output, always non-negative).
+            //    envDepth (-1 to +1) controls direction and intensity.
+            //    SolaceFilter::setCutoff() clamps to [20, 20000] Hz internally,
+            //    so overshoot from the envelope is always safe.
+            const float filterEnvVal    = filterEnvelope.getNextSample();
+            const float modulatedCutoff = baseCutoffHz + filterEnvVal * envDepth * kModRange;
+            filter.setCutoff (modulatedCutoff);
+
+            // 3. Filter: shape the spectrum (osc → filter → amp is correct order)
             float filteredSample = filter.processSample (oscSample);
 
-            // 3. Amp envelope + velocity + gain
-            float envValue      = ampEnvelope.getNextSample();
-            float currentSample = filteredSample
-                                  * kVoiceGain
-                                  * velocityScale
-                                  * envValue;
+            // 4. Amp envelope + velocity + gain
+            const float ampEnvVal     = ampEnvelope.getNextSample();
+            const float currentSample = filteredSample
+                                        * kVoiceGain
+                                        * velocityScale
+                                        * ampEnvVal;
 
-            // 4. Mix into all output channels (mono voice → stereo buffer)
+            // 5. Mix into all output channels (mono voice → stereo buffer)
             for (int ch = outputBuffer.getNumChannels(); --ch >= 0;)
                 outputBuffer.addSample (ch, startSample, currentSample);
 
             ++startSample;
 
-            // 5. Voice done check — AFTER getNextSample() so the ADSR's
-            //    final idle transition is included in the output correctly.
+            // 6. Voice done check — AFTER getNextSample() so the ADSR's
+            //    final idle transition is captured correctly in the output.
             if (! ampEnvelope.isActive())
             {
                 clearCurrentNote();
@@ -305,9 +358,12 @@ private:
 
     // --- Phase 6.3: Filter ---
     SolaceFilter filter;
-    // Stored at note-on so Phase 6.4 can compute modulated cutoff per-sample:
-    //   modulatedCutoff = baseCutoffHz + filterEnv.getNextSample() * depth * range
+    // baseCutoffHz: the APVTS filterCutoff value in Hz, read per render-block.
+    // The filter envelope adds to this per-sample: baseCutoffHz + envVal * depth * modRange.
     float baseCutoffHz = 20000.0f;
+
+    // --- Phase 6.4: Filter Envelope ---
+    SolaceADSR filterEnvelope;
 
     // Velocity scaling — set at note-on, multiplied per sample in renderNextBlock.
     float velocityScale = 0.0f;

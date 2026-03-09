@@ -273,8 +273,38 @@ column, gap: 8px, hug × hug
 - Velocity Mod Targets: 2 dropdowns ("Amp - Atta...", "None")
 - Velocity slider (variant: Big1)
 
-### Row 3 (Keyboard Row)
-- `Frame 46` — Keyboard component (IMAGE-SVG, full-width)
+### Row 3 (Keyboard + Performance Row)
+
+The bottom row is a `flex justify-between items-center self-stretch` container with two sub-panels:
+
+#### Left Sub-Panel — Pitch Bend & Mod Wheel
+- Bordered panel: `border-[#eeeeee] rounded-lg p-3`, column layout, `gap: 16px`, `self-stretch` (full height of keyboard row)
+- Contains **2 vertical sliders** side by side:
+  - **Slider 1** (Pitch Bend): track height `128px`, bg `#cccccc`, thumb fill `#eeeeee`/`#666666`
+  - **Slider 2** (Mod Wheel): track height `128px`, bg `#cccccc`, thumb at higher position in design
+- Each slider has a `24×20px` white label area to its right
+
+> ⚠️ **Pending decision:** Pitch Bend and Mod Wheel are MIDI performance controllers. Wiring these in the WebView bridge vs. using JUCE native controls needs to be discussed.
+
+#### Right Sub-Panel — MIDI Keyboard
+
+> ⚠️ **OPEN DECISION: CSS keyboard vs. JUCE native keyboard — to be discussed.**
+
+**Option A — CSS-drawn keyboard (as in Figma design):**
+- 6 octaves × 192px wide = 1152px total, 64px tall
+- White keys: SVG elements with `fill: #eeeeee`, various widths (26px, 27px, 28px, 29px)
+- Black keys: `div` elements, `16×40px`, `background: #666666`
+- Wrapped in `border-[#eeeeee] rounded-lg p-2`
+- Rendered entirely in HTML/CSS; notes sent via `bridge.js`
+
+**Option B — JUCE native `MidiKeyboardComponent` (current implementation):**
+- Already in codebase from Phase 5
+- Embedded at the bottom of the plugin window below the WebView area
+- Handles MIDI input directly; no bridge needed for note on/off
+- Appearance is JUCE-styled, not pixel-perfect to Figma design
+- Simpler, more robust, handles all edge cases (key highlighting, MIDI input)
+
+**Tradeoffs:** CSS keyboard matches Figma exactly and allows full styling control. JUCE keyboard handles MIDI I/O reliably and is already implemented. Decision pending.
 
 ---
 
@@ -296,15 +326,16 @@ Stored in `UI/assets/icons/`:
 | `preset-selecter.svg` | 456×64 | Full preset nav bar |
 | `keyboard-octave.svg` | 192×64 | One octave keyboard |
 
-> **Still needs individual export:** Sawtooth, Triangle, and any other waveform variants not captured in the set SVG. Also: `arrow_drop_down` icon, `chevron_backward`/`chevron_forward` as individual SVGs.
+> **Still needs individual export:** Sawtooth, Triangle, and any other waveform variants. Also confirm: `arrow_drop_down`, `chevron_backward`/`chevron_forward` as individual SVGs.
 
 ---
 
 ## Open Questions / Gaps
 
-1. **NATS font** — Is this a free font? Where is the font file? Check with Nabeel.
-2. **Waveform variants** — Confirm all 4 (or more) waveform types: Sine, Square, Sawtooth, Triangle?
-3. **Slider states** — "Big1", "Big2", "Mid", "High", "0", "Small", "Small1", "Small2" — these represent slider positions. What are the exact pixel heights for each variant?
-4. **Filter type options** — The selector shows "LP 24 dB". What are all the filter type options? (For dropdown values in JS)
-5. **LFO Target options** — What are all the possible dropdown values? (Filter Cutoff, Osc 2 Level, etc.)
-6. **Keyboard row** — Is `Frame 46` the full keyboard spanning the bottom? This is the JUCE keyboard component area.
+1. **NATS font** — Is this a free font? Where is the font file? Check with Nabeel. *(Acknowledged — will be resolved)*
+2. **Waveform variants** — Design currently has Sine + Square only. Will Sawtooth and Triangle be added? *(Acknowledged — may be added)*
+3. **Slider states** — "Big1", "Big2", "Mid", "High", "0", "Small", "Small1", "Small2" — what are the exact pixel track heights for each variant?
+4. **Filter type options** — The selector shows "LP 24 dB". What are all the filter type options? (LP12, LP24, HP12, HP24, BP?)
+5. **LFO Target options** — What are all the possible dropdown values? (Full list for JS implementation)
+6. **Keyboard: CSS vs JUCE native** — See Row 3 section above. Decision pending.
+7. **Pitch Bend / Mod Wheel** — Confirmed present in design (left of keyboard). Are these MIDI performance controls only, or also mapped to synth parameters?

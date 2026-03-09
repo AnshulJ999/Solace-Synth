@@ -206,11 +206,11 @@ filter.setCutoff(clampedCutoff);
 
 ## Sub-Phase 6.5 — Second Oscillator + Osc Mix
 
-**Why fifth:** The vision doc requires "at least two oscillators." Osc2 uses the same `SolaceOscillator` class from 6.2, plus its own tuning params. The Osc Mix section uses two independent level sliders (one per oscillator), matching the Figma design.
+**Why fifth:** The vision doc requires "at least two oscillators." Osc2 uses the same `SolaceOscillator` class from 6.2, plus its own tuning params. The Osc Mix section uses a **single crossfader** (`oscMix`): 0.0 = Osc1 only, 1.0 = Osc2 only, 0.5 = equal blend.
 
 ### Notes on Figma Design
 
-The Figma design shows the **Osc Mix** section with **two separate vertical level sliders** — "Osc 1" and "Osc 2" — not a single crossfader. This means each oscillator has its own independent amplitude in the mix, allowing both at full level, both at half, or any combination. Parameters: `osc1Level` and `osc2Level`.
+The Figma design shows the **Osc Mix** section as a **single vertical crossfader** — one fader that blends between Osc1 (bottom/0.0) and Osc2 (top/1.0). APVTS parameter: `oscMix`.
 
 The Figma design shows Osc 2 defaults: **Octave = 1** (one octave above Osc1), **Waveform = Square**. This creates a naturally interesting default patch.
 
@@ -218,8 +218,8 @@ The Figma design shows Osc 2 defaults: **Octave = 1** (one octave above Osc1), *
 
 | Action | File | What |
 |--------|------|------|
-| MODIFY | `Source/DSP/SolaceVoice.h` | Add `SolaceOscillator osc2`. In `startNote()`: read `osc2Waveform`, `osc2Octave`, `osc2Transpose`, `osc2Tuning` from APVTS, configure `osc2`. Read `osc1Level` and `osc2Level`. In `renderNextBlock()`: per sample, `mixed = (osc1.getNextSample() * osc1Level) + (osc2.getNextSample() * osc2Level)`. Feed `mixed` into filter. |
-| MODIFY | `Source/PluginProcessor.cpp` | Add parameters: `osc2Waveform` (int, 0–3, default 2/Square), `osc2Octave` (int, -3–+3, default 1), `osc2Transpose` (int, -12–+12, default 0), `osc2Tuning` (float, -100–+100 cents, default 0.0), `osc1Level` (float, 0.0–1.0, default 1.0), `osc2Level` (float, 0.0–1.0, default 1.0). |
+| MODIFY | `Source/DSP/SolaceVoice.h` | Add `SolaceOscillator osc2`. In `startNote()`: read `osc2Waveform`, `osc2Octave`, `osc2Transpose`, `osc2Tuning` from APVTS, configure `osc2`. Read `oscMix`. In `renderNextBlock()`: per sample, `mixed = (osc1.getNextSample() * (1.0f - oscMix)) + (osc2.getNextSample() * oscMix)`. Feed `mixed` into filter. |
+| MODIFY | `Source/PluginProcessor.cpp` | Add parameters: `osc2Waveform` (int, 0–3, default 2/Square), `osc2Octave` (int, -3–+3, default 1), `osc2Transpose` (int, -12–+12, default 0), `osc2Tuning` (float, -100–+100 cents, default 0.0), `oscMix` (float, 0.0–1.0, default 0.5). |
 
 > [!NOTE]
 > `osc2Octave` is an **octave shift** integer (not semitones). Range -3 to +3 means 3 octaves below to 3 octaves above base pitch. Default 1 = Osc2 plays one octave above Osc1, as shown in the Figma design.
@@ -229,9 +229,9 @@ The Figma design shows Osc 2 defaults: **Octave = 1** (one octave above Osc1), *
 
 ### Verification
 
-1. `osc1Level`=1.0, `osc2Level`=0.0 → only Osc1 audible.
-2. `osc1Level`=0.0, `osc2Level`=1.0 → only Osc2 audible (should be one octave up and square by default).
-3. Both levels at 1.0, Osc2 detune +7 cents → beating/chorus effect.
+1. `oscMix`=0.0 → only Osc1 audible (sine, default)
+2. `oscMix`=1.0 → only Osc2 audible (square, one octave up by default)
+3. `oscMix`=0.5 → equal blend of both — beating/thickness if Osc2 Tuning is slightly offset.
 4. Set Osc2 Octave to +1, Transpose to +7 → perfect fifth one octave up.
 
 ---
@@ -387,8 +387,7 @@ float rightGain = std::sqrt(0.5f * (1.0f + pan));
 | 6.5 | `osc2Octave` | int | -3–+3 | 1 |
 | 6.5 | `osc2Transpose` | int | -12–+12 | 0 |
 | 6.5 | `osc2Tuning` | float | -100–+100 cents | 0.0 |
-| 6.5 | `osc1Level` | float | 0.0–1.0 | 1.0 |
-| 6.5 | `osc2Level` | float | 0.0–1.0 | 1.0 |
+| 6.5 | `oscMix` | float | 0.0–1.0 (0=Osc1, 1=Osc2) | 0.5 |
 | 6.6 | `lfoWaveform` | int | 0–4 | 0 (Sine) |
 | 6.6 | `lfoRate` | float | 0.01–50 Hz | 1.0 |
 | 6.6 | `lfoAmount` | float | 0.0–1.0 | 0.0 |

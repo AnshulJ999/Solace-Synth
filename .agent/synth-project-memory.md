@@ -396,7 +396,7 @@ An AI-first "vibe-coding" framework for building JUCE plugins. Provides structur
 - [x] **Filter in V1:** LP12, LP24, HP12 using `juce::dsp::LadderFilter`. **LP24 is the default** (matches Figma design).
 - [x] **LFO target list:** None, FilterCutoff, Osc1Pitch, Osc2Pitch, Osc1Level, Osc2Level, AmpLevel, FilterResonance (8 targets, 0-7).
 - [x] **Velocity mod target list:** None, AmpLevel, AmpAttack, FilterCutoff, FilterResonance (5 targets, 0-4).
-- [x] **Osc Mix:** Two independent level faders (`osc1Level`, `osc2Level`) — NOT a single crossfader. Matches Figma design (two sliders in Osc Mix section).
+- [x] **Osc Mix:** Single vertical crossfader (`oscMix`, 0.0=Osc1 only, 1.0=Osc2 only, 0.5=equal blend). Confirmed by user. **Not** two separate level faders.
 - [x] **Osc2 defaults:** Waveform=Square (index 2), Octave=1 (one octave above Osc1). Confirmed from Figma screenshot.
 - [x] **Both oscillators get tuning params:** `osc1Octave`, `osc1Transpose`, `osc1Tuning` added in 6.2. `osc2Octave`, `osc2Transpose`, `osc2Tuning` in 6.5.
 - [x] **LFO has 3 target slots** (`lfoTarget1/2/3`) and one shared amount slider (`lfoAmount`). Matches 3 dropdown targets in Figma.

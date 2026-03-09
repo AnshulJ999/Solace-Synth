@@ -31,7 +31,7 @@ The accepted design is the **second iteration** (slider/fader-based) — the fir
 
 **Top row (left to right):**
 1. Oscillator 1 — Waveform selector, Octave selector, Transpose selector, Tuning fader
-2. Osc Mix — two vertical faders: Osc 1 Level, Osc 2 Level
+2. Osc Mix — one vertical crossfader (`oscMix`): 0.0 = Osc1 only, 1.0 = Osc2 only
 3. Oscillator 2 — Waveform selector, Octave selector, Transpose selector, Tuning fader
 4. Amplifier Envelope — Attack, Decay, Sustain, Release faders
 5. Master — Level fader
@@ -219,11 +219,7 @@ Wire the layout + components together into functional sections. Implement in top
 - `osc1Tuning` — fader (-100 to +100 cents)
 
 ### Osc Mix Section
-- `osc1Level` — fader (0.0–1.0), labeled "Osc 1"
-- `osc2Level` — fader (0.0–1.0), labeled "Osc 2"
-
-> [!NOTE]
-> The Figma design shows two separate vertical faders in the Osc Mix section (one labeled "Osc 2" at top, one labeled "Osc 1" at bottom). This is two independent level controls, not a crossfader. APVTS params: `osc1Level` and `osc2Level`.
+- `oscMix` — single vertical crossfader (0.0–1.0). 0.0 = Osc1 only, 1.0 = Osc2 only, 0.5 = equal blend.
 
 ### Oscillator 2 Section
 - `osc2Waveform` — arrow-selector (Sine / Saw / Square / Triangle)

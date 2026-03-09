@@ -497,7 +497,12 @@ Do NOT implement features suggested solely by Claude Code/Codex reviews without 
   - Build: successful. Listening test: passed. Gemini approved ✅.
 
 
-- [ ] Phase 6.5: Second Oscillator + `oscMix` crossfader
+- [x] **Phase 6.5: Second Oscillator + `oscMix` crossfader** — code complete (2026-03-10), awaiting build + listening test
+  - `Source/DSP/SolaceVoice.h` — `SolaceVoiceParams` extended with 5 atomics (`osc2Waveform/Octave/Transpose/Tuning`, `oscMix`). `SolaceOscillator osc2` private member added. `startNote()`: `osc2.reset() → setWaveform() → setTuningOffset() → setFrequency(baseHz)` — same pattern as osc1, same MIDI base frequency, independent tuning offsets. `oscMix` read per-block in `renderNextBlock()` (live crossfader response while notes held). Sample loop: both oscillators always call `getNextSample()` (phase-continuous crossfader sweep); `blendedOsc = osc1 * (1-mix) + osc2 * mix` feeds into filter unchanged.
+  - `PluginProcessor.cpp` — 5 new APVTS params: `osc2Waveform` (int 0-3, def **2=Square**), `osc2Octave` (int -3 to +3, def **1=+1 octave**), `osc2Transpose` (int -12 to +12, def 0), `osc2Tuning` (float -100 to +100 cents, def 0), `oscMix` (float 0-1, def **0.5=equal blend**). 5 new `voiceParams` atomics.
+  - Default patch: Osc1=Sine (unison) + Osc2=Square (+1 octave), 50/50 blend — immediately interesting, good demo of dual-osc capability.
+  - Design note: no `SolaceOscillator` changes needed — class already supports second instance reuse. UI bindings for all 5 params already in `main.js` from Phase 7.2 scaffold.
+
 - [ ] Phase 6.6: LFO (3 targets, per-voice free-running)
 - [ ] Phase 6.7: Unison (with level normalization)
 - [ ] Phase 6.8: Voicing params (voice count, velocity mod targets)

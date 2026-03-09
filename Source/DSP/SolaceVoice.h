@@ -60,6 +60,17 @@ struct SolaceVoiceParams
     const std::atomic<float>* filterEnvDecay   = nullptr;
     const std::atomic<float>* filterEnvSustain = nullptr;
     const std::atomic<float>* filterEnvRelease = nullptr;
+
+    // --- Phase 6.5: Oscillator 2 + Osc Mix ---
+    // Osc2 uses the same SolaceOscillator API as Osc1.
+    // Int parameters are stored as float by APVTS; cast to int at note-on.
+    // oscMix: float, 0.0–1.0. 0 = Osc1 only, 1 = Osc2 only, 0.5 = equal blend.
+    // oscMix is snapshotted per render-block (not note-on) for live crossfader response.
+    const std::atomic<float>* osc2Waveform  = nullptr;
+    const std::atomic<float>* osc2Octave    = nullptr;
+    const std::atomic<float>* osc2Transpose = nullptr;
+    const std::atomic<float>* osc2Tuning    = nullptr;  // float, -100 to +100 cents
+    const std::atomic<float>* oscMix        = nullptr;  // float, 0.0–1.0
 };
 
 // ============================================================================
@@ -89,11 +100,20 @@ struct SolaceVoiceParams
 //   envelope. Each sample: modulatedCutoff = baseCutoffHz + envVal * depth * modRange.
 //   modRange = 10000 Hz constant (V1). filterEnvDepth (-1 to +1) controls direction.
 //   filter.setCutoff() clamps to [20, 20000] Hz — safe for any modulation value.
+//   filterEnvelope.reset() called before trigger() at note-on to prevent ADSR
+//   restart from non-zero level when voice is reused mid-release.
 //
-// Signal flow (per sample, Phase 6.4+):
-//   osc1.getNextSample()
+// Phase 6.5 — Second Oscillator + Osc Mix:
+//   osc2 is a second SolaceOscillator with its own waveform and tuning stack,
+//   configured at note-on from osc2Waveform/Octave/Transpose/Tuning APVTS params.
+//   oscMix (0.0–1.0) crossfades between them per render-block:
+//     oscSample = osc1.getNextSample() * (1.0f - oscMix) + osc2.getNextSample() * oscMix
+//   The blended signal feeds into the filter unchanged — signal chain is additive.
+//
+// Signal flow (per sample, Phase 6.5+):
+//   blendedOsc = osc1 * (1 - oscMix) + osc2 * oscMix          ← crossfader
 //     → filter.setCutoff(baseCutoffHz + filterEnv * depth * 10000)  ← per sample
-//     → filter.processSample()                                       ← filtered
+//     → filter.processSample(blendedOsc)                            ← filtered
 //       → * kVoiceGain * velocityScale * ampEnvelope.getNextSample()
 //         → output buffer
 //
@@ -136,6 +156,13 @@ public:
         jassert (params.filterEnvDecay   != nullptr);
         jassert (params.filterEnvSustain != nullptr);
         jassert (params.filterEnvRelease != nullptr);
+
+        // Phase 6.5
+        jassert (params.osc2Waveform  != nullptr);
+        jassert (params.osc2Octave    != nullptr);
+        jassert (params.osc2Transpose != nullptr);
+        jassert (params.osc2Tuning    != nullptr);
+        jassert (params.oscMix        != nullptr);
     }
 
     // ========================================================================
@@ -186,6 +213,20 @@ public:
         );
         const double baseHz = juce::MidiMessage::getMidiNoteInHertz (midiNoteNumber);
         osc1.setFrequency (baseHz, getSampleRate());
+
+        // --- Oscillator 2 (Phase 6.5) ---
+        // Same setup pattern as Osc1. Both oscillators receive the same base MIDI
+        // frequency — their individual tuning offsets give them independent pitches.
+        // oscMix is NOT snapshotted here — it is read per render-block in
+        // renderNextBlock() so the crossfader is live while notes are held.
+        osc2.reset();  // phase-coherent start per note, same reasoning as osc1
+        osc2.setWaveform  (static_cast<int> (params.osc2Waveform->load()));
+        osc2.setTuningOffset (
+            static_cast<int>  (params.osc2Octave->load()),
+            static_cast<int>  (params.osc2Transpose->load()),
+            params.osc2Tuning->load()
+        );
+        osc2.setFrequency (baseHz, getSampleRate());
 
         // --- Filter (Phase 6.3) ---
         // filterType is snapshotted at note-on — mode changes mid-note cause a
@@ -262,19 +303,19 @@ public:
     // ========================================================================
     // renderNextBlock — fill the output buffer for this voice.
     //
-    // Signal flow (Phase 6.4+, per sample):
-    //   baseCutoffHz + filterEnv * depth * modRange → filter.setCutoff()
-    //   osc1 → filter.processSample() → * kVoiceGain * velocityScale * ampEnv
-    //   → addSample() into output buffer
+    // Signal flow (Phase 6.5+, per sample):
+    //   blendedOsc = osc1 * (1-mix) + osc2 * mix         ← crossfader (per block)
+    //   blendedOsc → filter (cutoff modulated by filterEnv per sample)
+    //     → * kVoiceGain * velocityScale * ampEnv → output
     //
     // Filter runs BEFORE amp envelope — correct subtractive order:
     //   filter self-resonance decays naturally during amp release phase.
     //
     // Per-block (before the sample loop):
-    //   - baseCutoffHz and filterResonance read from APVTS atomics (live knob response)
-    //   - filterEnvDepth read from APVTS atomic (cheap float load, user may sweep mid-note)
+    //   - baseCutoffHz, filterResonance, envDepth, oscMix read from APVTS atomics
     //
     // Per-sample (inside the loop):
+    //   - osc1 + osc2 both advance always (phase-continuous crossfader sweep)
     //   - filterEnvelope.getNextSample() → modulated cutoff → filter.setCutoff()
     //   - ampEnvelope.getNextSample()    → final amplitude scale
     //
@@ -298,9 +339,12 @@ public:
         baseCutoffHz = params.filterCutoff->load();
         filter.setResonance (params.filterResonance->load());
 
-        // filterEnvDepth is read per-block too. It is a continuous float the
-        // user may sweep mid-note; per-block resolution is plenty fine.
+        // filterEnvDepth: continuous float the user may sweep mid-note.
         const float envDepth = params.filterEnvDepth->load();
+
+        // oscMix: read per-block so moving the crossfader while holding a note
+        // is immediately audible. Clamped to [0, 1] for safety.
+        const float mix = juce::jlimit (0.0f, 1.0f, params.oscMix->load());
 
         // modRange: maximum Hz the filter envelope can add or subtract.
         // 10000 Hz gives dramatic sweeps while keeping headroom on both edges.
@@ -309,21 +353,24 @@ public:
 
         while (--numSamples >= 0)
         {
-            // 1. Oscillator: raw waveform sample in [-1, +1]
-            float oscSample = osc1.getNextSample();
+            // 1. Oscillators: blend Osc1 and Osc2 via oscMix crossfader.
+            //    mix=0 → Osc1 only; mix=1 → Osc2 only; mix=0.5 → equal blend.
+            //    Both oscillators always advance their phase accumulators each
+            //    sample (getNextSample() is called regardless of mix value) so
+            //    neither oscillator drifts out of phase if mix is swept back.
+            const float osc1Sample  = osc1.getNextSample();
+            const float osc2Sample  = osc2.getNextSample();
+            const float oscSample   = osc1Sample * (1.0f - mix) + osc2Sample * mix;
 
-            // 2. Filter envelope modulation — computed per sample so the sweep
-            //    is smooth (no stepping artefacts). filterEnvelope.getNextSample()
-            //    returns 0.0 → 1.0 (ADSR output, always non-negative).
-            //    envDepth (-1 to +1) controls direction and intensity.
-            //    SolaceFilter::setCutoff() clamps to [20, 20000] Hz internally,
-            //    so overshoot from the envelope is always safe.
+            // 2. Filter envelope modulation — per sample for smooth sweep.
+            //    filterEnvelope returns 0.0 → 1.0. envDepth (-1 to +1) controls
+            //    direction. SolaceFilter::setCutoff() clamps to [20, 20000] Hz.
             const float filterEnvVal    = filterEnvelope.getNextSample();
             const float modulatedCutoff = baseCutoffHz + filterEnvVal * envDepth * kModRange;
             filter.setCutoff (modulatedCutoff);
 
-            // 3. Filter: shape the spectrum (osc → filter → amp is correct order)
-            float filteredSample = filter.processSample (oscSample);
+            // 3. Filter: shape the spectrum (blended osc → filter → amp)
+            const float filteredSample = filter.processSample (oscSample);
 
             // 4. Amp envelope + velocity + gain
             const float ampEnvVal     = ampEnvelope.getNextSample();
@@ -373,6 +420,11 @@ private:
 
     // --- Phase 6.4: Filter Envelope ---
     SolaceADSR filterEnvelope;
+
+    // --- Phase 6.5: Oscillator 2 ---
+    // oscMix is cached per render-block (not stored here as a member).
+    // The per-block load from APVTS atomics gives live crossfader response.
+    SolaceOscillator osc2;
 
     // Velocity scaling — set at note-on, multiplied per sample in renderNextBlock.
     float velocityScale = 0.0f;

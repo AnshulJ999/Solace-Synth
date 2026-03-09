@@ -47,6 +47,13 @@ SolaceSynthProcessor::SolaceSynthProcessor()
     voiceParams.filterEnvSustain = apvts.getRawParameterValue ("filterEnvSustain");
     voiceParams.filterEnvRelease = apvts.getRawParameterValue ("filterEnvRelease");
 
+    // --- Phase 6.5: Oscillator 2 + Osc Mix ---
+    voiceParams.osc2Waveform  = apvts.getRawParameterValue ("osc2Waveform");
+    voiceParams.osc2Octave    = apvts.getRawParameterValue ("osc2Octave");
+    voiceParams.osc2Transpose = apvts.getRawParameterValue ("osc2Transpose");
+    voiceParams.osc2Tuning    = apvts.getRawParameterValue ("osc2Tuning");
+    voiceParams.oscMix        = apvts.getRawParameterValue ("oscMix");
+
     // Create 16 voices. We always create the maximum number up front — JUCE's
     // Synthesiser does not support safe voice addition/removal at runtime.
     // A polyphony cap (Phase 6.8) will be implemented inside startNote() later.
@@ -198,6 +205,38 @@ juce::AudioProcessorValueTreeState::ParameterLayout SolaceSynthProcessor::create
         juce::NormalisableRange<float> (0.001f, 10.0f, 0.001f),
         0.3f));
 
+    // --- Phase 6.5: Oscillator 2 + Osc Mix ---
+    // osc2Waveform default 2 = Square (matches plan — Figma shows Square as Osc2 default).
+    // osc2Octave default 1 = one octave above Osc1 (plan: Figma design shows Octave=1).
+    // oscMix default 0.5 = equal blend of both oscillators on first launch.
+    params.push_back (std::make_unique<juce::AudioParameterInt> (
+        juce::ParameterID { "osc2Waveform", 1 },
+        "Osc2 Waveform",
+        0, 3, 2));  // default: 2 = Square
+
+    params.push_back (std::make_unique<juce::AudioParameterInt> (
+        juce::ParameterID { "osc2Octave", 1 },
+        "Osc2 Octave",
+        -3, 3, 1));  // default: 1 = one octave above Osc1
+
+    params.push_back (std::make_unique<juce::AudioParameterInt> (
+        juce::ParameterID { "osc2Transpose", 1 },
+        "Osc2 Transpose",
+        -12, 12, 0));
+
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (
+        juce::ParameterID { "osc2Tuning", 1 },
+        "Osc2 Tuning",
+        juce::NormalisableRange<float> (-100.0f, 100.0f, 0.01f),
+        0.0f));
+
+    // oscMix: 0.0 = Osc1 only, 1.0 = Osc2 only, 0.5 = equal blend (default).
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (
+        juce::ParameterID { "oscMix", 1 },
+        "Osc Mix",
+        juce::NormalisableRange<float> (0.0f, 1.0f, 0.01f),
+        0.5f));
+
     return { params.begin(), params.end() };
 }
 
@@ -304,7 +343,7 @@ void SolaceSynthProcessor::prepareToPlay (double sampleRate, int samplesPerBlock
     SolaceLog::info ("prepareToPlay: sampleRate=" + juce::String (sampleRate)
         + " samplesPerBlock=" + juce::String (samplesPerBlock)
         + " voices=" + juce::String (synth.getNumVoices())
-        + " params: amp(4) osc1(4) filter(3) filterEnv(5)");
+        + " params: amp(4) osc1(4) filter(3) filterEnv(5) osc2+mix(5)");
 }
 
 void SolaceSynthProcessor::releaseResources()

@@ -477,11 +477,13 @@ Do NOT implement features suggested solely by Claude Code/Codex reviews without 
   - Build: successful. Waveforms audibly distinct — listening test passed.
   - Note: Naïve Saw/Square alias at high frequencies — intentional V1 behaviour. PolyBLEP tracked for V2.
 
-- [x] **Phase 6.3: Filter** — code complete (2026-03-10), awaiting build + listening test
-  - `Source/DSP/SolaceFilter.h` — NEW. Wrapper around `juce::dsp::LadderFilter<float>`. Per-sample via native `processSample(value, 0)` (no AudioBlock overhead). Modes: LP12 (0), LP24 (1, default), HP12 (2). Cutoff clamped [20, 20000 Hz]. Filter reset on voice steal.
-  - `Source/DSP/SolaceVoice.h` — added `SolaceFilter filter` member + `float baseCutoffHz`. Signal order: osc1 → filter → amp ADSR (correct subtractive order). `baseCutoffHz` stored at note-on for Phase 6.4 envelope modulation. Comment left inside renderNextBlock() showing exact 6.4 integration point.
-  - `PluginProcessor.cpp` — 3 new params: `filterCutoff` (20-20000Hz, NormalisableRange skew=0.3 for log feel, default 20000), `filterResonance` (0-1, default 0), `filterType` (int 0-2, default 1=LP24).
-  - Note: `filterCutoff` default 20000 Hz = fully open. Out-of-the-box the synth sounds identical to 6.2 until the cutoff is moved.
+- [x] **Phase 6.3: Filter** — COMPLETE (2026-03-10)
+  - `Source/DSP/SolaceFilter.h` — NEW. Wrapper around `juce::dsp::LadderFilter<float>`. Per-sample via 1-sample AudioBlock (LadderFilter::processSample is `protected` in JUCE 8, not public). AudioBlock is non-allocating stack wrapper. Modes: LP12 (0), LP24 (1, default), HP12 (2). Cutoff clamped [20, 20000 Hz]. Filter reset on voice steal.
+  - `Source/DSP/SolaceVoice.h` — added `SolaceFilter filter` member + `float baseCutoffHz`. Signal order: osc1 → filter → amp ADSR (correct subtractive order). Live per-block refresh of filterCutoff and filterResonance from APVTS atomics, so knob moves immediately affect held notes. filterType stays at note-on snapshot (mode switches mid-note click). Phase 6.4 integration point commented in the sample loop.
+  - `PluginProcessor.cpp` — 3 new params: `filterCutoff` (20-20000Hz, skew=0.3, default 20000 = fully open), `filterResonance` (0-1, default 0), `filterType` (int 0-2, default 1=LP24).
+  - Post-review fixes: (1) processSample → AudioBlock (protected API fix); (2) live per-block filter refresh added (was note-on snapshot only).
+  - UI: filterCutoff, filterResonance, filterType controls already wired in main.js (Phase 7.2). Will activate automatically once params are registered.
+
 
 - [ ] Phase 6.4: Filter Envelope
 - [ ] Phase 6.5: Second Oscillator + `oscMix` crossfader

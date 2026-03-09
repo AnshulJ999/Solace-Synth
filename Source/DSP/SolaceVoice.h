@@ -68,8 +68,14 @@ struct SolaceVoiceParams
 //
 // Phase 6.3 — Filter (LadderFilter LP/HP):
 //   SolaceFilter wraps juce::dsp::LadderFilter<float> (Moog-style ladder).
-//   Processes one sample at a time via processSample() — per-sample cutoff
-//   modulation is ready for Phase 6.4 (filter envelope) without refactoring.
+//   Per-sample design:
+//   LadderFilter::processSample() is protected in JUCE 8 — only callable by
+//   subclasses. SolaceFilter uses a 1-sample AudioBlock/ProcessContextReplacing
+//   to route one sample through LadderFilter::process() per call, which is the
+//   correct public API. This also drives the internal SmoothedValue (cutoff
+//   and resonance are smoothed on each sample call), preventing zipper noise
+//   when setCutoff() is called per-block or per-sample.
+//   AudioBlock is a non-owning pointer wrapper — no heap allocation.
 //   baseCutoffHz is stored so Phase 6.4 can compute modulatedCutoff in-loop.
 //
 // Signal flow (per sample):
@@ -234,6 +240,19 @@ public:
     {
         if (! ampEnvelope.isActive() && ! isVoiceActive())
             return;
+
+        // --- Live filter parameter refresh (once per render block) ---
+        // Read filterCutoff and filterResonance from APVTS atomics so that
+        // moving knobs while a note is held is immediately audible on that voice.
+        // LadderFilter uses SmoothedValue internally, so per-block updates are
+        // interpolated between blocks — no zipper noise.
+        //
+        // filterType is NOT updated here: switching modes mid-note causes a
+        // transient click (the mode changes the state-variable topology). It
+        // stays at the note-on snapshot value for V1.
+        baseCutoffHz = params.filterCutoff->load();
+        filter.setCutoff    (baseCutoffHz);
+        filter.setResonance (params.filterResonance->load());
 
         while (--numSamples >= 0)
         {

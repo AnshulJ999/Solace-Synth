@@ -109,15 +109,26 @@ public:
     // ========================================================================
     // processSample — filter one sample and return the output.
     //
-    // Uses LadderFilter's native per-sample path (channel 0, mono voice).
-    // This avoids AudioBlock construction overhead while giving us the
-    // per-sample control needed for filter envelope modulation in Phase 6.4.
+    // LadderFilter::processSample() is protected in JUCE 8 — only callable
+    // from within subclasses. The supported public path is process(context).
+    //
+    // We create a 1-sample AudioBlock on the stack (no heap allocation — 
+    // AudioBlock is a non-owning pointer wrapper) and route it through
+    // process(). This also correctly calls updateSmoothers() once per sample,
+    // which drives LadderFilter's internal SmoothedValue for cutoff/resonance.
+    // That smoother is what prevents zipper noise when setCutoff() is called
+    // per-block (Phase 6.3) or per-sample (Phase 6.4 filter envelope).
     //
     // Call once per audio sample in renderNextBlock().
     // ========================================================================
     float processSample (float input) noexcept
     {
-        return ladder.processSample (input, 0);  // channel 0 — mono per voice
+        float sample = input;
+        float* channelPtr = &sample;
+        juce::dsp::AudioBlock<float>               block (&channelPtr, 1, 1);
+        juce::dsp::ProcessContextReplacing<float>  ctx   (block);
+        ladder.process (ctx);
+        return sample;
     }
 
     // ========================================================================

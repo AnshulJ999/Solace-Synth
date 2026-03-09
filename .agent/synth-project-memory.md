@@ -183,6 +183,69 @@ Anshul rebuilds plugin → Full test in DAW → Feedback to friend → Repeat
 
 ---
 
+## Bugs, Patterns & Pre-Release Checklist
+
+*Full-codebase review -- Claude Code + Gemini, 2026-03-10*
+
+### Fixed
+
+| # | File | Issue | Fix Applied |
+|---|------|-------|-------------|
+| 1 | `SolaceVoice.h` | `filter.reset()` missing in `startNote()` -- stale LadderFilter delay state bleeds on voice reuse at high resonance | `filter.reset()` added before `filter.setMode()` |
+| 2 | `PluginEditor.cpp:57` | `callAfterDelay([this])` -- dangling pointer if editor closes within 500ms | `SafePointer<SolaceSynthEditor>` with null check |
+| 3 | `PluginEditor.cpp:312` | Comment claimed "no heap allocation" when `new DynamicObject()` IS heap | Comment corrected |
+| 4 | `PluginEditor.cpp:170` | Path traversal: `getChildFile(path)` without boundary check | `file.isAChildOf(uiDir)` guard added |
+
+### Tracked -- V2 / Pre-Release
+
+| # | File | Issue | Plan |
+|---|------|-------|------|
+| 5 | `SolaceFilter.h` | Cutoff hard-clamped to 20,000 Hz -- safe at 44.1kHz+ but unstable if sample rate < 40kHz | V2: `min(20000.0f, sampleRate * 0.45f)` dynamic clamp in `prepare()` |
+| 6 | `CMakeLists.txt` | `PLUGIN_CODE "Ss01"` -- collision risk in large-studio DAW scans | Pre-release: UUID-derived unique 4-char code |
+| 7 | `SolaceLogger.h` | Multi-instance: concurrent log file writes | Pre-release: instance-stamped filenames |
+| 8 | `PluginProcessor.cpp` | `masterVolume` via `buffer.applyGain()` once per block -- zippers under rapid DAW automation | Phase 6.9: `juce::LinearSmoothedValue<float>` per-sample gain |
+
+### Established Patterns -- Never Break
+
+**Audio thread:**
+- Params only via `std::atomic<float>*` from `getRawParameterValue()` -- no APVTS lookups on audio thread
+- Block-level reads outside the sample loop via `.load()`; only `getNextSample()` calls inside the loop
+- `processBlock()` always opens with `juce::ScopedNoDenormals`
+
+**Cross-thread lambdas:**
+- Audio-to-message thread: `callAsync()` + `SafePointer`
+- Deferred callbacks (callAfterDelay etc.): `SafePointer`, never raw `[this]` (Issue 2 was exactly this)
+
+**Voice lifecycle reset rules:**
+- `ampEnvelope` -- NO reset in `startNote()` -- JUCE ADSR ramps from current level on steal (prevents click on stolen note)
+- `filterEnvelope` -- ALWAYS `reset()` before `trigger()` -- pluck sweep must start from zero even on stolen voice
+- `filter` -- ALWAYS `reset()` before `setMode()` -- LadderFilter delay state persists after natural release; self-oscillation bleeds at high resonance if not cleared
+- `stopNote(allowTailOff=false)` -- ALL THREE: `ampEnvelope.reset()` + `filterEnvelope.reset()` + `filter.reset()` + `clearCurrentNote()`
+
+**LFO (Phase 6.6):**
+- Do NOT call `lfo.reset()` in `startNote()` -- LFO is free-running from voice allocation
+- Per-voice LFO phase drift on chords creates organic shimmer (confirmed by plan + Gemini)
+- Resetting on note-on would produce a key-synced LFO -- different and less organic character
+
+**kVoiceGain:**
+- Now: `0.15f` static (V1 acceptable with mixed velocities)
+- Phase 6.7: replace with `1.0f / sqrt(voiceCount * unisonCount)` dynamic normalisation
+
+### Confirmed-Clean Architecture
+
+| Decision | Rationale |
+|----------|-----------|
+| Filter before amp envelope in signal chain | Self-resonance decays naturally through amp release phase |
+| Both oscs always call `getNextSample()` regardless of `oscMix` | Phase-continuous crossfader -- swept mix never reveals a phase jump |
+| `getTailLengthSeconds()` returns `ampRelease` only | Voice is silent at amp zero; filter tail is inaudible thereafter |
+| `LadderFilter` via 1-sample `AudioBlock` on stack | Works around protected API in JUCE 8; zero heap; drives `updateSmoothers()` per sample |
+| `oscMix` read per-block | One atomic load; live knob response; V2 candidate for SmoothedValue under heavy automation |
+| `SafePointer` for all escaped lambdas | Component may be destroyed before a deferred callback fires |
+| APVTS listeners removed in destructor before members destruct | Prevents in-flight parameterChanged() on partially-destroyed object |
+| `visibilityChanged()` calls `sendAllParametersToJS()` | Compensates for events dropped by emitEventIfBrowserIsVisible() while editor hidden |
+
+---
+
 ## 🛠️ Technical Approach
 
 ### Framework Decision
@@ -669,9 +732,10 @@ Since `dev-nabeel` only contains `UI/` changes, this is always safe — no audio
 - [pamplejuce JUCE CMake template](https://github.com/sudara/pamplejuce)
 - [synth-plugin-book (MIT)](https://github.com/hollance/synth-plugin-book)
 - [awesome-juce curated list](https://github.com/sudara/awesome-juce)
-- [Helm — architecture reference](https://github.com/mtytel/helm)
-- [Odin2 — modern JUCE reference](https://github.com/TheWaveWarden/odin2)
+- [Helm - architecture reference](https://github.com/mtytel/helm)
+- [Odin2 - modern JUCE reference](https://github.com/TheWaveWarden/odin2)
 - [Wavetable by FigBug (BSD-3-Clause)](https://github.com/FigBug/Wavetable)
 - [JUCE pricing/licensing](https://juce.com/get-juce/)
 
 ---
+

@@ -54,9 +54,18 @@ SolaceSynthEditor::SolaceSynthEditor (SolaceSynthProcessor& p)
     addAndMakeVisible (midiKeyboard);
     // Grab keyboard focus after a short delay so the user can play immediately.
     // We use a lambda timer so we don't block the constructor.
-    juce::Timer::callAfterDelay (500, [this]() {
-        midiKeyboard.grabKeyboardFocus();
-    });
+    //
+    // IMPORTANT: use SafePointer, not raw [this]. The lambda fires on the message
+    // thread 500ms later — if the user closes the plugin window in that window,
+    // the editor is destroyed before the lambda fires. A raw 'this' would be a
+    // dangling pointer → undefined behaviour. SafePointer nulls itself on
+    // component deletion, making the check below safe.
+    juce::Timer::callAfterDelay (500,
+        [safeThis = juce::Component::SafePointer<SolaceSynthEditor> (this)]()
+        {
+            if (auto* self = safeThis.getComponent())
+                self->midiKeyboard.grabKeyboardFocus();
+        });
 
     // Set window size
     setSize (900, 600);
@@ -167,9 +176,9 @@ SolaceSynthEditor::resourceRequested (const juce::String& path)
 
     auto file = uiDir.getChildFile (filePath);
 
-    if (! file.existsAsFile())
+    if (! file.isAChildOf (uiDir) || ! file.existsAsFile())
     {
-        DBG ("Solace Synth: Resource not found: " + filePath);
+        DBG ("Solace Synth: Resource not found or outside UI dir: " + filePath);
         return std::nullopt;
     }
 
@@ -309,7 +318,10 @@ void SolaceSynthEditor::sendAllParametersToJS()
 
     auto& apvts = processorRef.getAPVTS();
 
-    // Build an array of { paramId, value } objects on the stack (no heap allocation)
+    // Build an array of { paramId, value } objects. paramsArray itself is
+    // stack-allocated; the per-entry DynamicObject instances are heap-allocated
+    // (via juce::var ownership — freed when paramsArray goes out of scope).
+    // This is fine: we're on the message thread, not the audio thread.
     juce::Array<juce::var> paramsArray;
 
     for (auto* param : apvts.processor.getParameters())

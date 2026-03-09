@@ -402,7 +402,7 @@ An AI-first "vibe-coding" framework for building JUCE plugins. Provides structur
 - [x] **LFO has 3 target slots** (`lfoTarget1/2/3`) and one shared amount slider (`lfoAmount`). Matches 3 dropdown targets in Figma.
 - [x] **Plugin window:** Resizable (`setResizable(true, false)` + `setResizeLimits()`). CSS uses relative units. Fallback: 3 size presets.
 - [x] **UI theme:** Light / white background, orange accent sliders. Dark theme is a V2 nice-to-have.
-- [ ] **LFO scope: per-voice or global?** Per-voice = organic drift. Global = classic polysynth lockstep. **Ask designer friend before 6.6.**
+- [x] **LFO scope: per-voice, free-running.** Confirmed by Nabeel. Each `SolaceVoice` owns its own `SolaceLFO`. LFO runs continuously from voice allocation — do NOT reset phase in `startNote()`. This produces organic drift when playing chords (each voice's LFO is at a different phase).
 - [ ] **Filter Env Depth** — UI position: Filter section or Filter Configuration section? Ask designer.
 - [ ] **unisonDetune / unisonSpread** — visible in UI (add controls) or engine-only for V1? Ask designer.
 - [ ] **Plugin title in UI:** "Solace Soft Synth" (Figma) vs "Solace Synth" (shorter)? Ask designer.
@@ -412,12 +412,53 @@ An AI-first "vibe-coding" framework for building JUCE plugins. Provides structur
 - [ ] Phase 6.2: Oscillator waveforms + Osc1 tuning params
 - [ ] Phase 6.3: Filter (`SolaceFilter.h` using `LadderFilter`, LP24 default)
 - [ ] Phase 6.4: Filter Envelope
-- [ ] Phase 6.5: Second Oscillator + Osc Mix levels
-- [ ] Phase 6.6: LFO (3 targets, global vs per-voice TBD)
+- [ ] Phase 6.5: Second Oscillator + `oscMix` crossfader
+- [ ] Phase 6.6: LFO (3 targets, per-voice free-running)
 - [ ] Phase 6.7: Unison (with level normalization)
 - [ ] Phase 6.8: Voicing params (voice count, velocity mod targets)
 - [ ] Phase 7: Full Figma UI implementation
 - [ ] GitHub Actions CI + pluginval
+
+---
+
+## 🌿 Git Workflow & Collaboration
+
+### Branch Strategy
+```
+main          ← stable only. Never commit directly. Merge via PR when a sub-phase is complete and verified.
+dev-anshul    ← Anshul's active working branch (all C++/DSP/bridge work). Primary dev branch.
+dev-nabeel    ← Nabeel's branch. UI/ folder only. Never touches Source/.
+```
+
+### Rules
+- **Anshul:** Works on `dev-anshul`. Merges `dev-nabeel` → `dev-anshul` after reviewing diffs (verify only `UI/` files changed). Merges `dev-anshul` → `main` when a sub-phase is stable.
+- **Nabeel:** Works on `dev-nabeel` only. Only edits `UI/` folder. Commits + pushes via Antigravity UI. Never merges branches himself. Never touches `Source/`.
+- **PRs to main:** Always use a PR (even solo), for the diff review moment.
+- **No force pushes** to `main` or `dev-anshul` ever.
+- **Branch protection** on GitHub: `main` and `dev-anshul` require PR, no direct push.
+
+### Tagging / Checkpointing
+After each sub-phase is merged to `main`:
+```bash
+git tag v0.1-phase6.1-adsr
+git push origin --tags
+```
+Tags allow instant rollback to any verified state without hunting for commit hashes.
+
+### Nabeel's Hot-Reload Workflow
+Nabeel does **not** need to build the project. UI files are served from disk at runtime:
+1. Edit files in `UI/` → Save
+2. Close + reopen the plugin window (or refresh WebView)
+3. Changes visible immediately — no C++ compile needed
+
+### If Nabeel breaks his branch
+```bash
+# Reset dev-nabeel to last known good commit (Anshul runs this)
+git checkout dev-nabeel
+git reset --hard <good-commit-hash>
+git push --force-with-lease origin dev-nabeel
+```
+Since `dev-nabeel` only contains `UI/` changes, this is always safe — no audio engine code is at risk.
 
 ---
 
@@ -442,9 +483,9 @@ An AI-first "vibe-coding" framework for building JUCE plugins. Provides structur
 4. ~~JUCE inclusion method?~~ → **RESOLVED: CMake FetchContent**
 5. ~~Waveform list?~~ → **RESOLVED: Sine/Saw/Square/Triangle in V1; Noise deferred**
 6. ~~Filter HP in V1?~~ → **RESOLVED: LP12/LP24/HP12 via LadderFilter; LP24 is default**
-7. ~~Osc Mix: crossfader or two levels?~~ → **RESOLVED: two independent level faders from Figma**
-8. **Does friend know HTML/CSS?** Critical for WebView collaboration — not yet confirmed
-9. **LFO scope: per-voice or global?** Ask designer friend before Phase 6.6
+7. ~~Osc Mix: crossfader or two levels?~~ → **RESOLVED: single vertical crossfader (`oscMix`, 0.0=Osc1 only, 1.0=Osc2 only)**
+8. ~~LFO scope: per-voice or global?~~ → **RESOLVED: per-voice, free-running** (confirmed by Nabeel)
+9. **Does Nabeel know HTML/CSS?** Somewhat — he's practically new to coding. Relies on Antigravity IDE. He owns `UI/` only; never touches `Source/`.
 10. **Plugin title:** "Solace Soft Synth" (Figma) or "Solace Synth"? Confirm with designer
 11. **Portamento:** Polyphonic glide is complex — firmly V2
 12. **Preset system:** APVTS is already the foundation — save/load is almost free when ready

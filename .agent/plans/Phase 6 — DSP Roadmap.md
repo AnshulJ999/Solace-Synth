@@ -261,8 +261,8 @@ The Figma design shows Osc 2 defaults: **Octave = 1** (one octave above Osc1), *
 | MODIFY | `Source/DSP/SolaceVoice.h` | Add `SolaceLFO lfo`. In `renderNextBlock()`: compute `lfoValue = lfo.getNextSample() * lfoAmount`. Apply `lfoValue` to each active LFO target (check `lfoTarget1`, `lfoTarget2`, `lfoTarget3`). For pitch targets: add semitone offset before setting oscillator frequency. For level targets: add to level before mixing. For filter cutoff: add to cutoff before `filter.setCutoff()` (and clamp). |
 | MODIFY | `Source/PluginProcessor.cpp` | Add parameters: `lfoWaveform` (int, 0–4, default 0/Sine), `lfoRate` (0.01–50 Hz, default 1.0), `lfoAmount` (0.0–1.0, default 0.0), `lfoTarget1` (int, 0–7, default 1/FilterCutoff), `lfoTarget2` (int, 0–7, default 0/None), `lfoTarget3` (int, 0–7, default 0/None). |
 
-> [!IMPORTANT]
-> **LFO scope — per-voice vs global (pending decision).** The current plan puts `SolaceLFO` inside `SolaceVoice` — each note gets its own independent LFO phase starting at note-on. This sounds organic but voices drift out of sync. A **global LFO** (one instance in `PluginProcessor`, passed by pointer to voices) keeps all voices in lockstep — closer to classic polysynths (Juno, Prophet-5). **Ask Anshul's friend which behavior they prefer before implementing 6.6.** For initial development, per-voice is easier and can be changed later.
+> [!NOTE]
+> **LFO scope: per-voice, free-running — CONFIRMED.** Each `SolaceVoice` owns its own `SolaceLFO` instance. The LFO runs continuously from the moment the voice is allocated. **Do NOT reset the LFO phase in `startNote()`** — that would make per-voice behave identically to a global key-synced LFO and lose the organic character. Because each voice starts at a different time, chord voices will have LFO phases that drift progressively further apart, creating natural shimmer on pads and filter sweeps.
 
 > [!NOTE]
 > **LFO `lfoAmount` vs `lfoDepth`:** The Figma design labels this control "Amount" — this is the canonical label used in the UI. The APVTS parameter ID is `lfoAmount`.
@@ -431,7 +431,7 @@ graph TD
 
 | Sub-Phase | Question | Status |
 |-----------|----------|--------|
-| 6.6 | **LFO scope: per-voice or global?** Per-voice = organic drift between voices. Global = classic locked polysynth behavior. Ask designer friend before 6.6. | ⏳ Pending |
+| 6.6 | ~~LFO scope: per-voice or global?~~ | ✅ Resolved: per-voice, free-running (confirmed by Nabeel) |
 
 ---
 

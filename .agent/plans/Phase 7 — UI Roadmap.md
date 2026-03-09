@@ -34,7 +34,7 @@ The accepted design is the **second iteration** (slider/fader-based) — the fir
 2. Osc Mix — one vertical crossfader (`oscMix`): 0.0 = Osc1 only, 1.0 = Osc2 only
 3. Oscillator 2 — Waveform selector, Octave selector, Transpose selector, Tuning fader
 4. Amplifier Envelope — Attack, Decay, Sustain, Release faders
-5. Master — Level fader
+5. Master — **Distortion fader** (masterDistortion, added Phase 6.9) + Level fader
 
 **Bottom row (left to right):**
 1. Filter — Cutoff fader, Resonance fader
@@ -42,15 +42,15 @@ The accepted design is the **second iteration** (slider/fader-based) — the fir
 3. Low Frequency Oscillator — Waveform selector, Rate fader, Amount fader, 3 LFO Target dropdowns
 4. Voicing — No. of Voices selector, Unison selector, Velocity Range fader, 2 Velocity Mod Target dropdowns
 
+**Bottom row (keyboard strip):**
+5. Pitch Bend + Mod Wheel sliders (left panel)
+6. MIDI Keyboard — **OPEN DECISION: CSS-drawn vs. JUCE native** (see `design-tokens.md` Row 3 section)
+
 ---
 
 ## Prerequisites
 
-1. **Figma export** — designer friend needs to export:
-   - Full-page screenshot/mockup for visual reference (already available as `Screenshots/Interface-2-Faders-Main-New.png`)
-   - Exact CSS values: colors (hex), font name and weights, spacing and padding values
-   - Exported SVG assets (waveform icons for arrow selectors, SS logo)
-   - Section card border-radius, shadow specs
+1. **Figma design** — ✅ **Extracted via Figma MCP (2026-03-09).** Full design tokens, layout, typography, and SVG assets stored in `.agent/figma/design-tokens.md` and `UI/assets/icons/`. Remaining gaps documented in Open Questions below.
 
 2. **DSP parameters defined** — Phase 6 adds APVTS parameters as it progresses. UI can bind to any existing parameter via the bridge. Controls for parameters not yet implemented will simply have no effect until the DSP catches up.
 
@@ -330,10 +330,16 @@ The UI and DSP tracks are **weakly coupled**:
 | Item | Question | Status |
 |------|----------|--------|
 | `filterEnvDepth` | Where does the bipolar depth control appear in the UI — Filter section or Filter Config? | ⏳ Pending |
-| `unisonDetune` / `unisonSpread` | Are these visible in the UI or handled silently by the engine? | ⏳ Pending |
-| Plugin title | "Solace Soft Synth" (as in Figma) or "Solace Synth" (shorter)? | ⏳ Pending |
-| Font | What font exactly? (Figma Inspect will show the name) | ⏳ Pending |
-| Color values | Exact hex codes for background, surface, accent, text | ⏳ Pending |
+| `unisonDetune` / `unisonSpread` | Are these visible in the UI or handled silently by the engine? | ⏳ **Pending decision (Anshul)** |
+| Plugin title | Confirmed as **"Solace Soft Synth"** (from Figma text node `I118:668;36:320`) | ✅ Resolved |
+| Font | Confirmed: **MuseoModerno** (title), **Jura** (headings/tags), **NATS** (values). NATS file needed from Nabeel. | ⏳ Pending (font file) |
+| Color values | ✅ Resolved — all exact hex values extracted. See `.agent/figma/design-tokens.md`. |
+| Layout/spacing | ✅ Resolved — all padding, gap, border-radius values extracted from Figma MCP. |
+| Waveform icons | Sine + Square confirmed. Sawtooth + Triangle icons **must be created by Nabeel** before Phase 7.3. | ⏳ Pending (designer) |
+| Menu Button | Present in top-right of design. Contents/behaviour TBD — likely preset management or settings panel. | ⏳ Pending (design decision) |
+| MIDI Keyboard | CSS-drawn (Figma design) vs. JUCE native (current impl). Options documented in `design-tokens.md`. | ⏳ **Pending decision (Anshul)** |
+| Pitch Bend / Mod Wheel | In design as CSS sliders (left of keyboard). MIDI wiring approach TBD. | ⏳ Pending decision |
+| `masterDistortion` | ✅ Confirmed — Distortion slider is in Master section (Figma Interface 3). DSP added as Phase 6.9. UI control needed in Phase 7. |
 
 ---
 

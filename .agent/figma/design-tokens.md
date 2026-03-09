@@ -170,6 +170,24 @@ column, gap: 8px, hug × hug
         └── Slider SVG component
 ```
 
+### Slider Variant Dimensions (verified from component set `85:624`)
+
+| Variant | Container height | Track height | Thumb position |
+|---|---|---|---|
+| `Property 1=0` | 208px | 200px | 0px from bottom |
+| `Property 1=Low` | 208px | 200px | 50px from bottom |
+| `Property 1=Mid` | 208px | 200px | 100px from bottom |
+| `Property 1=High` | 208px | 200px | 150px from bottom |
+| `Property 1=Full` | 208px | 200px | 200px from bottom (top) |
+| `Property 1=Big1` | 289px | 280px | ~133px from bottom |
+| `Property 1=Big2` | 289px | 280px | ~265px from bottom |
+| `Property 1=Small1` | 128px | 120px | ~108px from bottom |
+| `Property 1=Small2` | 128px | 120px | ~52px from bottom |
+
+- **Thumb style:** White fill, `#FF9E2F` (Primary) stroke 4px, 8px border-radius, Basic Drop shadow
+- **Standard thumb size:** 20×24px; **Big thumb:** 24×20px (wider)
+- **Track fill:** `#CCCCCC` (Light), 8px wide, 8px border-radius
+
 ### Selector (Octave / Transpose / etc.)
 - **Width:** 94px fixed
 - **Mode:** column, gap: 8px
@@ -181,10 +199,27 @@ column, gap: 8px, hug × hug
 - **Mode:** column, align-items: center, gap: 12px, hug × hug
 - Text label (Tag style) above SVG waveform icon
 - SVG icon container: row, center, gap: 8px
+- **⚠️ DESIGN GAP:** Component set `36:504` contains only `Type=Sinewave` and `Type=Sqaurewave` (note the typo). **Sawtooth and Triangle variants do not yet exist in Figma.** Nabeel must add these two icons before Phase 7.3.
 
 ### Dropdown
 - **Small (LFO/Voicing):** border 1px `#EEEEEE`, radius: `4px`, padding: `8px`, fill-horizontal, gap: `8px`
 - **Large (Preset):** width 320px, padding: `12px`, border 1px `#EEEEEE`
+
+### Dropdown Display-Name Convention (confirmed from Figma text labels)
+
+Options use `"Section - Parameter"` format, truncated by the control width. Use these exact JS strings:
+
+| param ID | Full display label | Shown truncated as |
+|---|---|---|
+| `none` | `None` | `None` |
+| `filterCutoff` | `Filter - Cutoff` | `Filter - Cut...` |
+| `filterResonance` | `Filter - Resonance` | `Filter - Res...` |
+| `osc1Pitch` | `Osc 1 - Pitch` | `Osc 1 - Pitch` |
+| `osc2Pitch` | `Osc 2 - Pitch` | `Osc 2 - Pitch` |
+| `osc1Level` | `Osc 1 - Level` | `Osc 1 - Level` |
+| `osc2Level` | `Osc 2 - Level` | `Osc 2 - Level` |
+| `ampLevel` | `Amp - Level` | `Amp - Level` |
+| `ampAttack` | `Amp - Attack` | `Amp - Atta...` |
 
 ---
 
@@ -242,7 +277,7 @@ column, gap: 8px, hug × hug
 - Release slider (value: 0)
 
 #### Master
-- Distortion slider (value: 0)
+- Distortion slider (value: 0)   ← ⚠️ **NOT IN PHASE 6 PLAN** — see Open Questions #8
 - Level slider (value: Mid)
 
 ### Row 2 — Right Block
@@ -332,10 +367,11 @@ Stored in `UI/assets/icons/`:
 
 ## Open Questions / Gaps
 
-1. **NATS font** — Is this a free font? Where is the font file? Check with Nabeel. *(Acknowledged — will be resolved)*
-2. **Waveform variants** — Design currently has Sine + Square only. Will Sawtooth and Triangle be added? *(Acknowledged — may be added)*
-3. **Slider states** — "Big1", "Big2", "Mid", "High", "0", "Small", "Small1", "Small2" — what are the exact pixel track heights for each variant?
-4. **Filter type options** — The selector shows "LP 24 dB". What are all the filter type options? (LP12, LP24, HP12, HP24, BP?)
-5. **LFO Target options** — What are all the possible dropdown values? (Full list for JS implementation)
+1. **NATS font** — Confirmed as `fontFamily: NATS` in Figma globalVars. Not on Google Fonts. Nabeel must provide the font file (e.g., `NATS.woff2`) to add to `UI/assets/fonts/`. Until resolved, placeholder: `font-family: 'Courier New', monospace`.
+2. **Waveform variants** — ✅ **Confirmed gap**: Figma component set `36:504` only has Sinewave and Squarewave (note Figma typo: "Sqaurewave"). **Sawtooth and Triangle icons must be created by Nabeel.** Affects Phase 7.3.
+3. **Slider dimensions** — ✅ **Resolved** — see Slider Variant Dimensions table above (container heights: Standard=208px, Big=289px, Small=128px).
+4. **Filter type options** — Only `LP 24 dB` appears in the Figma design. `LP 12 dB` and `HP 12 dB` are not present. Our Phase 6 plan specifies LP12/LP24/HP12 — Nabeel needs to update the Figma selector to show all three. JS implementation should use: `["LP 12 dB", "LP 24 dB", "HP 12 dB"]` with `LP 24 dB` as default.
+5. **LFO Target options** — Figma shows the selected values only (not the full dropdown list). Full list from Phase 6 spec: `["None", "Filter - Cutoff", "Filter - Resonance", "Osc 1 - Pitch", "Osc 2 - Pitch", "Osc 1 - Level", "Osc 2 - Level", "Amp - Level"]`. Velocity mod targets: `["None", "Amp - Level", "Amp - Attack", "Filter - Cutoff", "Filter - Resonance"]`.
 6. **Keyboard: CSS vs JUCE native** — See Row 3 section above. Decision pending.
 7. **Pitch Bend / Mod Wheel** — Confirmed present in design (left of keyboard). Are these MIDI performance controls only, or also mapped to synth parameters?
+8. **⚠️ CRITICAL — Distortion slider in Master** — The Figma design shows TWO sliders in the Master section: `Distortion` (at 0) and `Level` (at Mid). The Phase 6 DSP plan only includes `masterVolume`. **Decision needed:** Is this a planned distortion/drive effect (`masterDistortion` APVTS param)? Or is this a design placeholder that should be removed? If implemented, it needs: a new sub-phase in Phase 6, a new APVTS parameter, and a DSP module (soft clipper / waveshaper). **Confirm with Nabeel and Anshul before Phase 6 DSP work begins.**

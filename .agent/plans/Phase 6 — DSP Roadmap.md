@@ -350,6 +350,36 @@ float rightGain = std::sqrt(0.5f * (1.0f + pan));
 
 ---
 
+## Sub-Phase 6.9 — Master Distortion (Drive / Soft Clipper)
+
+**Why added:** The Figma design (Interface 3, Master section) includes a **Distortion** slider alongside the Level slider. This is a global post-processing effect: a soft-clipper / drive stage applied in `PluginProcessor::processBlock()` after `synth.renderNextBlock()`, before the final output gain. Adds warmth and saturation when driven.
+
+**Depends on:** Nothing — this is fully global and independent of voice-level work. Can be implemented any time after the main signal chain is working (post 6.1).
+
+### Files
+
+| Action | File | What |
+|--------|------|------|
+| NEW | `Source/DSP/SolaceDistortion.h` | Simple soft-clipper module. `processSample(float x, float drive)` applies `tanh(drive * x) / tanh(drive)` (normalised hyperbolic tangent) for smooth saturation. Drive range maps 0.0→1.0 from clean to heavily saturated. |
+| MODIFY | `Source/PluginProcessor.cpp` | Add `masterDistortion` (float, 0.0–1.0, default 0.0) to `createParameterLayout()`. In `processBlock()`: after `synth.renderNextBlock()`, for each sample apply `solaceDistortion.processSample(sample, 1.0f + driveParam * 9.0f)` — maps 0→1 to drive factor 1.0→10.0. Apply **before** `masterVolume` gain stage. |
+| NEW | `Source/DSP/SolaceDistortion.h` | Header with a single `processSample()` static inline method. No state needed for tanh soft-clip. |
+
+> [!NOTE]
+> **Formula:** `y = tanh(k * x) / tanh(k)` where `k = 1.0 + drive * 9.0`. At `drive=0` → `k=1` → very mild saturation (near-linear). At `drive=1` → `k=10` → heavy clipping. Division by `tanh(k)` normalises output to [-1, +1] at all drive levels, preventing loudness jump.
+
+> [!IMPORTANT]
+> Apply distortion **per channel** (left and right independently) and **before** the master volume gain — distortion character changes with level, so order matters.
+
+### Verification
+
+1. `masterDistortion`=0.0 → signal passes through cleanly, no audible change.
+2. `masterDistortion`=0.5 → mild warmth/saturation on a sine wave.
+3. `masterDistortion`=1.0 → heavy saturation, sine wave sounds nearly square.
+4. Confirm output never clips above ±1.0 at any drive setting.
+5. Confirm `masterVolume` still scales the final output after distortion.
+
+---
+
 ## Branching Strategy
 
 > [!IMPORTANT]
@@ -401,6 +431,7 @@ float rightGain = std::sqrt(0.5f * (1.0f + pan));
 | 6.8 | `velocityRange` | float | 0.0–1.0 | 1.0 |
 | 6.8 | `velocityModTarget1` | int | 0–4 | 2 (AmpAttack) |
 | 6.8 | `velocityModTarget2` | int | 0–4 | 0 (None) |
+| 6.9 | `masterDistortion` | float | 0.0–1.0 | 0.0 |
 
 ---
 
@@ -417,6 +448,7 @@ graph TD
   F --> G
   G --> H["6.8 Voicing (voice count, velocity mod)"]
   A --> H
+  A --> I["6.9 Master Distortion (global, independent)"]
 ```
 
 - 6.1 → 6.2 → 6.3 → 6.4 is the critical path.
@@ -424,6 +456,7 @@ graph TD
 - 6.6 (LFO) needs a filter to modulate, so depends on 6.3.
 - 6.7 (unison) is last in DSP — needs oscillators and filter.
 - 6.8 (voicing) is last overall — needs amp ADSR (for velocity→attack) and all modulation targets.
+- 6.9 (distortion) is a global post-process — only needs a working signal chain. Can be done any time after 6.1.
 
 ---
 

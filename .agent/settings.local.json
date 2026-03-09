@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "mcp__mcphub__figma-get_figma_data"
+      "mcp__mcphub__figma-get_figma_data",
+      "Bash(tr '\\\\\\\\n' '\\\\n')"
     ]
   }
 }

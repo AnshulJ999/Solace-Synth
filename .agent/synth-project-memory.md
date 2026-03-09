@@ -504,3 +504,8 @@ Since `dev-nabeel` only contains `UI/` changes, this is always safe — no audio
 - [JUCE pricing/licensing](https://juce.com/get-juce/)
 
 ---
+
+- Added testing infrastructure using `juce_add_console_app` and CTest in CMakeLists.txt.
+- Refactored `SolaceLogger` to accept a custom `juce::File` directory argument for testing, maintaining backwards compatibility with a default argument.
+- Test suites correctly mock application directories using `%TEMP%/SolaceSynthTests/` so they don't clobber the main application.
+- Added Linux dependencies: `sudo apt-get install -y libxrandr-dev libxext-dev libx11-dev libxcursor-dev libxinerama-dev libfreetype6-dev libasound2-dev libgl1-mesa-dev libcurl4-openssl-dev libwebkit2gtk-4.1-dev libgtk-3-dev`.

@@ -125,3 +125,12 @@ target_link_libraries("${PROJECT_NAME}"
 # C++ standard
 # ============================================================================
 target_compile_features("${PROJECT_NAME}" PRIVATE cxx_std_20)
+
+# ============================================================================
+# Tests
+# ============================================================================
+include(CTest)
+enable_testing()
+if (BUILD_TESTING)
+    add_subdirectory(Tests)
+endif()

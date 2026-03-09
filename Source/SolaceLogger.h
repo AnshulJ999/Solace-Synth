@@ -35,18 +35,16 @@ enum class LogLevel
 class SolaceLogger : public juce::Logger
 {
 public:
-    SolaceLogger()
+    SolaceLogger (const juce::File& logDirectory = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("SolaceSynth"))
+        : directory (logDirectory)
     {
-        auto logDir = juce::File::getSpecialLocation (juce::File::tempDirectory)
-                          .getChildFile ("SolaceSynth");
-
         // Create 3 log files with 512KB max each
         traceLogger = std::make_unique<juce::FileLogger> (
-            logDir.getChildFile ("trace.log"), "Solace Synth - TRACE", 1024 * 512);
+            directory.getChildFile ("trace.log"), "Solace Synth - TRACE", 1024 * 512);
         debugLogger = std::make_unique<juce::FileLogger> (
-            logDir.getChildFile ("debug.log"), "Solace Synth - DEBUG", 1024 * 512);
+            directory.getChildFile ("debug.log"), "Solace Synth - DEBUG", 1024 * 512);
         infoLogger = std::make_unique<juce::FileLogger> (
-            logDir.getChildFile ("info.log"), "Solace Synth - INFO", 1024 * 512);
+            directory.getChildFile ("info.log"), "Solace Synth - INFO", 1024 * 512);
     }
 
     // Write a message at a specific level — cascades to appropriate files
@@ -86,12 +84,11 @@ public:
     // Get the log directory path (for display/reference)
     juce::String getLogDirectory() const
     {
-        return juce::File::getSpecialLocation (juce::File::tempDirectory)
-                   .getChildFile ("SolaceSynth")
-                   .getFullPathName();
+        return directory.getFullPathName();
     }
 
 private:
+    juce::File directory;
     std::unique_ptr<juce::FileLogger> traceLogger;
     std::unique_ptr<juce::FileLogger> debugLogger;
     std::unique_ptr<juce::FileLogger> infoLogger;

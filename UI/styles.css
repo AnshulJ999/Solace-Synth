@@ -1,12 +1,103 @@
 /* ============================================================================
- * Solace Synth - UI Styles (Phase 4 - Placeholder)
+ * Solace Synth — UI Design System
+ * Phase 7.1: Design System Setup
  *
- * Minimal styling for bridge testing. The real UI will come from the Figma
- * design by Anshul's friend in a later phase.
- * ============================================================================
- */
+ * All values are sourced directly from Figma MCP extraction (2026-03-09).
+ * File: Synth Project / Mockup / Interface 3 (node 118:665)
+ *
+ * Fonts:
+ *   MuseoModerno 600  — Logo/title text
+ *   Jura 700/600      — Section headings and control labels
+ *   NATS 400          — Value readouts (fallback: Jura until font file provided)
+ *
+ * Color tokens (Figma names → CSS vars):
+ *   White    #FFFFFF  → --color-bg
+ *   Black    #202020  → --color-text
+ *   Dark     #666666  → --color-text-dark (headings, values)
+ *   Medium   #999999  → --color-text-mid
+ *   Light    #CCCCCC  → --color-text-light, --color-slider-track
+ *   Lightest #EEEEEE  → --color-border
+ *   Primary  #FF9E2F  → --color-accent
+ * ============================================================================ */
 
-/* --- Reset & Base --- */
+/* ---- Google Fonts ---- */
+@import url('https://fonts.googleapis.com/css2?family=MuseoModerno:wght@600&family=Jura:wght@600;700&display=swap');
+
+/* ============================================================================
+ * Design Tokens
+ * ============================================================================ */
+:root {
+    /* Colors */
+    --color-bg:           #FFFFFF;
+    --color-text:         #202020;
+    --color-text-dark:    #666666;
+    --color-text-mid:     #999999;
+    --color-text-light:   #CCCCCC;
+    --color-border:       #EEEEEE;
+    --color-border-light: #CCCCCC; /* Voicing section only */
+    --color-accent:       #FF9E2F;
+    --color-accent-hover: #e08a1f;
+    --color-divider:      #D9D9D9;
+
+    /* Slider */
+    --color-slider-track: #CCCCCC;
+    --color-slider-thumb-bg:     #FFFFFF;
+    --color-slider-thumb-stroke: #FF9E2F;
+
+    /* Fonts */
+    --font-display: 'MuseoModerno', sans-serif;
+    --font-ui:      'Jura', sans-serif;
+    /* NATS font: provide NATS.woff2 in UI/assets/fonts/ and uncomment:
+       @font-face { font-family: 'NATS'; src: url('assets/fonts/NATS.woff2'); }
+       --font-value: 'NATS', sans-serif;
+       Until then: */
+    --font-value:   'Jura', sans-serif;
+
+    /* Font sizes — clamp(min, preferred, max) for responsive scaling */
+    --text-title:   clamp(28px, 3.3vw, 48px);
+    --text-heading: clamp(16px, 1.9vw, 28px);
+    --text-tag:     clamp(10px, 1.04vw, 15px);
+    --text-value:   clamp(12px, 1.39vw, 20px);
+
+    /* Spacing — derived from Figma (base unit = 8px) */
+    --space-xs:  4px;
+    --space-sm:  8px;
+    --space-md:  12px;
+    --space-lg:  16px;
+    --space-xl:  24px;
+    --space-2xl: 32px;
+    --space-3xl: 40px;
+    --space-4xl: 48px;
+
+    /* Effective root padding (Figma: 40px 48px) — responsive */
+    --root-padding-v: clamp(20px, 3.9vh, 40px);
+    --root-padding-h: clamp(24px, 3.3vw, 48px);
+    --root-gap:       clamp(16px, 3.1vh, 32px);
+
+    /* Card */
+    --card-radius:  8px;
+    --card-border:  1px solid var(--color-border);
+    --card-shadow:  0px 1px 1px 0px rgba(0, 0, 0, 0.25);
+    --card-padding-h: clamp(16px, 2.2vw, 32px);
+    --card-padding-v: clamp(16px, 2.6vh, 24px);
+    --card-gap:       clamp(16px, 2.6vh, 24px);
+
+    /* Slider dimensions */
+    --slider-track-w: 8px;
+    --slider-thumb-w: 20px;
+    --slider-thumb-h: 24px;
+    --slider-thumb-radius: 8px;
+
+    /* Top bar */
+    --topbar-gap: clamp(16px, 2.2vw, 32px);
+
+    /* Keyboard strip height (JUCE MidiKeyboard native) */
+    --keyboard-strip-h: 88px;
+}
+
+/* ============================================================================
+ * Reset
+ * ============================================================================ */
 *, *::before, *::after {
     box-sizing: border-box;
     margin: 0;
@@ -17,190 +108,649 @@ html, body {
     width: 100%;
     height: 100%;
     overflow: hidden;
-    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
-    font-size: 14px;
-    color: #333;
-    background: #f5f5f5;
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-ui);
+    font-size: 16px;
     user-select: none;
     -webkit-user-select: none;
 }
 
-.app {
+/* ============================================================================
+ * Root Layout
+ * Figma: column, justify-content: center, gap: 32px, padding: 40px 48px
+ * ============================================================================ */
+.solace-root {
     display: flex;
     flex-direction: column;
-    height: 100%;
-    padding: 16px;
-    gap: 16px;
-}
-
-/* --- Header --- */
-.header {
-    display: flex;
-    align-items: baseline;
-    gap: 12px;
-    padding-bottom: 8px;
-    border-bottom: 2px solid #e0e0e0;
-}
-
-.logo {
-    font-size: 24px;
-    font-weight: 700;
-    color: #1a1a1a;
-    letter-spacing: -0.5px;
-}
-
-.version {
-    font-size: 11px;
-    color: #999;
-    font-weight: 500;
-}
-
-/* --- Panels (card containers) --- */
-.panel {
-    background: white;
-    border-radius: 12px;
-    padding: 20px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-    border: 1px solid #e8e8e8;
-}
-
-.panel-title {
-    font-size: 16px;
-    font-weight: 600;
-    color: #1a1a1a;
-    margin-bottom: 16px;
-}
-
-/* --- Slider Group --- */
-.slider-group {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-}
-
-.slider-label {
-    font-size: 12px;
-    font-weight: 600;
-    color: #666;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.slider-container-horizontal {
-    display: flex;
-    align-items: center;
-    gap: 12px;
     width: 100%;
-    max-width: 400px;
+    height: 100%;
+    padding: var(--root-padding-v) var(--root-padding-h);
+    gap: var(--root-gap);
+    background: var(--color-bg);
+    overflow: hidden;
 }
 
-.slider-value-side {
-    font-size: 11px;
-    color: #999;
-    min-width: 16px;
+/* ============================================================================
+ * Top Bar
+ * Figma: row, justify-content: space-between, align-items: flex-end, gap: 32px
+ * ============================================================================ */
+.top-bar {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: var(--topbar-gap);
+    flex-shrink: 0;
+}
+
+/* Logo group (SS monogram + title) */
+.logo-group {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    padding: 0 var(--space-xl);
+}
+
+.logo-monogram {
+    /* Container for the SS SVG — 63×76 in Figma */
+    width: clamp(32px, 4.4vw, 63px);
+    height: auto;
+    flex-shrink: 0;
+}
+
+.logo-title {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: var(--text-title);
+    color: var(--color-text);
+    letter-spacing: 0.003em;
+    line-height: 1.59;
+    white-space: nowrap;
+}
+
+/* Top-right controls group (preset nav + menu) */
+.top-controls {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-2xl);
+}
+
+/* Preset selecter: [< | dropdown | >] */
+.preset-selecter {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-xs);
+    border: var(--card-border);
+    border-radius: var(--card-radius);
+    background: var(--color-bg);
+}
+
+.preset-nav-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-md);
+    background: var(--color-bg);
+    border: var(--card-border);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    flex-shrink: 0;
+}
+
+.preset-nav-btn:hover {
+    background: var(--color-border);
+}
+
+.preset-nav-btn img,
+.preset-nav-btn svg {
+    width: clamp(6px, 0.56vw, 8px);
+    height: clamp(10px, 0.83vw, 12px);
+}
+
+.preset-dropdown {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-sm);
+    padding: var(--space-md);
+    border: var(--card-border);
+    border-radius: 4px;
+    min-width: clamp(140px, 22vw, 320px);
+    cursor: pointer;
+    background: var(--color-bg);
+    transition: background 0.15s ease;
+}
+
+.preset-dropdown:hover {
+    background: var(--color-border);
+}
+
+.preset-dropdown-label {
+    font-family: var(--font-ui);
+    font-weight: 700;
+    font-size: var(--text-value);
+    color: var(--color-text-dark);
+    flex: 1;
     text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-/* --- Horizontal Slider (simple, reliable, placeholder) --- */
-.horizontal-slider {
+/* Menu button */
+.menu-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-lg);
+    border: var(--card-border);
+    border-radius: var(--card-radius);
+    background: var(--color-bg);
+    cursor: pointer;
+    transition: background 0.15s ease;
+    flex-shrink: 0;
+}
+
+.menu-btn:hover {
+    background: var(--color-border);
+}
+
+.menu-btn img,
+.menu-btn svg {
+    width: clamp(20px, 1.7vw, 24px);
+    height: clamp(20px, 1.7vw, 24px);
+}
+
+/* ============================================================================
+ * Main Content Area
+ * Two rows of section cards stacked vertically, filling remaining space
+ * ============================================================================ */
+.content-area {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    gap: var(--root-gap);
+    min-height: 0; /* Allow flex children to shrink */
+}
+
+/* Each row of section cards */
+.section-row {
+    display: flex;
+    flex-direction: row;
+    gap: var(--root-gap);
+    flex: 1;
+    min-height: 0;
+}
+
+/* ============================================================================
+ * Section Cards
+ * Figma: border 1px #EEEEEE, border-radius 8px, box-shadow Basic Drop
+ * ============================================================================ */
+.card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--card-gap);
+    padding: var(--card-padding-v) var(--card-padding-h);
+    border: var(--card-border);
+    border-radius: var(--card-radius);
+    box-shadow: var(--card-shadow);
+    background: var(--color-bg);
+    overflow: hidden;
+    position: relative;
+}
+
+/* Flex-grow assignments — approximate Figma proportions within each row */
+/* Row 1 */
+.card--osc-block   { flex: 3; }   /* Osc1 + OscMix + Osc2 together */
+.card--amp-env     { flex: 2; }
+.card--master      { flex: 1; min-width: 0; }
+
+/* Row 2 */
+.card--filter-block { flex: 2.5; } /* Filter + Filter Config */
+.card--lfo          { flex: 2; }
+.card--voicing      { flex: 1.5; border-color: var(--color-border-light); box-shadow: none; }
+
+/* Horizontal dividers within a card (1px separator between sub-sections) */
+.card-divider {
+    width: 1px;
+    background: var(--color-border);
+    align-self: stretch;
+    flex-shrink: 0;
+    margin: 0 var(--space-sm);
+}
+
+/* Internal row layout within a card (for multi-sub-section cards) */
+.card-row {
+    display: flex;
+    flex-direction: row;
+    flex: 1;
+    gap: 0;
+    min-height: 0;
+}
+
+/* Sub-section within a card-row */
+.sub-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--card-gap);
+    padding: 0 var(--card-padding-h);
+    flex: 1;
+    min-width: 0;
+}
+
+.sub-section:first-child {
+    padding-left: 0;
+}
+
+.sub-section:last-child {
+    padding-right: 0;
+}
+
+/* ============================================================================
+ * Section Heading
+ * Figma: Jura 700 28px, color #666666
+ * ============================================================================ */
+.section-heading {
+    font-family: var(--font-ui);
+    font-weight: 700;
+    font-size: var(--text-heading);
+    color: var(--color-text-dark);
+    line-height: 1.18;
+    flex-shrink: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ============================================================================
+ * Controls Row (horizontal group of controls within a section)
+ * ============================================================================ */
+.controls-row {
+    display: flex;
+    flex-direction: row;
+    gap: var(--space-lg);
+    flex: 1;
+    align-items: flex-end;
+    min-height: 0;
+}
+
+/* ============================================================================
+ * Vertical Fader (Slider)
+ * Figma: 8px wide track, #CCCCCC track, white+orange thumb, 8px border-radius
+ *        Standard: 200px track. Big: 280px track. Small: 120px track.
+ *        Thumb: 20×24px (standard), orange (#FF9E2F) stroke 4px
+ * ============================================================================ */
+.fader {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-sm);
+    flex-shrink: 0;
+}
+
+.fader-label {
+    font-family: var(--font-ui);
+    font-weight: 600;
+    font-size: var(--text-tag);
+    color: var(--color-text);
+    letter-spacing: 0.01em;
+    text-align: center;
+    line-height: 1.6;
+}
+
+.fader-track-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    flex: 1;
+}
+
+/* Native range input rotated to vertical */
+.fader-input {
     -webkit-appearance: none;
     appearance: none;
-    flex: 1;
-    height: 6px;
-    background: #e0e0e0;
-    border-radius: 3px;
+    writing-mode: vertical-lr;
+    direction: rtl;
+    background: transparent;
+    cursor: pointer;
     outline: none;
+    padding: 0;
+    border: none;
+    /* Height is set inline per variant; width matches thumb */
+    width: var(--slider-thumb-w);
+}
+
+/* Webkit track */
+.fader-input::-webkit-slider-runnable-track {
+    width: var(--slider-track-w);
+    border-radius: 4px;
+    background: var(--color-slider-track);
+}
+
+/* Webkit thumb */
+.fader-input::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: var(--slider-thumb-w);
+    height: var(--slider-thumb-h);
+    background: var(--color-slider-thumb-bg);
+    border: 4px solid var(--color-slider-thumb-stroke);
+    border-radius: var(--slider-thumb-radius);
+    box-shadow: var(--card-shadow);
+    margin-top: -8px; /* Center thumb on track */
+    cursor: grab;
+    transition: border-color 0.1s ease, transform 0.1s ease;
+}
+
+.fader-input::-webkit-slider-thumb:active {
+    cursor: grabbing;
+    transform: scale(1.05);
+}
+
+.fader-input:hover::-webkit-slider-thumb {
+    border-color: var(--color-accent-hover);
+}
+
+/* Firefox track */
+.fader-input::-moz-range-track {
+    width: var(--slider-track-w);
+    border-radius: 4px;
+    background: var(--color-slider-track);
+}
+
+/* Firefox thumb */
+.fader-input::-moz-range-thumb {
+    width: var(--slider-thumb-w);
+    height: var(--slider-thumb-h);
+    background: var(--color-slider-thumb-bg);
+    border: 4px solid var(--color-slider-thumb-stroke);
+    border-radius: var(--slider-thumb-radius);
+    box-shadow: var(--card-shadow);
+    cursor: grab;
+    transition: border-color 0.1s ease;
+}
+
+.fader-value {
+    font-family: var(--font-value);
+    font-weight: 400;
+    font-size: var(--text-value);
+    color: var(--color-text-dark);
+    letter-spacing: 0.0075em;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+}
+
+/* Fader height variants (track heights from Figma component set 85:624) */
+.fader--standard .fader-input { height: clamp(100px, 19.5vh, 200px); }
+.fader--big      .fader-input { height: clamp(140px, 27.3vh, 280px); }
+.fader--small    .fader-input { height: clamp(60px,  11.7vh, 120px); }
+
+/* ============================================================================
+ * Arrow Selector (< value >)
+ * Figma: 94px fixed width, Jura, row with chevrons 24×24px
+ * ============================================================================ */
+.arrow-selector {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    width: clamp(70px, 6.5vw, 94px);
+    flex-shrink: 0;
+}
+
+.arrow-selector-label {
+    font-family: var(--font-ui);
+    font-weight: 600;
+    font-size: var(--text-tag);
+    color: var(--color-text);
+    letter-spacing: 0.01em;
+    line-height: 1.6;
+}
+
+.arrow-selector-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+}
+
+.arrow-selector-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    border-radius: 4px;
+    transition: background 0.1s ease;
+    flex-shrink: 0;
+}
+
+.arrow-selector-btn:hover {
+    background: var(--color-border);
+}
+
+.arrow-selector-btn img,
+.arrow-selector-btn svg {
+    width: clamp(5px, 0.46vw, 6.67px);
+    height: clamp(9px, 0.83vw, 13.33px);
+}
+
+.arrow-selector-value {
+    font-family: var(--font-value);
+    font-weight: 400;
+    font-size: var(--text-value);
+    color: var(--color-text-dark);
+    text-align: center;
+    letter-spacing: 0.0075em;
+    line-height: 1.2;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ============================================================================
+ * Waveform Selector
+ * Figma: column, align-items: center, gap: 12px
+ * ============================================================================ */
+.waveform-selector {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-md);
+    flex-shrink: 0;
+}
+
+.waveform-selector-label {
+    font-family: var(--font-ui);
+    font-weight: 600;
+    font-size: var(--text-tag);
+    color: var(--color-text);
+    letter-spacing: 0.01em;
+    line-height: 1.6;
+}
+
+.waveform-icon-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-sm);
     cursor: pointer;
 }
 
-.horizontal-slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 20px;
-    height: 20px;
-    background: #ef8c2d;
-    border-radius: 50%;
-    border: 3px solid white;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
-    cursor: grab;
+.waveform-icon {
+    /* Figma sine: 144×34px icon inside the row */
+    width: clamp(60px, 10vw, 144px);
+    height: auto;
+    display: block;
 }
 
-.horizontal-slider::-webkit-slider-thumb:active {
-    cursor: grabbing;
-    background: #d97a1f;
-    box-shadow: 0 2px 6px rgba(239, 140, 45, 0.4);
+/* ============================================================================
+ * Dropdown
+ * Figma: border 1px #EEEEEE, border-radius 4px, padding 8px, fill-horizontal
+ * ============================================================================ */
+.dropdown {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    background: var(--color-bg);
+    cursor: pointer;
+    width: 100%;
+    transition: background 0.12s ease;
+    position: relative;
 }
 
-/* Firefox */
-.horizontal-slider::-moz-range-track {
-    height: 6px;
-    background: #e0e0e0;
-    border-radius: 3px;
+.dropdown:hover {
+    background: var(--color-border);
 }
 
-.horizontal-slider::-moz-range-thumb {
-    width: 20px;
-    height: 20px;
-    background: #ef8c2d;
-    border-radius: 50%;
-    border: 3px solid white;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
-    cursor: grab;
+.dropdown-label {
+    font-family: var(--font-value);
+    font-weight: 400;
+    font-size: var(--text-value);
+    color: var(--color-text);
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1.2;
+    padding: 0 var(--space-sm);
+    text-align: left;
 }
 
-/* Value display */
-.slider-value {
-    font-size: 13px;
+.dropdown-arrow {
+    width: 10px;
+    height: 5px;
+    flex-shrink: 0;
+    opacity: 0.5;
+}
+
+/* Dropdown stack (multiple dropdowns under one label) */
+.dropdown-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    width: 100%;
+}
+
+.dropdown-group-label {
+    font-family: var(--font-ui);
     font-weight: 600;
-    color: #555;
-    font-variant-numeric: tabular-nums;
-    min-width: 40px;
-    text-align: center;
+    font-size: var(--text-tag);
+    color: var(--color-text);
+    letter-spacing: 0.01em;
+    line-height: 1.6;
 }
 
-/* --- Debug Log Panel --- */
+/* ============================================================================
+ * Debug Panel (hidden by default, Ctrl+Shift+D to show)
+ * ============================================================================ */
+.debug-panel {
+    display: none;
+    position: fixed;
+    bottom: calc(var(--keyboard-strip-h) + 8px);
+    right: 12px;
+    width: 400px;
+    max-height: 220px;
+    background: rgba(32, 32, 32, 0.92);
+    border: 1px solid #444;
+    border-radius: var(--card-radius);
+    z-index: 9999;
+    overflow: hidden;
+}
+
+.debug-panel.debug-panel--visible {
+    display: flex;
+    flex-direction: column;
+}
+
+.debug-panel-title {
+    font-family: var(--font-ui);
+    font-size: 11px;
+    font-weight: 700;
+    color: #aaa;
+    padding: 6px 10px;
+    border-bottom: 1px solid #444;
+    flex-shrink: 0;
+    letter-spacing: 0.05em;
+}
+
 .debug-log {
-    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-    font-size: 11px;
-    color: #666;
-    max-height: 150px;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 10px;
+    color: #ccc;
+    padding: 6px 10px;
     overflow-y: auto;
+    flex: 1;
     line-height: 1.5;
-    white-space: pre-wrap;
-    word-break: break-all;
 }
 
-.debug-log .log-entry {
-    padding: 2px 0;
-    border-bottom: 1px solid #f0f0f0;
+.log-entry { padding: 1px 0; }
+.log-entry.from-js    { color: #64b5f6; }
+.log-entry.from-cpp   { color: #81c784; }
+.log-entry.from-trace { color: #757575; }
+.log-entry.from-warn  { color: #ffb74d; }
+.log-entry.error      { color: #e57373; }
+
+/* ============================================================================
+ * Status indicator (top-right subtle dot, replaces full status bar)
+ * ============================================================================ */
+.status-indicator {
+    position: fixed;
+    top: 8px;
+    right: 10px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--font-ui);
+    font-size: 10px;
+    color: var(--color-text-mid);
+    opacity: 0.7;
+    pointer-events: none;
+    z-index: 100;
 }
 
-.debug-log .log-entry.from-js {
-    color: #2196F3;
+.status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-text-light);
+    transition: background 0.3s ease;
 }
 
-.debug-log .log-entry.from-cpp {
-    color: #4CAF50;
-}
+.status-dot--connected { background: #66bb6a; }
+.status-dot--error     { background: #ef5350; }
 
-.debug-log .log-entry.from-trace {
-    color: #9E9E9E;
-}
-
-.debug-log .log-entry.from-warn {
-    color: #FF9800;
-}
-
-.debug-log .log-entry.error {
-    color: #f44336;
-}
-
-/* --- Status Bar --- */
-.status-bar {
-    margin-top: auto;
-    padding: 8px 12px;
-    font-size: 11px;
-    color: #999;
-    border-top: 1px solid #e8e8e8;
+/* ============================================================================
+ * Utility
+ * ============================================================================ */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }

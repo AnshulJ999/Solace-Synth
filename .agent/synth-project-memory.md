@@ -350,7 +350,7 @@ An AI-first "vibe-coding" framework for building JUCE plugins. Provides structur
 - [x] **Phase 1: Repo scaffolding** — .gitignore, README.md created
 - [x] **Phase 2: JUCE project setup** — CMakeLists.txt (FetchContent), PluginProcessor (with APVTS), PluginEditor (placeholder)
 - [x] **Phase 3: Hello World** — VST3 + Standalone build and run successfully (2026-03-09)
-- [/] **Phase 4: WebView Integration** — in progress (2026-03-09)
+- [x] **Phase 4: WebView Integration** — COMPLETE (2026-03-09)
   - WebBrowserComponent with ResourceProvider, WebView2 backend
   - C++↔JS bridge: setParameter/uiReady/log (JS→C++) + parameterChanged/syncAllParameters (C++→JS)
   - UI/index.html with masterVolume slider, bridge.js, main.js, styles.css
@@ -363,18 +363,7 @@ An AI-first "vibe-coding" framework for building JUCE plugins. Provides structur
     6. Visibility drift: events dropped when editor hidden → added `visibilityChanged()` resync
     7. C4390 warning: `DBG` macro on single-line `if` → added braces
     8. Heap alloc: unnecessary `new` for paramsArray → stack-allocated
-    9. **JS bridge API mismatch (root cause of "Connecting to engine..." stuck):**
-       - bridge.js called `window.__JUCE__.backend.getNativeFunction()` which doesn't exist
-       - JUCE 8's low-level backend only exposes `emitEvent`/`addEventListener`
-       - `getNativeFunction` is in JUCE's ES module index.js, not on the backend object
-       - **Fix:** rewrote bridge.js to use correct `__juce__invoke` event pattern
-       - Also added try/catch in main.js init to surface errors in status bar
-  - **Production note:** UI files served from disk via `SOLACE_DEV_UI_PATH`. For release, must embed via `juce_add_binary_data()`
-- [x] **Phase 4: WebView Integration** — COMPLETE (2026-03-09)
-  - WebBrowserComponent with ResourceProvider, WebView2 backend
-  - C++↔JS bridge: setParameter/uiReady/log (JS→C++) + parameterChanged/syncAllParameters (C++→JS)
-  - UI/index.html with masterVolume slider, bridge.js, main.js, styles.css
-  - Full bug history documented above (9 bugs fixed)
+    9. JS bridge API mismatch (`window.__JUCE__.backend.getNativeFunction`) → rewrote bridge.js to JUCE's `__juce__invoke` pattern; added `try/catch` in `main.js` init
   - Multi-level logging: SolaceLogger (trace/debug/info files)
   - Audio thread safety verified (no disk I/O on audio thread)
   - **Verified in trace.log:** round-trip values 0.08, 0.30, 0.44, 0.64, 0.78 all correct
@@ -389,6 +378,11 @@ An AI-first "vibe-coding" framework for building JUCE plugins. Provides structur
   - `PluginEditor.h/cpp` — `juce::MidiKeyboardComponent midiKeyboard` added as 80px strip at bottom of window; auto-grabs keyboard focus 500ms after launch
   - **Verified:** polyphonic sine tones play correctly. Mouse click on piano strip ✅. Computer keyboard (A/S/D/F/etc.) ✅. Polyphony ✅. Volume slider controls output level ✅.
   - **Architecture note:** MidiKeyboardState lives in Processor (audio thread access). Editor holds MidiKeyboardComponent (UI thread). Cross-thread: documented as safe by JUCE.
+- [ ] **Phase 6: Core synth shaping** — next recommended step
+  - Add amp ADSR to the voice so note shape is musical, not organ-like
+  - Add waveform selection (at least sine / saw / square / triangle)
+  - Add first filter stage (LP12 first is the cleanest entry point)
+  - Expand APVTS parameter set before the Figma UI lands
 - [ ] GitHub Actions CI + pluginval (automated testing)
 
 ### Pre-Release Backlog (do before shipping)
@@ -403,8 +397,9 @@ An AI-first "vibe-coding" framework for building JUCE plugins. Provides structur
 - [ ] **Filter HP decision** — include in V1 or defer to V2?
 
 ### Pending — Implementation (after initialization)
-- [ ] Prototype: single oscillator → ADSR → filter → standalone output
-- [ ] Implement polyphonic voice architecture
+- [ ] Add amp ADSR to the current voice engine
+- [ ] Add oscillator waveform switching
+- [ ] Add filter module + cutoff/resonance parameters
 - [ ] Implement LFO modulation routing
 - [ ] Implement unison engine
 

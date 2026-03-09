@@ -13,3 +13,9 @@ Coding practices:
 - If you're ever confused or find yourself spiralling with a problem you can't reconcile, STOP, and discuss with the user. 
 - Do not make any critical decisions on your own without discussion and approval from the user.
 - Use relevant Skills automatically.
+
+---
+
+G:\GitHub\Solace-Synth\.agent\Vision-Document.md
+
+Always read the above vision document too. This one is maintained by Nabeel and contains his vision for the project. If the plans/memories do not match the Vision, please flag any such issues and discuss with me to clarify.

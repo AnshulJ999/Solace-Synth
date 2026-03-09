@@ -18,16 +18,25 @@ SolaceSynthProcessor::SolaceSynthProcessor()
     SolaceLog::info ("=== Solace Synth started ===");
     SolaceLog::info ("Log directory: " + solaceLogger->getLogDirectory());
 
-    // --- Phase 5: Polyphonic Synthesiser Setup ---
-    // Add voices. Each SolaceVoice can play one note at a time.
-    // Number of voices = maximum polyphony. 8 is a good starting point.
-    constexpr int numVoices = 8;
-    for (int i = 0; i < numVoices; ++i)
-        synth.addVoice (new SolaceVoice());
+    // --- Phase 6.1: Polyphonic Synthesiser Setup ---
+    // Build the parameter pointer struct. APVTS is fully initialised by this
+    // point (it is a member initialised in the initialiser list before the
+    // constructor body runs), so getRawParameterValue() is safe here.
+    SolaceVoiceParams voiceParams;
+    voiceParams.ampAttack  = apvts.getRawParameterValue ("ampAttack");
+    voiceParams.ampDecay   = apvts.getRawParameterValue ("ampDecay");
+    voiceParams.ampSustain = apvts.getRawParameterValue ("ampSustain");
+    voiceParams.ampRelease = apvts.getRawParameterValue ("ampRelease");
 
-    // Add our sound descriptor.
-    // SolaceSound::appliesToNote() and appliesToChannel() return true for all inputs,
-    // so any note on any channel will trigger a SolaceVoice.
+    // Create 16 voices. We always create the maximum number up front — JUCE's
+    // Synthesiser does not support safe voice addition/removal at runtime.
+    // A polyphony cap (Phase 6.8) will be implemented inside startNote() later.
+    constexpr int numVoices = 16;
+    for (int i = 0; i < numVoices; ++i)
+        synth.addVoice (new SolaceVoice (voiceParams));
+
+    // SolaceSound returns true for all MIDI notes and channels, so any
+    // incoming note will trigger one of the SolaceVoice instances.
     synth.addSound (new SolaceSound());
 
     SolaceLog::info ("Synthesiser ready: " + juce::String (numVoices) + " voices, SolaceSound");
@@ -42,23 +51,49 @@ SolaceSynthProcessor::~SolaceSynthProcessor()
 // ============================================================================
 // Parameter Layout
 //
-// This defines ALL automatable parameters for the plugin.
-// Currently just a master volume for testing. Full parameter set will be
-// added when DSP modules are implemented.
-//
+// Defines ALL automatable parameters for the plugin.
 // IMPORTANT: Parameter IDs must be stable — changing them breaks saved
-// presets and DAW automation. Choose IDs carefully.
+// presets and DAW automation. Never rename or remove an ID after shipping.
+//
+// Convention: {section}{ParamName}, version 1.
+//   e.g. "ampAttack", "filterCutoff", "osc1Waveform"
 // ============================================================================
 juce::AudioProcessorValueTreeState::ParameterLayout SolaceSynthProcessor::createParameterLayout()
 {
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
 
-    // Master volume (0.0 to 1.0, default 0.8)
+    // --- Master ---
     params.push_back (std::make_unique<juce::AudioParameterFloat> (
         juce::ParameterID { "masterVolume", 1 },
         "Master Volume",
         juce::NormalisableRange<float> (0.0f, 1.0f, 0.01f),
         0.8f));
+
+    // --- Phase 6.1: Amplifier Envelope ---
+    // Times in seconds. Sustain is a linear amplitude level (0.0–1.0).
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (
+        juce::ParameterID { "ampAttack", 1 },
+        "Amp Attack",
+        juce::NormalisableRange<float> (0.001f, 5.0f, 0.001f),
+        0.01f));
+
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (
+        juce::ParameterID { "ampDecay", 1 },
+        "Amp Decay",
+        juce::NormalisableRange<float> (0.001f, 5.0f, 0.001f),
+        0.1f));
+
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (
+        juce::ParameterID { "ampSustain", 1 },
+        "Amp Sustain",
+        juce::NormalisableRange<float> (0.0f, 1.0f, 0.01f),
+        0.8f));
+
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (
+        juce::ParameterID { "ampRelease", 1 },
+        "Amp Release",
+        juce::NormalisableRange<float> (0.001f, 10.0f, 0.001f),
+        0.3f));
 
     return { params.begin(), params.end() };
 }
@@ -125,14 +160,25 @@ void SolaceSynthProcessor::changeProgramName (int index, const juce::String& new
 // ============================================================================
 void SolaceSynthProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    // The Synthesiser must know the sample rate before rendering.
-    // This converts MIDI note frequencies to the correct angleDelta per sample.
+    // Inform the Synthesiser of the sample rate. This must happen before
+    // voice preparation so that getSampleRate() returns a valid value inside
+    // each voice's prepare() call.
     synth.setCurrentPlaybackSampleRate (sampleRate);
+
+    // Build a ProcessSpec and prepare each voice's DSP modules (Phase 6.1+).
+    // Established pattern from production JUCE synths (BlackBird, ProPhat):
+    //   iterate via getVoice(i) + dynamic_cast, call voice->prepare(spec).
+    juce::dsp::ProcessSpec spec;
+    spec.sampleRate       = sampleRate;
+    spec.maximumBlockSize = static_cast<juce::uint32> (samplesPerBlock);
+    spec.numChannels      = static_cast<juce::uint32> (getTotalNumOutputChannels());
+
+    for (int i = 0; i < synth.getNumVoices(); ++i)
+        if (auto* voice = dynamic_cast<SolaceVoice*> (synth.getVoice (i)))
+            voice->prepare (spec);
 
     SolaceLog::info ("prepareToPlay: sampleRate=" + juce::String (sampleRate)
         + " samplesPerBlock=" + juce::String (samplesPerBlock));
-
-    juce::ignoreUnused (samplesPerBlock);
 }
 
 void SolaceSynthProcessor::releaseResources()

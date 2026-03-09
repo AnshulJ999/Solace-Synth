@@ -1,8 +1,8 @@
 # Solace Synth — Project Memory
 
 **Created:** 2026-03-08
-**Last Updated:** 2026-03-09 (Phase 7.2 rev2 — layout fixes, SVG placeholders, filterEnvDepth hidden)
-**Status:** Active — Phases 0-5 complete + Phase 7.2 UI scaffold (rev2). Layout significantly improved. Remaining: icon polish, layout fine-tuning, Phase 7.3 component extraction, Phase 6.1 DSP start.
+**Last Updated:** 2026-03-09 (Phase 6.1 — Amp ADSR envelope implemented, code written, pending build verification)
+**Status:** Active — Phases 0-5 complete + Phase 7.2 UI scaffold (rev2). Phase 6.1 code complete, awaiting build + manual verification.
 
 ---
 
@@ -369,6 +369,35 @@ An AI-first "vibe-coding" framework for building JUCE plugins. Provides structur
   - **Verified in trace.log:** round-trip values 0.08, 0.30, 0.44, 0.64, 0.78 all correct
   - **Production note:** UI files served from disk via `SOLACE_DEV_UI_PATH`. For release, must embed via `juce_add_binary_data()`
 
+### Phase 6.1 — Amp ADSR (2026-03-09) — CODE WRITTEN, PENDING BUILD VERIFICATION
+
+**New files:**
+- `Source/DSP/SolaceADSR.h` — Thin wrapper around `juce::ADSR`. Methods: `prepare(sampleRate)`, `setParameters(attack, decay, sustain, release)`, `trigger()`, `release()`, `getNextSample()`, `isActive()`, `reset()`.
+
+**Modified files:**
+- `Source/DSP/SolaceVoice.h` — Major rewrite:
+  - Introduced `SolaceVoiceParams` struct (at top of file) holding `const std::atomic<float>*` pointers for all APVTS params the voice reads. Currently: `ampAttack`, `ampDecay`, `ampSustain`, `ampRelease`.
+  - Constructor is now `explicit SolaceVoice(const SolaceVoiceParams&)` — stores params by value, jasserts all pointers non-null.
+  - New `void prepare(const juce::dsp::ProcessSpec&)` method — calls `setCurrentPlaybackSampleRate()` + `ampEnvelope.prepare(sampleRate)`.
+  - `startNote()` — resets angle, stores velocity (0–1 float), snapshots APVTS via `.load()`, calls `ampEnvelope.setParameters()` + `trigger()`, computes angleDelta.
+  - `stopNote()` — calls `ampEnvelope.release()` for tail-off; `ampEnvelope.reset()` + `clearCurrentNote()` for immediate cut.
+  - `renderNextBlock()` — per sample: `getNextSample()` × `kVoiceGain` × `velocityScale` × `envValue`. Checks `isActive()` AFTER advancing to catch envelope completion. Calls `clearCurrentNote()` + resets `angleDelta` when done.
+  - Removed: manual `tailOff` exponential decay.
+  - `kVoiceGain = 0.15f` static constexpr (same as Phase 5; TODO 6.7 for dynamic normalization).
+- `Source/PluginProcessor.cpp`:
+  - `createParameterLayout()` — added `ampAttack` (0.001–5s, default 0.01), `ampDecay` (0.001–5s, default 0.1), `ampSustain` (0–1, default 0.8), `ampRelease` (0.001–10s, default 0.3).
+  - Constructor — builds `SolaceVoiceParams` from `apvts.getRawParameterValue()`, bumped voice count from 8 → **16**, passes voiceParams to each `new SolaceVoice(voiceParams)`.
+  - `prepareToPlay()` — calls `synth.setCurrentPlaybackSampleRate()` first, then builds `juce::dsp::ProcessSpec`, iterates via `synth.getVoice(i)` + `dynamic_cast<SolaceVoice*>`, calls `voice->prepare(spec)` on each.
+
+**Pattern used:** Standard production JUCE pattern from BlackBird/ProPhat: `prepareToPlay` → build `ProcessSpec` → iterate voice pool with `getVoice(i)` + `dynamic_cast` → call `voice->prepare(spec)`.
+
+**⚠️ Build verification required:** Run `cmake --build build --config Release` and verify:
+1. Build succeeds cleanly (no new warnings).
+2. Standalone launches.
+3. Notes have musical shape (Attack/Decay/Sustain/Release instead of organ gate).
+4. Soft key press → quieter than hard press (velocity sensitivity).
+5. After note-off, sound fades over ~0.3s (default release).
+
 ### Next Up
 - [x] **Phase 5: First Sound** — COMPLETE (2026-03-09)
   - `Source/DSP/SolaceSound.h` — `SynthesiserSound` tag class (all notes/channels)
@@ -378,11 +407,16 @@ An AI-first "vibe-coding" framework for building JUCE plugins. Provides structur
   - `PluginEditor.h/cpp` — `juce::MidiKeyboardComponent midiKeyboard` added as 80px strip at bottom of window; auto-grabs keyboard focus 500ms after launch
   - **Verified:** polyphonic sine tones play correctly. Mouse click on piano strip ✅. Computer keyboard (A/S/D/F/etc.) ✅. Polyphony ✅. Volume slider controls output level ✅.
   - **Architecture note:** MidiKeyboardState lives in Processor (audio thread access). Editor holds MidiKeyboardComponent (UI thread). Cross-thread: documented as safe by JUCE.
-- [ ] **Phase 6: Core synth shaping** — next recommended step
-  - Add amp ADSR to the voice so note shape is musical, not organ-like
-  - Add waveform selection (at least sine / saw / square / triangle)
-  - Add first filter stage (LP12 first is the cleanest entry point)
-  - Expand APVTS parameter set before the Figma UI lands
+- [~] **Phase 6: Core synth shaping** — IN PROGRESS
+  - [x] **6.1 Amp ADSR** — code written 2026-03-09, pending build verification
+  - [ ] 6.2 Oscillator waveforms + Osc1 tuning
+  - [ ] 6.3 Filter (LadderFilter LP24)
+  - [ ] 6.4 Filter Envelope
+  - [ ] 6.5 Second Oscillator + Osc Mix
+  - [ ] 6.6 LFO (3 targets, per-voice free-running)
+  - [ ] 6.7 Unison
+  - [ ] 6.8 Voicing params
+  - [ ] 6.9 Master Distortion
 - [ ] GitHub Actions CI + pluginval (automated testing)
 
 ### Pre-Release Backlog (do before shipping)
@@ -426,7 +460,7 @@ Do NOT implement features suggested solely by Claude Code/Codex reviews without 
 - [ ] **Plugin title in UI:** "Solace Soft Synth" (Figma) vs "Solace Synth" (shorter)? Ask designer.
 
 ### Pending — Implementation (after Phase 5)
-- [ ] Phase 6.1: Amp ADSR (`SolaceADSR.h` + velocity scaling)
+- [x] Phase 6.1: Amp ADSR (`SolaceADSR.h` + velocity scaling) — code written, pending build
 - [ ] Phase 6.2: Oscillator waveforms + Osc1 tuning params
 - [ ] Phase 6.3: Filter (`SolaceFilter.h` using `LadderFilter`, LP24 default)
 - [ ] Phase 6.4: Filter Envelope

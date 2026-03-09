@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_audio_basics/juce_audio_basics.h>
+#include <juce_dsp/juce_dsp.h>
 #include "SolaceSound.h"
 
 // ============================================================================
@@ -10,7 +11,7 @@
 // a pool of these voices and assigns them to incoming MIDI note-on events.
 //
 // Phase 5 Implementation:
-//   - Single sine wave oscillator (std::sin based, standard for clarity)
+//   - Single sine wave oscillator (juce::dsp::FastMathApproximations::sin based for efficiency)
 //   - Velocity-scaled amplitude
 //   - Simple exponential tail-off on note release (avoids audible click)
 //
@@ -112,13 +113,16 @@ public:
             // --- Release phase: exponential decay ---
             while (--numSamples >= 0)
             {
-                auto currentSample = static_cast<float> (std::sin (currentAngle) * level * tailOff);
+                auto currentSample = static_cast<float> (juce::dsp::FastMathApproximations::sin (currentAngle) * level * tailOff);
 
                 // Mix into all output channels
                 for (int ch = outputBuffer.getNumChannels(); --ch >= 0;)
                     outputBuffer.addSample (ch, startSample, currentSample);
 
                 currentAngle += angleDelta;
+                if (currentAngle >= juce::MathConstants<double>::pi)
+                    currentAngle -= juce::MathConstants<double>::twoPi;
+
                 ++startSample;
 
                 // Decay factor: 0.99 gives ~0.5s tail at 44.1kHz
@@ -139,12 +143,15 @@ public:
             // --- Sustain phase: note is held, render at full level ---
             while (--numSamples >= 0)
             {
-                auto currentSample = static_cast<float> (std::sin (currentAngle) * level);
+                auto currentSample = static_cast<float> (juce::dsp::FastMathApproximations::sin (currentAngle) * level);
 
                 for (int ch = outputBuffer.getNumChannels(); --ch >= 0;)
                     outputBuffer.addSample (ch, startSample, currentSample);
 
                 currentAngle += angleDelta;
+                if (currentAngle >= juce::MathConstants<double>::pi)
+                    currentAngle -= juce::MathConstants<double>::twoPi;
+
                 ++startSample;
             }
         }
@@ -162,7 +169,7 @@ public:
 
 private:
     // Sine oscillator state — all doubles for precision at low frequencies
-    double currentAngle  = 0.0;   // Current phase (radians, not bounded to 2pi)
+    double currentAngle  = 0.0;   // Current phase (radians, bound to [-pi, pi])
     double angleDelta    = 0.0;   // Phase increment per sample (0.0 = silent)
     double level         = 0.0;   // Amplitude (0.0-0.15, velocity scaled)
     double tailOff       = 0.0;   // Release envelope (0.0=held, 1.0→0.0=releasing)

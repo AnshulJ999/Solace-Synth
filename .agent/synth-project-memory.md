@@ -1,8 +1,8 @@
 # Solace Synth — Project Memory
 
 **Created:** 2026-03-08
-**Last Updated:** 2026-03-10 (Phase 6.1 complete — Amp ADSR + two post-review fixes; next: Phase 6.2)
-**Status:** Active — Phases 0-5 complete + Phase 6.1 complete + Phase 7.2 UI scaffold (rev2). Next: Phase 6.2 (waveforms + Osc1 tuning).
+**Last Updated:** 2026-03-10 (Phase 6.5 code review complete — one Phase 6.3 bug found; Phases 6.1–6.5 code done, pending build + listening test)
+**Status:** Active — Phases 0-5 complete + Phases 6.1–6.5 code complete. Next: build verification + listening test for 6.5, fix filter.reset() bug, then Phase 6.6 (LFO).
 
 ---
 
@@ -497,11 +497,25 @@ Do NOT implement features suggested solely by Claude Code/Codex reviews without 
   - Build: successful. Listening test: passed. Gemini approved ✅.
 
 
-- [x] **Phase 6.5: Second Oscillator + `oscMix` crossfader** — code complete (2026-03-10), awaiting build + listening test
+- [x] **Phase 6.5: Second Oscillator + `oscMix` crossfader** — code complete (2026-03-10), code review complete (2026-03-10), awaiting build + listening test
   - `Source/DSP/SolaceVoice.h` — `SolaceVoiceParams` extended with 5 atomics (`osc2Waveform/Octave/Transpose/Tuning`, `oscMix`). `SolaceOscillator osc2` private member added. `startNote()`: `osc2.reset() → setWaveform() → setTuningOffset() → setFrequency(baseHz)` — same pattern as osc1, same MIDI base frequency, independent tuning offsets. `oscMix` read per-block in `renderNextBlock()` (live crossfader response while notes held). Sample loop: both oscillators always call `getNextSample()` (phase-continuous crossfader sweep); `blendedOsc = osc1 * (1-mix) + osc2 * mix` feeds into filter unchanged.
   - `PluginProcessor.cpp` — 5 new APVTS params: `osc2Waveform` (int 0-3, def **2=Square**), `osc2Octave` (int -3 to +3, def **1=+1 octave**), `osc2Transpose` (int -12 to +12, def 0), `osc2Tuning` (float -100 to +100 cents, def 0), `oscMix` (float 0-1, def **0.5=equal blend**). 5 new `voiceParams` atomics.
   - Default patch: Osc1=Sine (unison) + Osc2=Square (+1 octave), 50/50 blend — immediately interesting, good demo of dual-osc capability.
   - Design note: no `SolaceOscillator` changes needed — class already supports second instance reuse. UI bindings for all 5 params already in `main.js` from Phase 7.2 scaffold.
+  - **Code review verdict (Claude Code, 2026-03-10):** Phase 6.5 code is correct. All design decisions validated: per-block oscMix read, always-advance for both oscs, linear crossfade (standard for synth osc blend), jlimit clamp, and APVTS defaults match Figma plan. No Phase 6.5 fixes needed.
+  - **Bug found in Phase 6.3 during this review (see below):** `filter.reset()` is not called in `startNote()`. Pass to Antigravity to fix before moving to 6.6.
+  - **SolaceFilter.h formally reviewed (first review):** LadderFilter choice correct. monoSpec override correct. setMode fallback to LP24 correct. setCutoff/setResonance clamps correct. processSample AudioBlock approach correct (works around protected API, drives internal SmoothedValue correctly). No issues found in SolaceFilter.h itself.
+
+  **⚠️ Phase 6.3 bug (found during 6.5 review — fix before 6.6):**
+  In `SolaceVoice::startNote()`, `filter.reset()` is never called before the filter is re-initialised for a new note. After a voice's natural release (allowTailOff=true), the amp envelope reaches zero → `clearCurrentNote()` is called → voice becomes available for reuse. The LadderFilter's internal delay state is **not** cleared at this point. When that voice is reused, the filter begins processing a new note's audio with stale state from the previous note. At low resonance this is imperceptible. At high resonance (near self-oscillation), the residual ringing will audibly bleed into the new note's attack.
+  **Fix (1 line, in `startNote()` filter block):**
+  ```cpp
+  // --- Filter (Phase 6.3) ---
+  filter.reset();   // ← ADD: clear stale delay state from previous note's release
+  filter.setMode      (static_cast<int> (params.filterType->load()));
+  ...
+  ```
+  This mirrors the existing `filterEnvelope.reset()` pattern above it — same rationale. The comment block already explains the reasoning for filter envelope reset; apply the same logic here.
 
 - [ ] Phase 6.6: LFO (3 targets, per-voice free-running)
 - [ ] Phase 6.7: Unison (with level normalization)

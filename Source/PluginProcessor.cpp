@@ -18,15 +18,22 @@ SolaceSynthProcessor::SolaceSynthProcessor()
     SolaceLog::info ("=== Solace Synth started ===");
     SolaceLog::info ("Log directory: " + solaceLogger->getLogDirectory());
 
-    // --- Phase 6.1: Polyphonic Synthesiser Setup ---
     // Build the parameter pointer struct. APVTS is fully initialised by this
     // point (it is a member initialised in the initialiser list before the
     // constructor body runs), so getRawParameterValue() is safe here.
+
+    // --- Phase 6.1: Amplitude Envelope ---
     SolaceVoiceParams voiceParams;
     voiceParams.ampAttack  = apvts.getRawParameterValue ("ampAttack");
     voiceParams.ampDecay   = apvts.getRawParameterValue ("ampDecay");
     voiceParams.ampSustain = apvts.getRawParameterValue ("ampSustain");
     voiceParams.ampRelease = apvts.getRawParameterValue ("ampRelease");
+
+    // --- Phase 6.2: Oscillator 1 Waveform + Tuning ---
+    voiceParams.osc1Waveform  = apvts.getRawParameterValue ("osc1Waveform");
+    voiceParams.osc1Octave    = apvts.getRawParameterValue ("osc1Octave");
+    voiceParams.osc1Transpose = apvts.getRawParameterValue ("osc1Transpose");
+    voiceParams.osc1Tuning    = apvts.getRawParameterValue ("osc1Tuning");
 
     // Create 16 voices. We always create the maximum number up front — JUCE's
     // Synthesiser does not support safe voice addition/removal at runtime.
@@ -94,6 +101,33 @@ juce::AudioProcessorValueTreeState::ParameterLayout SolaceSynthProcessor::create
         "Amp Release",
         juce::NormalisableRange<float> (0.001f, 10.0f, 0.001f),
         0.3f));
+
+    // --- Phase 6.2: Oscillator 1 Waveform ---
+    // AudioParameterInt: stored internally as a float in APVTS.
+    // Waveform index: 0=Sine, 1=Sawtooth, 2=Square, 3=Triangle.
+    params.push_back (std::make_unique<juce::AudioParameterInt> (
+        juce::ParameterID { "osc1Waveform", 1 },
+        "Osc1 Waveform",
+        0, 3, 0));  // default: 0 = Sine
+
+    // --- Phase 6.2: Oscillator 1 Tuning ---
+    // Octave and Transpose are AudioParameterInt (discrete steps).
+    // Tuning (cents) is AudioParameterFloat (continuous fine-tune).
+    params.push_back (std::make_unique<juce::AudioParameterInt> (
+        juce::ParameterID { "osc1Octave", 1 },
+        "Osc1 Octave",
+        -3, 3, 0));
+
+    params.push_back (std::make_unique<juce::AudioParameterInt> (
+        juce::ParameterID { "osc1Transpose", 1 },
+        "Osc1 Transpose",
+        -12, 12, 0));
+
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (
+        juce::ParameterID { "osc1Tuning", 1 },
+        "Osc1 Tuning",
+        juce::NormalisableRange<float> (-100.0f, 100.0f, 0.01f),
+        0.0f));
 
     return { params.begin(), params.end() };
 }
@@ -187,7 +221,9 @@ void SolaceSynthProcessor::prepareToPlay (double sampleRate, int samplesPerBlock
             voice->prepare (spec);
 
     SolaceLog::info ("prepareToPlay: sampleRate=" + juce::String (sampleRate)
-        + " samplesPerBlock=" + juce::String (samplesPerBlock));
+        + " samplesPerBlock=" + juce::String (samplesPerBlock)
+        + " voices=" + juce::String (synth.getNumVoices())
+        + " params registered: ampAttack/Decay/Sustain/Release, osc1Waveform/Octave/Transpose/Tuning");
 }
 
 void SolaceSynthProcessor::releaseResources()

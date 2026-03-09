@@ -5,6 +5,7 @@
 #include <juce_dsp/juce_dsp.h>
 #include "SolaceSound.h"
 #include "SolaceADSR.h"
+#include "SolaceOscillator.h"
 
 // ============================================================================
 // SolaceVoiceParams — APVTS Parameter Pointers for SolaceVoice
@@ -31,6 +32,16 @@ struct SolaceVoiceParams
     const std::atomic<float>* ampDecay   = nullptr;
     const std::atomic<float>* ampSustain = nullptr;
     const std::atomic<float>* ampRelease = nullptr;
+
+    // --- Phase 6.2: Oscillator 1 Waveform + Tuning ---
+    // osc1Waveform: int stored as float (Sine=0, Saw=1, Square=2, Triangle=3)
+    // osc1Octave:   int stored as float (-3 to +3, default 0)
+    // osc1Transpose: int stored as float (-12 to +12 semitones, default 0)
+    // osc1Tuning:   float (-100.0 to +100.0 cents, default 0.0)
+    const std::atomic<float>* osc1Waveform  = nullptr;
+    const std::atomic<float>* osc1Octave    = nullptr;
+    const std::atomic<float>* osc1Transpose = nullptr;
+    const std::atomic<float>* osc1Tuning    = nullptr;
 };
 
 // ============================================================================
@@ -48,14 +59,22 @@ struct SolaceVoiceParams
 //     PluginProcessor::prepareToPlay() via the established JUCE voice-iterate
 //     pattern: synth.getVoice(i) + dynamic_cast<SolaceVoice*>.
 //
+// Phase 6.2 — Waveforms + Osc1 Tuning:
+//   - Replaces the inline std::sin() with a SolaceOscillator (osc1).
+//   - Waveform (Sine/Saw/Square/Triangle) is read from APVTS at note-on.
+//   - Octave, Transpose, and Tuning offsets are applied via setTuningOffset()
+//     which computes a frequency multiplier using equal-temperament math.
+//   - All four waveforms produce output in [-1.0, +1.0] — same as sine.
+//   - Naïve waveforms (Saw, Square) alias at high frequencies (V1 acceptable).
+//     V2 will replace with PolyBLEP or wavetable.
+//
 // Signal flow (per sample):
-//   sin(angle) * kVoiceGain * velocityScale * ampEnvelope.getNextSample()
+//   osc1.getNextSample() * kVoiceGain * velocityScale * ampEnvelope.getNextSample()
 //
 // Architecture rules (audio thread):
 //   - No allocations, no locks, no logging, no I/O.
 //   - addSample() (not setSample()) so voices mix correctly in polyphony.
 //   - startSample offset MUST be respected — a note-on can arrive mid-block.
-//   - angleDelta == 0.0 is the "not yet started" guard.
 // ============================================================================
 
 class SolaceVoice : public juce::SynthesiserVoice
@@ -68,10 +87,17 @@ public:
     explicit SolaceVoice (const SolaceVoiceParams& voiceParams)
         : params (voiceParams)
     {
+        // Phase 6.1 — Amp ADSR
         jassert (params.ampAttack  != nullptr);
         jassert (params.ampDecay   != nullptr);
         jassert (params.ampSustain != nullptr);
         jassert (params.ampRelease != nullptr);
+
+        // Phase 6.2 — Osc1 waveform + tuning
+        jassert (params.osc1Waveform  != nullptr);
+        jassert (params.osc1Octave    != nullptr);
+        jassert (params.osc1Transpose != nullptr);
+        jassert (params.osc1Tuning    != nullptr);
     }
 
     // ========================================================================
@@ -84,16 +110,16 @@ public:
     //       if (auto* v = dynamic_cast<SolaceVoice*>(synth.getVoice(i)))
     //           v->prepare(spec);
     //
-    // setCurrentPlaybackSampleRate() makes getSampleRate() valid for the
-    // lifetime of this prepare/release cycle.
+    // Note: setCurrentPlaybackSampleRate() is NOT called here.
+    // juce::Synthesiser::setCurrentPlaybackSampleRate() (called first in
+    // PluginProcessor::prepareToPlay) already propagates the sample rate
+    // to every voice it owns. Calling it again here would be redundant.
     // ========================================================================
     void prepare (const juce::dsp::ProcessSpec& spec)
     {
-        // Note: setCurrentPlaybackSampleRate() is NOT called here.
-        // juce::Synthesiser::setCurrentPlaybackSampleRate() (called first in
-        // PluginProcessor::prepareToPlay) already propagates the sample rate
-        // to every voice it owns. Calling it again here would be redundant.
         ampEnvelope.prepare (spec.sampleRate);
+        // SolaceOscillator does not need a separate prepare() — sample rate is
+        // passed directly to setFrequency() at each note-on via getSampleRate().
     }
 
     // ========================================================================
@@ -107,27 +133,51 @@ public:
     // ========================================================================
     // startNote — called by the Synthesiser on each MIDI note-on.
     //
-    // Snapshots the current APVTS ADSR values (atomic loads), configures and
-    // triggers the envelope, stores velocity, and computes the oscillator
-    // phase increment for this note's frequency.
+    // Snapshots the current APVTS values (atomic loads), configures the
+    // oscillator waveform + tuning, triggers the amp envelope, and stores
+    // velocity for per-sample scaling.
+    //
+    // All heavy setup (pow() for tuning, etc.) is done here — NOT per sample.
     // ========================================================================
     void startNote (int midiNoteNumber,
                     float velocity,
                     juce::SynthesiserSound* /*sound*/,
                     int /*currentPitchWheelPosition*/) override
     {
-        // Reset oscillator phase for a clean, click-free attack.
-        currentAngle = 0.0;
+        // Reset oscillator for a clean, phase-coherent attack.
+        osc1.reset();
 
-        // Store MIDI velocity (already normalised to 0.0–1.0 by JUCE) for
-        // per-sample amplitude scaling. Full velocity = loudest note.
+        // Store MIDI velocity (normalised to 0.0–1.0 by JUCE) for per-sample
+        // amplitude scaling. Full velocity = loudest note.
         velocityScale = velocity;
 
-        // Snapshot ADSR parameters from APVTS atomics.
-        // .load() is thread-safe. Snapshotting at note-on means the envelope
-        // shape is fixed for the duration of this note, which is correct
-        // behaviour: changing Attack mid-note does not affect already-sounding
-        // notes (it affects the next note-on). This matches standard synth UX.
+        // --- Osc1 Waveform (Phase 6.2) ---
+        // AudioParameterInt values are stored as float in APVTS atomics.
+        // Casting to int gives the discrete index: 0=Sine, 1=Saw, 2=Square, 3=Triangle.
+        osc1.setWaveform (static_cast<int> (params.osc1Waveform->load()));
+
+        // --- Osc1 Tuning Offset (Phase 6.2) ---
+        // Must be called BEFORE setFrequency() so the multiplier is current.
+        //   octave    → integer, read as float and cast back (APVTS stores ints as float)
+        //   transpose → same, semitone integers
+        //   cents     → genuine float (-100.0 to +100.0)
+        osc1.setTuningOffset (
+            static_cast<int>   (params.osc1Octave->load()),
+            static_cast<int>   (params.osc1Transpose->load()),
+            params.osc1Tuning->load()
+        );
+
+        // --- Osc1 Frequency (Phase 6.2) ---
+        // Convert MIDI note to Hz, then set the oscillator's phase increment.
+        // The tuning multiplier (set above) is applied inside setFrequency().
+        const double baseHz = juce::MidiMessage::getMidiNoteInHertz (midiNoteNumber);
+        osc1.setFrequency (baseHz, getSampleRate());
+
+        // --- Amp Envelope (Phase 6.1) ---
+        // Snapshot ADSR parameters from APVTS atomics. .load() is thread-safe.
+        // Snapshotting at note-on means the envelope shape is fixed for the
+        // duration of this note. Changing Attack mid-note does not affect
+        // already-sounding notes — it affects the next note-on. Standard synth UX.
         ampEnvelope.setParameters (
             params.ampAttack->load(),
             params.ampDecay->load(),
@@ -135,13 +185,6 @@ public:
             params.ampRelease->load()
         );
         ampEnvelope.trigger();
-
-        // Convert MIDI note number to frequency and then to a per-sample
-        // phase increment (angleDelta) using equal temperament.
-        // A4 = MIDI 69 = 440 Hz. Each semitone = 2^(1/12).
-        double frequencyHz     = juce::MidiMessage::getMidiNoteInHertz (midiNoteNumber);
-        double cyclesPerSample = frequencyHz / getSampleRate();
-        angleDelta = cyclesPerSample * juce::MathConstants<double>::twoPi;
     }
 
     // ========================================================================
@@ -165,15 +208,19 @@ public:
             // Reset the envelope to idle and mark this voice as free.
             ampEnvelope.reset();
             clearCurrentNote();
-            angleDelta = 0.0;
         }
     }
 
     // ========================================================================
     // renderNextBlock — fill the output buffer for this voice.
     //
-    // Called every audio block while the voice is active. Renders the sine
-    // oscillator shaped by the ADSR envelope and velocity.
+    // Called every audio block while the voice is active.
+    //
+    // Signal flow per sample:
+    //   osc1.getNextSample()       → waveform in [-1, +1]
+    //   * kVoiceGain               → headroom guard (16-voice polyphony)
+    //   * velocityScale            → MIDI velocity sensitivity (0.0–1.0)
+    //   * ampEnvelope.getNextSample() → ADSR shape (0.0–1.0)
     //
     // CRITICAL: addSample() not setSample() — voices mix into a shared buffer.
     // CRITICAL: startSample offset respected — note may begin mid-block.
@@ -183,8 +230,9 @@ public:
                           int startSample,
                           int numSamples) override
     {
-        // Guard: angleDelta is 0.0 until startNote() has been called.
-        if (angleDelta == 0.0)
+        // Guard: osc1 will return zeros if setFrequency() hasn't been called yet
+        // (angleDelta == 0). The envelope also won't be active. Belt-and-suspenders:
+        if (! ampEnvelope.isActive() && ! isVoiceActive())
             return;
 
         while (--numSamples >= 0)
@@ -193,21 +241,19 @@ public:
             float envValue = ampEnvelope.getNextSample();
 
             // Compute output sample:
-            //   sin(angle)    → oscillator (-1.0 to +1.0)
-            //   * kVoiceGain  → headroom guard (prevents clipping with many voices)
+            //   osc1 sample → waveform oscillator (-1.0 to +1.0)
+            //   * kVoiceGain → headroom guard
             //   * velocityScale → MIDI velocity sensitivity
-            //   * envValue    → envelope shape (attack / decay / sustain / release)
-            auto currentSample = static_cast<float> (std::sin (currentAngle))
-                                 * kVoiceGain
-                                 * velocityScale
-                                 * envValue;
+            //   * envValue → envelope shape
+            float currentSample = osc1.getNextSample()
+                                  * kVoiceGain
+                                  * velocityScale
+                                  * envValue;
 
-            // Mix into all output channels (mono and stereo both handled).
+            // Mix into all output channels (handles both mono and stereo).
             for (int ch = outputBuffer.getNumChannels(); --ch >= 0;)
                 outputBuffer.addSample (ch, startSample, currentSample);
 
-            // Advance oscillator phase.
-            currentAngle += angleDelta;
             ++startSample;
 
             // Check envelope state AFTER getNextSample() — the ADSR transitions
@@ -216,7 +262,6 @@ public:
             if (! ampEnvelope.isActive())
             {
                 clearCurrentNote();
-                angleDelta = 0.0;
                 break;
             }
         }
@@ -224,21 +269,21 @@ public:
 
     // ========================================================================
     // Pitch wheel / controller — required overrides, not yet implemented.
+    // Phase 6.8+ / V2: pitch wheel will modulate osc1 frequency.
     // ========================================================================
     void pitchWheelMoved (int /*newValue*/)                    override {}
     void controllerMoved (int /*controller*/, int /*value*/)   override {}
 
 private:
     // APVTS parameter pointers — copied at construction, read at note-on.
-    // Lightweight struct (four raw pointers), safe to copy by value.
+    // Lightweight struct (eight raw pointers), safe to copy by value.
     const SolaceVoiceParams params;
 
-    // Amplifier envelope — shapes each note's attack, decay, sustain, release.
+    // --- Phase 6.1: Amplifier envelope ---
     SolaceADSR ampEnvelope;
 
-    // Oscillator phase state.
-    double currentAngle = 0.0;  // Current phase in radians (accumulates per sample)
-    double angleDelta   = 0.0;  // Phase increment per sample. 0.0 = not yet started.
+    // --- Phase 6.2: Oscillator 1 ---
+    SolaceOscillator osc1;
 
     // Velocity scaling — set at note-on, multiplied per sample.
     float velocityScale = 0.0f;

@@ -469,7 +469,12 @@ Do NOT implement features suggested solely by Claude Code/Codex reviews without 
   - Post-review fix 1: removed redundant `setCurrentPlaybackSampleRate()` in `voice->prepare()` — JUCE Synthesiser already propagates it
   - Post-review fix 2: `getTailLengthSeconds()` was `return 0.0` — would have silently dropped release tails in DAW renders
   - Build: successful (pre-fix). Manual listening test: pending (rebuild after fixes).
-- [ ] Phase 6.2: Oscillator waveforms + Osc1 tuning params
+- [x] **Phase 6.2: Oscillator Waveforms + Osc1 Tuning** — code complete (2026-03-10), awaiting build + listening test
+  - `Source/DSP/SolaceOscillator.h` — NEW. Phase accumulator, 4 waveforms (Sine/Saw/Square/Triangle), setTuningOffset (2^oct * 2^(semi/12) * 2^(cents/1200)), setFrequency, reset, getNextSample. All waveforms output [-1, +1].
+  - `Source/DSP/SolaceVoice.h` — replaced inline `std::sin()` with `SolaceOscillator osc1`. `SolaceVoiceParams` extended with `osc1Waveform/Octave/Transpose/Tuning`. `startNote()` reads + applies waveform and tuning offset. Phase guard changed from `angleDelta == 0.0` check to `!ampEnvelope.isActive() && !isVoiceActive()`.
+  - `PluginProcessor.cpp` — 4 new params: `osc1Waveform` (int 0-3, def 0), `osc1Octave` (int -3 to +3, def 0), `osc1Transpose` (int -12 to +12, def 0), `osc1Tuning` (float -100 to +100 cents, def 0). `prepareToPlay` log updated to confirm all 8 params.
+  - Note: Naïve Saw/Square alias at high frequencies — intentional V1 behaviour. PolyBLEP tracked for V2.
+
 - [ ] Phase 6.3: Filter (`SolaceFilter.h` using `LadderFilter`, LP24 default)
 - [ ] Phase 6.4: Filter Envelope
 - [ ] Phase 6.5: Second Oscillator + `oscMix` crossfader

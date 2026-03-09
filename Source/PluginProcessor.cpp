@@ -232,16 +232,22 @@ double SolaceSynthProcessor::getTailLengthSeconds() const
     // audio immediately — the release phase is silently dropped in recordings.
     //
     // getRawParameterValue is const + noexcept in JUCE, safe to call here.
-    // Returns whichever tail is longer: amp release or filter env release.
-    // This ensures DAW hosts keep driving the plugin long enough for the longer
-    // of the two release tails to complete after transport stops or during
-    // offline renders. Without this, a host receiving a shorter value would
-    // cut the audio early and silently drop the end of the release tail.
+    //
+    // Returns ampRelease only — NOT max(ampRelease, filterEnvRelease).
+    //
+    // Rationale: audio output = filteredSample * kVoiceGain * velocityScale * ampEnvVal.
+    // When the amp envelope finishes, ampEnvVal reaches 0 and the voice calls
+    // clearCurrentNote() — no more audio contribution from that voice regardless
+    // of where the filter envelope is in its cycle. The actual audible tail ends
+    // exactly when ampRelease completes. Reporting filterEnvRelease to the host
+    // would cause unnecessary silence to be recorded during offline bouncing
+    // without any audio to capture for those extra seconds.
+    //
+    // Update this if voice lifetime is ever extended to outlast the amp envelope
+    // (e.g., for a self-oscillating filter resonance tail in a future phase).
     auto* ampRel = apvts.getRawParameterValue ("ampRelease");
-    auto* envRel = apvts.getRawParameterValue ("filterEnvRelease");
-    const double ampRelease = (ampRel != nullptr) ? static_cast<double> (ampRel->load()) : 10.0;
-    const double envRelease = (envRel != nullptr) ? static_cast<double> (envRel->load()) : 10.0;
-    return std::max (ampRelease, envRelease);
+    return (ampRel != nullptr) ? static_cast<double> (ampRel->load()) : 10.0;
+
 }
 
 // ============================================================================

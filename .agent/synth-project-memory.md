@@ -485,11 +485,17 @@ Do NOT implement features suggested solely by Claude Code/Codex reviews without 
   - UI: filterCutoff, filterResonance, filterType controls already wired in main.js (Phase 7.2). Will activate automatically once params are registered.
 
 
-- [x] **Phase 6.4: Filter Envelope** — code complete (2026-03-10), awaiting build + listening test
-  - `Source/DSP/SolaceVoice.h` — `SolaceVoiceParams` extended with 5 new atomics (`filterEnvDepth/Attack/Decay/Sustain/Release`). `SolaceADSR filterEnvelope` member added. `prepare()`: `filterEnvelope.prepare(sampleRate)`. `startNote()`: filter env params snapshotted + `filterEnvelope.trigger()`. `stopNote()`: `filterEnvelope.release()` on tail-off; `filterEnvelope.reset()` on hard cut. `renderNextBlock()`: per-block reads `baseCutoffHz` and `envDepth` from APVTS; per-sample: `modulatedCutoff = baseCutoffHz + filterEnv.getNextSample() * envDepth * 10000.0f` → `filter.setCutoff()`.
-  - `PluginProcessor.cpp` — 5 new APVTS params: `filterEnvDepth` (-1 to +1, def 0), `filterEnvAttack` (0.001-5s, def 0.01), `filterEnvDecay` (0.001-5s, def 0.3), `filterEnvSustain` (0-1, def 0.0), `filterEnvRelease` (0.001-10s, def 0.3). `getTailLengthSeconds()` updated to `std::max(ampRelease, filterEnvRelease)` — resolves the Phase 6.1 TODO.
+- [x] **Phase 6.4: Filter Envelope** — COMPLETE (2026-03-10)
+  - `Source/DSP/SolaceVoice.h` — `SolaceVoiceParams` extended with 5 new atomics. `SolaceADSR filterEnvelope` member added. `prepare()`: `filterEnvelope.prepare(sampleRate)`. `startNote()`: `filterEnvelope.reset()` → `setParameters()` → `trigger()`. `stopNote()`: `filterEnvelope.release()` on tail-off; `filterEnvelope.reset()` on hard cut. `renderNextBlock()`: per-block reads `baseCutoffHz` + `envDepth`; per-sample: `modulatedCutoff = baseCutoffHz + filterEnv.getNextSample() * envDepth * 10000.0f` → `filter.setCutoff()`.
+  - `PluginProcessor.cpp` — 5 new APVTS params registered.
+  `filterEnvDepth` (-1 to +1, def 0), `filterEnvAttack` (0.001-5s, def 0.01), `filterEnvDecay` (0.001-5s, def 0.3), `filterEnvSustain` (0-1, def 0.0), `filterEnvRelease` (0.001-10s, def 0.3). `getTailLengthSeconds()` updated to `std::max(ampRelease, filterEnvRelease)` — resolves the Phase 6.1 TODO.
   - UI: all 5 filter env params already wired in `main.js` (Phase 7.2 scaffold). Active on build.
   - Out-of-the-box behaviour: `filterEnvDepth=0` → no envelope effect, sounds identical to 6.3 on launch. Move depth to hear the envelope.
+  
+  - `getTailLengthSeconds()` returns `ampRelease` only (not max of both — filter env does not extend audible output since amp multiplies signal to zero first).
+  - Post-review fixes: (1) `filterEnvelope.reset()` added before `trigger()` in `startNote()` — prevents ADSR::noteOn() restart from non-zero level when voice reused mid-release (would have caused audible artifact on pluck attack); (2) Reverted `getTailLengthSeconds()` to `ampRelease` only — architecturally consistent with voice lifetime model.
+  - Build: successful. Listening test: passed. Gemini approved ✅.
+
 
 - [ ] Phase 6.5: Second Oscillator + `oscMix` crossfader
 - [ ] Phase 6.6: LFO (3 targets, per-voice free-running)

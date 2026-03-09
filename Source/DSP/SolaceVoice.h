@@ -200,8 +200,17 @@ public:
 
         // --- Filter Envelope (Phase 6.4) ---
         // Snapshotted at note-on — ADSR shape is fixed for the note's lifetime.
-        // filterEnvDepth is read per-sample in renderNextBlock() (it is a float
-        // the user may sweep mid-note, and reading it per-sample is cheap).
+        // filterEnvDepth is read per-block in renderNextBlock() (cheap, per-block
+        // resolution is fine for a UI knob the user may sweep mid-note).
+        //
+        // reset() before trigger() is REQUIRED: the voice is freed when the amp
+        // envelope finishes, which may happen before the filter envelope release
+        // completes (if filterEnvRelease > ampRelease). If this voice is then
+        // immediately reused, the filter envelope could still be mid-release.
+        // JUCE's ADSR::noteOn() restarts from the current level (not from 0),
+        // so without reset(), the new note's filter attack would start from a
+        // non-zero level — an audible artifact on the pluck attack.
+        filterEnvelope.reset();
         filterEnvelope.setParameters (
             params.filterEnvAttack->load(),
             params.filterEnvDecay->load(),

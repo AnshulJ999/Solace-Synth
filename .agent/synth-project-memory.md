@@ -392,16 +392,45 @@ An AI-first "vibe-coding" framework for building JUCE plugins. Provides structur
 - [ ] Full Figma UI implementation
 
 ### Pending — Spec Gaps (need decisions before DSP implementation)
-- [ ] **Define full LFO target list** and velocity mod target list
-- [ ] **Waveform list confirmed** (suggest: Sine, Saw, Square, Triangle, Noise)
-- [ ] **Filter HP decision** — include in V1 or defer to V2?
+- [x] **Waveform list:** Sine, Saw, Square, Triangle in V1. **Noise deferred to V2** (per-voice PRNG complexity).
+- [x] **Filter in V1:** LP12, LP24, HP12 using `juce::dsp::LadderFilter`. **LP24 is the default** (matches Figma design).
+- [x] **LFO target list:** None, FilterCutoff, Osc1Pitch, Osc2Pitch, Osc1Level, Osc2Level, AmpLevel, FilterResonance (8 targets, 0-7).
+- [x] **Velocity mod target list:** None, AmpLevel, AmpAttack, FilterCutoff, FilterResonance (5 targets, 0-4).
+- [x] **Osc Mix:** Two independent level faders (`osc1Level`, `osc2Level`) — NOT a single crossfader. Matches Figma design (two sliders in Osc Mix section).
+- [x] **Osc2 defaults:** Waveform=Square (index 2), Octave=1 (one octave above Osc1). Confirmed from Figma screenshot.
+- [x] **Both oscillators get tuning params:** `osc1Octave`, `osc1Transpose`, `osc1Tuning` added in 6.2. `osc2Octave`, `osc2Transpose`, `osc2Tuning` in 6.5.
+- [x] **LFO has 3 target slots** (`lfoTarget1/2/3`) and one shared amount slider (`lfoAmount`). Matches 3 dropdown targets in Figma.
+- [x] **Plugin window:** Resizable (`setResizable(true, false)` + `setResizeLimits()`). CSS uses relative units. Fallback: 3 size presets.
+- [x] **UI theme:** Light / white background, orange accent sliders. Dark theme is a V2 nice-to-have.
+- [ ] **LFO scope: per-voice or global?** Per-voice = organic drift. Global = classic polysynth lockstep. **Ask designer friend before 6.6.**
+- [ ] **Filter Env Depth** — UI position: Filter section or Filter Configuration section? Ask designer.
+- [ ] **unisonDetune / unisonSpread** — visible in UI (add controls) or engine-only for V1? Ask designer.
+- [ ] **Plugin title in UI:** "Solace Soft Synth" (Figma) vs "Solace Synth" (shorter)? Ask designer.
 
-### Pending — Implementation (after initialization)
-- [ ] Add amp ADSR to the current voice engine
-- [ ] Add oscillator waveform switching
-- [ ] Add filter module + cutoff/resonance parameters
-- [ ] Implement LFO modulation routing
-- [ ] Implement unison engine
+### Pending — Implementation (after Phase 5)
+- [ ] Phase 6.1: Amp ADSR (`SolaceADSR.h` + velocity scaling)
+- [ ] Phase 6.2: Oscillator waveforms + Osc1 tuning params
+- [ ] Phase 6.3: Filter (`SolaceFilter.h` using `LadderFilter`, LP24 default)
+- [ ] Phase 6.4: Filter Envelope
+- [ ] Phase 6.5: Second Oscillator + Osc Mix levels
+- [ ] Phase 6.6: LFO (3 targets, global vs per-voice TBD)
+- [ ] Phase 6.7: Unison (with level normalization)
+- [ ] Phase 6.8: Voicing params (voice count, velocity mod targets)
+- [ ] Phase 7: Full Figma UI implementation
+- [ ] GitHub Actions CI + pluginval
+
+---
+
+## 🎨 Design Spec (confirmed from Figma screenshots)
+
+**Reference:** `Screenshots/Interface-2-Faders-Main-New.png`
+- Theme: Light/white background, orange accent sliders
+- All continuous params: vertical faders
+- Discrete/enum params: arrow selectors (`< value >`)
+- Target selectors: dropdowns (truncated label + arrow)
+- Sections (top row): Osc 1, Osc Mix, Osc 2, Amplifier Envelope, Master
+- Sections (bottom row): Filter, Filter Configuration, Low Frequency Oscillator, Voicing
+- Logo: "SS" monogram with orange highlight
 
 ---
 
@@ -411,12 +440,14 @@ An AI-first "vibe-coding" framework for building JUCE plugins. Provides structur
 2. ~~WebView vs native JUCE?~~ → **RESOLVED: WebView confirmed**
 3. ~~JUCE license?~~ → **RESOLVED: Starter (free commercial), project license deferred**
 4. ~~JUCE inclusion method?~~ → **RESOLVED: CMake FetchContent**
-5. **Does friend know HTML/CSS?** Critical for WebView collaboration — not yet confirmed
-6. **"Computer-friendly UI" — does it imply an onscreen keyboard?**
-7. **Filter HP in V1?** Strongly recommend yes — trivial to add with State Variable Filter
-8. **Portamento:** Polyphonic glide is complex — keep firmly in V2
-9. **Preset system architecture:** Use `AudioProcessorValueTreeState` from day one — preset load/save is almost free if designed in early
-10. **Neural DSP / BIAS FX 2 precedent noted:** BIAS FX 2 uses HTML/CSS WebView for its premium UI — validates this approach for commercial-quality results
+5. ~~Waveform list?~~ → **RESOLVED: Sine/Saw/Square/Triangle in V1; Noise deferred**
+6. ~~Filter HP in V1?~~ → **RESOLVED: LP12/LP24/HP12 via LadderFilter; LP24 is default**
+7. ~~Osc Mix: crossfader or two levels?~~ → **RESOLVED: two independent level faders from Figma**
+8. **Does friend know HTML/CSS?** Critical for WebView collaboration — not yet confirmed
+9. **LFO scope: per-voice or global?** Ask designer friend before Phase 6.6
+10. **Plugin title:** "Solace Soft Synth" (Figma) or "Solace Synth"? Confirm with designer
+11. **Portamento:** Polyphonic glide is complex — firmly V2
+12. **Preset system:** APVTS is already the foundation — save/load is almost free when ready
 
 ---
 

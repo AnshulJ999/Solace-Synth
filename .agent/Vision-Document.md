@@ -23,7 +23,20 @@
 * JUCE  
 * Audio Plugin Coder (APC)
 
+# Roles
+
+**Anshul:**
+
+* Backend vibe-coding  
+* Frontend vibe-coding \- importing the Figma design into the code
+
+**Nabeel:**
+
+* Figma UI UX Design  
+* JUCE Code Review
+
 # UI Tryouts
 
 * UI with knobs did not work out since folks complained about dragging knobs not being intuitive   
 * The second iteration with sliders appears more viable. Tried to create some branding and manage the colors better. Not final at all.
+

@@ -25,9 +25,12 @@
 //
 // Usage per voice:
 //   1. Call setWaveform(index) at note-on (read from APVTS).
-//   2. Call setFrequency(hz, sampleRate) at note-on (includes tuning offset).
-//   3. Call reset() at note-on to restart phase from zero (click-free attack).
-//   4. Call getNextSample() once per sample in renderNextBlock().
+//   2. Call setTuningOffset(octave, transpose, cents) at note-on.
+//          MUST be called before setFrequency() — setFrequency() reads the
+//          tuning multiplier computed here.
+//   3. Call setFrequency(hz, sampleRate) at note-on.
+//   4. Call reset() at note-on to restart phase from zero (click-free attack).
+//   5. Call getNextSample() once per sample in renderNextBlock().
 //
 // Thread safety:
 //   Designed to run exclusively on the audio thread.
@@ -126,9 +129,13 @@ public:
         // Advance phase accumulator.
         currentAngle += angleDelta;
 
-        // Wrap to [0, 2π] to prevent floating-point drift on long notes.
-        // Using subtraction rather than fmod for performance on the audio thread.
-        if (currentAngle >= juce::MathConstants<double>::twoPi)
+        // Wrap to [0, 2π]. Using a while loop rather than fmod (fmod is more
+        // expensive on the audio thread). A single subtraction is insufficient
+        // when angleDelta > 2π — which is reachable for high MIDI notes with
+        // octave/transpose/cents offsets (e.g. MIDI 127 + osc1Octave=+3 gives
+        // angleDelta ≈ 30 radians). The loop runs at most a handful of
+        // iterations (ceil(angleDelta / 2π) - 1), so it is audio-thread safe.
+        while (currentAngle >= juce::MathConstants<double>::twoPi)
             currentAngle -= juce::MathConstants<double>::twoPi;
 
         return sample;
@@ -156,9 +163,11 @@ private:
                 return static_cast<float> (std::sin (angle));
 
             case Sawtooth:
-                // Linear ramp from +1 to -1 over one cycle.
-                // angle / twoPi maps [0, 2π] → [0, 1]; *2 - 1 → [-1, +1].
+                // Linear ramp from -1 to +1 over one cycle (rising sawtooth).
+                // angle / twoPi maps [0, 2π] → [0, 1); *2 - 1 → [-1, +1).
                 // Wraps discontinuously at 2π → 0 (generates alias harmonics).
+                // Note: rising and falling saws have identical harmonic content
+                // (just phase-inverted), so this is acoustically equivalent.
                 return static_cast<float> (2.0 * (angle / twoPi) - 1.0);
 
             case Square:

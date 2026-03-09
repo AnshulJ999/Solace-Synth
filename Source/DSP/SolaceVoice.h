@@ -232,6 +232,14 @@ public:
         // filterType is snapshotted at note-on — mode changes mid-note cause a
         // transient click (state-vector discontinuity). Cutoff and resonance are
         // read live per-block in renderNextBlock(), so knob moves are audible.
+        //
+        // reset() is REQUIRED here for the same reason filterEnvelope.reset() is
+        // required above: after a natural note-off, the amp envelope decays to
+        // zero and clearCurrentNote() is called, but the LadderFilter's internal
+        // delay state is NOT automatically cleared. At high resonance (approaching
+        // self-oscillation), the filter keeps ringing even with zero input — that
+        // residual state bleeds into the next note's attack when the voice is reused.
+        filter.reset();
         filter.setMode      (static_cast<int> (params.filterType->load()));
         filter.setResonance (params.filterResonance->load());
         // baseCutoffHz is updated per-block in renderNextBlock(); initialise it

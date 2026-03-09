@@ -481,6 +481,81 @@ Do NOT implement features suggested solely by Claude Code/Codex reviews without 
 
 ---
 
+## 🧪 Testing Strategy (Phase 6)
+
+### Three-Layer Approach
+
+| Layer | Tool | When | Purpose |
+|-------|------|------|---------|
+| **1. Manual listening** | Standalone plugin | After every sub-phase build | Verify DSP sounds correct — ears are the primary gate |
+| **2. C++ unit tests (CTest)** | CTest + headless test executables | After 6.3 | Numerical verification: ADSR stages, waveform range [-1,1], no NaN |
+| **3. Plugin validation** | `pluginval` (Tracktion) | Before DAW release / Phase 7 gate | Full host stress test: polyphony, parameter save/load, thread safety |
+
+### Automation Rollout
+- **6.1–6.2:** Manual listening only. Fast iteration priority.
+- **After 6.3:** Add `test_adsr.cpp`, `test_oscillator.cpp`, `test_filter.cpp` — small headless CTest executables (no audio hardware needed).
+- **Phase 7 (pre-release):** `pluginval.exe --validate-in-process "Solace Synth.vst3" --strictness-level 5`
+- **Pre-release:** GitHub Actions CI: build + CTest + pluginval headless on every push to `dev-anshul`.
+
+### General Rules (Every Sub-Phase)
+1. **Build gate:** `cmake --build build --config Release` — zero new warnings. Never commit a failing build.
+2. **Log check:** `%TEMP%\SolaceSynth\info.log` — confirm new APVTS params appear on startup.
+3. **No crash:** Launch standalone, open window, play notes.
+4. **No silence:** Notes produce audio.
+
+### Velocity Testing Note
+- Computer keyboard → JUCE sends fixed velocity (64). Cannot test velocity range this way.
+- With MIDI keyboard: soft/hard press sends different velocities.
+- JUCE's on-screen MidiKeyboardComponent: click **top of key** = low velocity, **bottom of key** = high velocity (built-in JUCE behaviour).
+
+### Per-Phase Manual Test Checklist
+
+#### Phase 6.1 — Amp ADSR (COMPLETE)
+- [x] No crash, 16 voices loaded
+- [x] Basic notes produce sound
+- [ ] Attack fade-in (needs APVTS param set via UI — deferred until UI bridge connected)
+- [ ] Release fade-out (same)
+- [ ] Tail length: release audible after DAW transport stop (requires Reaper test)
+- [ ] Velocity range (requires MIDI keyboard or bottom-of-key click)
+
+#### Phase 6.2 — Waveforms + Osc1 Tuning
+- [ ] Sine, Saw, Square, Triangle each sound distinct
+- [ ] `osc1Octave` = +1 → pitch doubles; -1 → pitch halves
+- [ ] `osc1Transpose` = +12 → same as +1 octave; +7 → perfect fifth
+- [ ] `osc1Tuning` = +100 cents → slightly sharp; -100 → slightly flat
+- [ ] Waveform switch mid-note: no click or crash
+
+#### Phase 6.3 — Filter
+- [ ] Sweep cutoff 20kHz → 200Hz (LP24) → progressively darker
+- [ ] Max resonance → self-resonance at cutoff
+- [ ] HP12 mode → bass disappears
+- [ ] Multiple simultaneous notes filter independently (no cross-voice artifacts)
+- [ ] Cutoff at 20Hz → near silence, no crash, no NaN
+
+#### Phase 6.4 — Filter Envelope
+- [ ] Fast A, med D, S=0, depth=+1.0 → classic pluck
+- [ ] depth=-1.0 → inverted pluck (filter closes on hit)
+- [ ] depth=0.0 → no envelope effect
+- [ ] Cutoff stays in [20, 20000 Hz] at all depths (no NaN)
+
+#### Phase 6.5 — Osc2 + Mix
+- [ ] `oscMix`=0.0 → Only Osc1 audible
+- [ ] `oscMix`=1.0 → Only Osc2 audible
+- [ ] `oscMix`=0.5 + `osc2Tuning` offset → beating / chorus thickness
+
+#### Phase 6.6 — LFO
+- [ ] Target=FilterCutoff, slow rate → wah sweep
+- [ ] Target=Osc1Pitch, small amount → vibrato
+- [ ] Target=AmpLevel → tremolo
+- [ ] Hold chord → per-voice LFO de-sync produces organic shimmer
+
+#### Phase 6.7 — Unison
+- [ ] `unisonCount`=4, `detune`=20 cents → thick supersaw
+- [ ] `unisonSpread`=1.0 → wide stereo on headphones
+- [ ] Count=1 vs count=8: approximately equal perceived loudness (equal-power normalisation)
+
+---
+
 ## 🌿 Git Workflow & Collaboration
 
 ### Branch Strategy

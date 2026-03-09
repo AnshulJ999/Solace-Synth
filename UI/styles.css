@@ -92,6 +92,9 @@
     padding: 0;
 }
 
+/* Ensure [hidden] always wins even against display:flex class rules */
+[hidden] { display: none !important; }
+
 html, body {
     width: 100%;
     height: 100%;
@@ -336,9 +339,22 @@ html, body {
     flex-direction: row;
     gap: var(--space-lg);
     flex: 1;
-    align-items: flex-start;  /* TOP-align: waveform selector, arrow selectors, faders all start at top */
+    align-items: flex-start;
     min-height: 0;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    /* No overflow:hidden here — sub-section clips the boundary.
+       overflow:hidden here would silently clip items that just barely overflow. */
+}
+
+/* Oscillator controls need tighter gap: waveform + 2 selectors + fader
+   need to fit in a narrower column than amp-env or master. */
+.controls-row--osc {
+    gap: var(--space-sm);
+}
+
+/* Waveform icon is smaller in the tighter osc column */
+.controls-row--osc .waveform-icon {
+    width: clamp(40px, 4.5vw, 72px);
 }
 
 /* Centered variant — for Osc Mix single-fader layout */

@@ -1,98 +1,86 @@
 /* ============================================================================
  * Solace Synth — UI Design System
- * Phase 7.1: Design System Setup
+ * Phase 7.1/7.2 (rev 2): Design System + Layout Fixes
  *
- * All values are sourced directly from Figma MCP extraction (2026-03-09).
+ * All values sourced from Figma MCP extraction (2026-03-09).
  * File: Synth Project / Mockup / Interface 3 (node 118:665)
  *
  * Fonts:
- *   MuseoModerno 600  — Logo/title text
- *   Jura 700/600      — Section headings and control labels
+ *   MuseoModerno 600  — Logo/title text (Google Fonts)
+ *   Jura 700/600      — Section headings and control labels (Google Fonts)
  *   NATS 400          — Value readouts (fallback: Jura until font file provided)
  *
- * Color tokens (Figma names → CSS vars):
- *   White    #FFFFFF  → --color-bg
- *   Black    #202020  → --color-text
- *   Dark     #666666  → --color-text-dark (headings, values)
- *   Medium   #999999  → --color-text-mid
- *   Light    #CCCCCC  → --color-text-light, --color-slider-track
- *   Lightest #EEEEEE  → --color-border
- *   Primary  #FF9E2F  → --color-accent
+ * TODO (pre-release): Replace Google Fonts @import with locally bundled font
+ * files in UI/assets/fonts/ to eliminate the network dependency in offline
+ * DAW environments. Font loading degrades gracefully in Jura fallback for now.
  * ============================================================================ */
 
-/* ---- Google Fonts ---- */
+/* ---- Google Fonts — dev only, replace before release ---- */
 @import url('https://fonts.googleapis.com/css2?family=MuseoModerno:wght@600&family=Jura:wght@600;700&display=swap');
 
 /* ============================================================================
  * Design Tokens
  * ============================================================================ */
 :root {
-    /* Colors */
+    /* Colors (exact Figma values) */
     --color-bg:           #FFFFFF;
     --color-text:         #202020;
     --color-text-dark:    #666666;
     --color-text-mid:     #999999;
     --color-text-light:   #CCCCCC;
     --color-border:       #EEEEEE;
-    --color-border-light: #CCCCCC; /* Voicing section only */
+    --color-border-voicing: #CCCCCC;
     --color-accent:       #FF9E2F;
     --color-accent-hover: #e08a1f;
-    --color-divider:      #D9D9D9;
 
     /* Slider */
-    --color-slider-track: #CCCCCC;
+    --color-slider-track:        #CCCCCC;
     --color-slider-thumb-bg:     #FFFFFF;
     --color-slider-thumb-stroke: #FF9E2F;
 
     /* Fonts */
     --font-display: 'MuseoModerno', sans-serif;
     --font-ui:      'Jura', sans-serif;
-    /* NATS font: provide NATS.woff2 in UI/assets/fonts/ and uncomment:
-       @font-face { font-family: 'NATS'; src: url('assets/fonts/NATS.woff2'); }
-       --font-value: 'NATS', sans-serif;
-       Until then: */
+    /* NATS: provide NATS.woff2 in UI/assets/fonts/ and add @font-face.
+       Then set: --font-value: 'NATS', 'Jura', sans-serif; */
     --font-value:   'Jura', sans-serif;
 
-    /* Font sizes — clamp(min, preferred, max) for responsive scaling */
-    --text-title:   clamp(28px, 3.3vw, 48px);
-    --text-heading: clamp(16px, 1.9vw, 28px);
-    --text-tag:     clamp(10px, 1.04vw, 15px);
-    --text-value:   clamp(12px, 1.39vw, 20px);
+    /* Font sizes — clamp(min, preferred vw/vh based, max) */
+    --text-title:   clamp(22px, 2.6vw, 40px);
+    --text-heading: clamp(13px, 1.5vw, 22px);
+    --text-tag:     clamp(9px,  0.9vw, 13px);
+    --text-value:   clamp(10px, 1.1vw, 16px);
 
-    /* Spacing — derived from Figma (base unit = 8px) */
+    /* Spacing */
     --space-xs:  4px;
     --space-sm:  8px;
     --space-md:  12px;
     --space-lg:  16px;
     --space-xl:  24px;
     --space-2xl: 32px;
-    --space-3xl: 40px;
-    --space-4xl: 48px;
 
-    /* Effective root padding (Figma: 40px 48px) — responsive */
-    --root-padding-v: clamp(20px, 3.9vh, 40px);
-    --root-padding-h: clamp(24px, 3.3vw, 48px);
-    --root-gap:       clamp(16px, 3.1vh, 32px);
+    /* Root layout */
+    --root-padding-v: clamp(16px, 2.8vh, 32px);
+    --root-padding-h: clamp(20px, 2.6vw, 40px);
+    --root-gap:       clamp(12px, 2.0vh, 20px);
 
     /* Card */
-    --card-radius:  8px;
-    --card-border:  1px solid var(--color-border);
-    --card-shadow:  0px 1px 1px 0px rgba(0, 0, 0, 0.25);
-    --card-padding-h: clamp(16px, 2.2vw, 32px);
-    --card-padding-v: clamp(16px, 2.6vh, 24px);
-    --card-gap:       clamp(16px, 2.6vh, 24px);
+    --card-radius:    8px;
+    --card-border:    1px solid var(--color-border);
+    --card-shadow:    0px 1px 1px 0px rgba(0, 0, 0, 0.25);
+    --card-padding-h: clamp(12px, 1.6vw, 24px);
+    --card-padding-v: clamp(12px, 1.8vh, 20px);
+    --card-gap:       clamp(10px, 1.8vh, 18px);
 
-    /* Slider dimensions */
-    --slider-track-w: 8px;
-    --slider-thumb-w: 20px;
-    --slider-thumb-h: 24px;
-    --slider-thumb-radius: 8px;
+    /* Divider between sub-sections */
+    --divider-margin: clamp(8px, 0.6vw, 12px);
 
-    /* Top bar */
-    --topbar-gap: clamp(16px, 2.2vw, 32px);
-
-    /* Keyboard strip height (JUCE MidiKeyboard native) */
-    --keyboard-strip-h: 88px;
+    /* Slider */
+    --slider-track-w:    8px;
+    --slider-thumb-w:    20px;
+    --slider-thumb-h:    24px;
+    --slider-thumb-r:    8px;
+    --slider-thumb-border: 4px;
 }
 
 /* ============================================================================
@@ -111,14 +99,12 @@ html, body {
     background: var(--color-bg);
     color: var(--color-text);
     font-family: var(--font-ui);
-    font-size: 16px;
     user-select: none;
     -webkit-user-select: none;
 }
 
 /* ============================================================================
  * Root Layout
- * Figma: column, justify-content: center, gap: 32px, padding: 40px 48px
  * ============================================================================ */
 .solace-root {
     display: flex;
@@ -133,29 +119,26 @@ html, body {
 
 /* ============================================================================
  * Top Bar
- * Figma: row, justify-content: space-between, align-items: flex-end, gap: 32px
  * ============================================================================ */
 .top-bar {
     display: flex;
     flex-direction: row;
     justify-content: space-between;
-    align-items: flex-end;
-    gap: var(--topbar-gap);
+    align-items: center;
+    gap: var(--space-xl);
     flex-shrink: 0;
 }
 
-/* Logo group (SS monogram + title) */
+/* Logo group */
 .logo-group {
     display: flex;
     flex-direction: row;
     align-items: center;
-    gap: 10px;
-    padding: 0 var(--space-xl);
+    gap: var(--space-sm);
 }
 
 .logo-monogram {
-    /* Container for the SS SVG — 63×76 in Figma */
-    width: clamp(32px, 4.4vw, 63px);
+    width: clamp(28px, 3.3vw, 50px);
     height: auto;
     flex-shrink: 0;
 }
@@ -165,28 +148,27 @@ html, body {
     font-weight: 600;
     font-size: var(--text-title);
     color: var(--color-text);
-    letter-spacing: 0.003em;
-    line-height: 1.59;
     white-space: nowrap;
+    line-height: 1.2;
 }
 
-/* Top-right controls group (preset nav + menu) */
+/* Top-right controls */
 .top-controls {
     display: flex;
     flex-direction: row;
     align-items: center;
-    gap: var(--space-2xl);
+    gap: var(--space-xl);
 }
 
-/* Preset selecter: [< | dropdown | >] */
-.preset-selecter {
+/* Preset selector */
+.preset-selector {
     display: flex;
     flex-direction: row;
     align-items: center;
-    gap: var(--space-sm);
-    padding: var(--space-xs);
+    gap: var(--space-xs);
     border: var(--card-border);
     border-radius: var(--card-radius);
+    padding: var(--space-xs);
     background: var(--color-bg);
 }
 
@@ -194,50 +176,39 @@ html, body {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: var(--space-md);
-    background: var(--color-bg);
+    width: 32px;
+    height: 32px;
     border: var(--card-border);
     border-radius: 4px;
+    background: var(--color-bg);
     cursor: pointer;
-    transition: background 0.15s ease;
+    transition: background 0.12s ease;
     flex-shrink: 0;
 }
 
-.preset-nav-btn:hover {
-    background: var(--color-border);
-}
-
-.preset-nav-btn img,
-.preset-nav-btn svg {
-    width: clamp(6px, 0.56vw, 8px);
-    height: clamp(10px, 0.83vw, 12px);
-}
+.preset-nav-btn:hover   { background: var(--color-border); }
+.preset-nav-btn img     { width: 7px; height: 12px; display: block; }
 
 .preset-dropdown {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: var(--space-sm);
-    padding: var(--space-md);
     border: var(--card-border);
     border-radius: 4px;
-    min-width: clamp(140px, 22vw, 320px);
+    padding: var(--space-sm) var(--space-md);
+    min-width: clamp(100px, 16vw, 240px);
     cursor: pointer;
     background: var(--color-bg);
-    transition: background 0.15s ease;
+    transition: background 0.12s ease;
 }
 
-.preset-dropdown:hover {
-    background: var(--color-border);
-}
+.preset-dropdown:hover { background: var(--color-border); }
 
 .preset-dropdown-label {
     font-family: var(--font-ui);
     font-weight: 700;
     font-size: var(--text-value);
     color: var(--color-text-dark);
-    flex: 1;
-    text-align: center;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -248,38 +219,30 @@ html, body {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: var(--space-lg);
+    width: 40px;
+    height: 40px;
     border: var(--card-border);
     border-radius: var(--card-radius);
     background: var(--color-bg);
     cursor: pointer;
-    transition: background 0.15s ease;
+    transition: background 0.12s ease;
     flex-shrink: 0;
 }
 
-.menu-btn:hover {
-    background: var(--color-border);
-}
-
-.menu-btn img,
-.menu-btn svg {
-    width: clamp(20px, 1.7vw, 24px);
-    height: clamp(20px, 1.7vw, 24px);
-}
+.menu-btn:hover   { background: var(--color-border); }
+.menu-btn img     { width: 22px; height: 22px; display: block; }
 
 /* ============================================================================
- * Main Content Area
- * Two rows of section cards stacked vertically, filling remaining space
+ * Content Area + Section Rows
  * ============================================================================ */
 .content-area {
     display: flex;
     flex-direction: column;
     flex: 1;
     gap: var(--root-gap);
-    min-height: 0; /* Allow flex children to shrink */
+    min-height: 0;
 }
 
-/* Each row of section cards */
 .section-row {
     display: flex;
     flex-direction: row;
@@ -289,8 +252,7 @@ html, body {
 }
 
 /* ============================================================================
- * Section Cards
- * Figma: border 1px #EEEEEE, border-radius 8px, box-shadow Basic Drop
+ * Cards
  * ============================================================================ */
 .card {
     display: flex;
@@ -302,66 +264,63 @@ html, body {
     box-shadow: var(--card-shadow);
     background: var(--color-bg);
     overflow: hidden;
-    position: relative;
+    min-width: 0;
 }
 
-/* Flex-grow assignments — approximate Figma proportions within each row */
-/* Row 1 */
-.card--osc-block   { flex: 3; }   /* Osc1 + OscMix + Osc2 together */
-.card--amp-env     { flex: 2; }
-.card--master      { flex: 1; min-width: 0; }
+/* Row 1 flex proportions */
+.card--osc-block  { flex: 5; }
+.card--amp-env    { flex: 2.5; }
+.card--master     { flex: 1; }
 
-/* Row 2 */
-.card--filter-block { flex: 2.5; } /* Filter + Filter Config */
-.card--lfo          { flex: 2; }
-.card--voicing      { flex: 1.5; border-color: var(--color-border-light); box-shadow: none; }
+/* Row 2 flex proportions */
+.card--filter-block { flex: 3; }
+.card--lfo          { flex: 2.5; }
+.card--voicing      { flex: 1.5; border-color: var(--color-border-voicing); box-shadow: none; }
 
-/* Horizontal dividers within a card (1px separator between sub-sections) */
+/* Internal row for multi-sub-section cards */
+.card-row {
+    display: flex;
+    flex-direction: row;
+    flex: 1;
+    min-height: 0;
+    gap: 0;
+}
+
+/* 1px vertical divider between sub-sections */
 .card-divider {
     width: 1px;
     background: var(--color-border);
     align-self: stretch;
     flex-shrink: 0;
-    margin: 0 var(--space-sm);
+    margin: 0 var(--divider-margin);
 }
 
-/* Internal row layout within a card (for multi-sub-section cards) */
-.card-row {
-    display: flex;
-    flex-direction: row;
-    flex: 1;
-    gap: 0;
-    min-height: 0;
-}
-
-/* Sub-section within a card-row */
+/* Sub-section within a card-row. No extra horizontal padding — card handles it */
 .sub-section {
     display: flex;
     flex-direction: column;
     gap: var(--card-gap);
-    padding: 0 var(--card-padding-h);
     flex: 1;
     min-width: 0;
+    overflow: hidden;
 }
 
-.sub-section:first-child {
-    padding-left: 0;
-}
-
-.sub-section:last-child {
-    padding-right: 0;
-}
+/* Specific sub-section flex overrides */
+.sub-section--osc1      { flex: 3; }
+.sub-section--osc-mix   { flex: 1.2; min-width: 80px; }
+.sub-section--osc2      { flex: 3; }
+.sub-section--filter    { flex: 1.2; min-width: 80px; }
+.sub-section--filter-cfg { flex: 3; }
 
 /* ============================================================================
  * Section Heading
- * Figma: Jura 700 28px, color #666666
  * ============================================================================ */
 .section-heading {
     font-family: var(--font-ui);
     font-weight: 700;
     font-size: var(--text-heading);
     color: var(--color-text-dark);
-    line-height: 1.18;
+    line-height: 1.2;
     flex-shrink: 0;
     white-space: nowrap;
     overflow: hidden;
@@ -369,28 +328,40 @@ html, body {
 }
 
 /* ============================================================================
- * Controls Row (horizontal group of controls within a section)
+ * Controls Row
+ * FIX: was align-items: flex-end — now flex-start so all controls align at top
  * ============================================================================ */
 .controls-row {
     display: flex;
     flex-direction: row;
     gap: var(--space-lg);
     flex: 1;
-    align-items: flex-end;
+    align-items: flex-start;  /* TOP-align: waveform selector, arrow selectors, faders all start at top */
     min-height: 0;
+    flex-wrap: wrap;
+}
+
+/* Centered variant — for Osc Mix single-fader layout */
+.controls-row--center {
+    justify-content: center;
+    align-items: flex-start;
+}
+
+/* Column variant — for Filter Config (type selector on top, env faders below) */
+.controls-row--col {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    gap: var(--card-gap);
 }
 
 /* ============================================================================
- * Vertical Fader (Slider)
- * Figma: 8px wide track, #CCCCCC track, white+orange thumb, 8px border-radius
- *        Standard: 200px track. Big: 280px track. Small: 120px track.
- *        Thumb: 20×24px (standard), orange (#FF9E2F) stroke 4px
+ * Vertical Fader
  * ============================================================================ */
 .fader {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: var(--space-sm);
+    gap: var(--space-xs);
     flex-shrink: 0;
 }
 
@@ -401,19 +372,11 @@ html, body {
     color: var(--color-text);
     letter-spacing: 0.01em;
     text-align: center;
-    line-height: 1.6;
+    line-height: 1.4;
+    white-space: nowrap;
 }
 
-.fader-track-wrap {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    flex: 1;
-}
-
-/* Native range input rotated to vertical */
+/* Native range input — rotated to vertical via writing-mode */
 .fader-input {
     -webkit-appearance: none;
     appearance: none;
@@ -424,55 +387,53 @@ html, body {
     outline: none;
     padding: 0;
     border: none;
-    /* Height is set inline per variant; width matches thumb */
+    /* Width = thumb width so the click area is correct */
     width: var(--slider-thumb-w);
 }
 
-/* Webkit track */
+/* Webkit: track */
 .fader-input::-webkit-slider-runnable-track {
     width: var(--slider-track-w);
-    border-radius: 4px;
+    border-radius: 999px;
     background: var(--color-slider-track);
 }
 
-/* Webkit thumb */
+/* Webkit: thumb */
 .fader-input::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
     width: var(--slider-thumb-w);
     height: var(--slider-thumb-h);
     background: var(--color-slider-thumb-bg);
-    border: 4px solid var(--color-slider-thumb-stroke);
-    border-radius: var(--slider-thumb-radius);
+    border: var(--slider-thumb-border) solid var(--color-slider-thumb-stroke);
+    border-radius: var(--slider-thumb-r);
     box-shadow: var(--card-shadow);
-    margin-top: -8px; /* Center thumb on track */
     cursor: grab;
-    transition: border-color 0.1s ease, transform 0.1s ease;
+    transition: border-color 0.1s ease;
 }
 
 .fader-input::-webkit-slider-thumb:active {
     cursor: grabbing;
-    transform: scale(1.05);
 }
 
 .fader-input:hover::-webkit-slider-thumb {
     border-color: var(--color-accent-hover);
 }
 
-/* Firefox track */
+/* Firefox: track */
 .fader-input::-moz-range-track {
     width: var(--slider-track-w);
-    border-radius: 4px;
+    border-radius: 999px;
     background: var(--color-slider-track);
 }
 
-/* Firefox thumb */
+/* Firefox: thumb */
 .fader-input::-moz-range-thumb {
     width: var(--slider-thumb-w);
     height: var(--slider-thumb-h);
     background: var(--color-slider-thumb-bg);
-    border: 4px solid var(--color-slider-thumb-stroke);
-    border-radius: var(--slider-thumb-radius);
+    border: var(--slider-thumb-border) solid var(--color-slider-thumb-stroke);
+    border-radius: var(--slider-thumb-r);
     box-shadow: var(--card-shadow);
     cursor: grab;
     transition: border-color 0.1s ease;
@@ -483,27 +444,25 @@ html, body {
     font-weight: 400;
     font-size: var(--text-value);
     color: var(--color-text-dark);
-    letter-spacing: 0.0075em;
     text-align: center;
     font-variant-numeric: tabular-nums;
-    line-height: 1.2;
+    white-space: nowrap;
 }
 
-/* Fader height variants (track heights from Figma component set 85:624) */
-.fader--standard .fader-input { height: clamp(100px, 19.5vh, 200px); }
-.fader--big      .fader-input { height: clamp(140px, 27.3vh, 280px); }
-.fader--small    .fader-input { height: clamp(60px,  11.7vh, 120px); }
+/* Fader height variants (clamp: min / responsive / Figma max) */
+.fader--standard .fader-input { height: clamp(80px,  16vh, 160px); }
+.fader--big      .fader-input { height: clamp(110px, 22vh, 220px); }
+.fader--small    .fader-input { height: clamp(50px,  10vh, 100px); }
 
 /* ============================================================================
- * Arrow Selector (< value >)
- * Figma: 94px fixed width, Jura, row with chevrons 24×24px
+ * Arrow Selector  ( < value > )
  * ============================================================================ */
 .arrow-selector {
     display: flex;
     flex-direction: column;
-    gap: var(--space-sm);
-    width: clamp(70px, 6.5vw, 94px);
+    gap: var(--space-xs);
     flex-shrink: 0;
+    min-width: 0;
 }
 
 .arrow-selector-label {
@@ -512,14 +471,14 @@ html, body {
     font-size: var(--text-tag);
     color: var(--color-text);
     letter-spacing: 0.01em;
-    line-height: 1.6;
+    line-height: 1.4;
+    white-space: nowrap;
 }
 
 .arrow-selector-row {
     display: flex;
     flex-direction: row;
     align-items: center;
-    justify-content: center;
     gap: 2px;
 }
 
@@ -538,15 +497,8 @@ html, body {
     flex-shrink: 0;
 }
 
-.arrow-selector-btn:hover {
-    background: var(--color-border);
-}
-
-.arrow-selector-btn img,
-.arrow-selector-btn svg {
-    width: clamp(5px, 0.46vw, 6.67px);
-    height: clamp(9px, 0.83vw, 13.33px);
-}
+.arrow-selector-btn:hover { background: var(--color-border); }
+.arrow-selector-btn img   { width: 7px; height: 12px; display: block; }
 
 .arrow-selector-value {
     font-family: var(--font-value);
@@ -554,23 +506,21 @@ html, body {
     font-size: var(--text-value);
     color: var(--color-text-dark);
     text-align: center;
-    letter-spacing: 0.0075em;
     line-height: 1.2;
     flex: 1;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    min-width: 24px;
 }
 
 /* ============================================================================
  * Waveform Selector
- * Figma: column, align-items: center, gap: 12px
  * ============================================================================ */
 .waveform-selector {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: var(--space-md);
+    gap: var(--space-sm);
     flex-shrink: 0;
 }
 
@@ -580,48 +530,42 @@ html, body {
     font-size: var(--text-tag);
     color: var(--color-text);
     letter-spacing: 0.01em;
-    line-height: 1.6;
+    line-height: 1.4;
+    white-space: nowrap;
 }
 
 .waveform-icon-row {
     display: flex;
     flex-direction: row;
     align-items: center;
-    justify-content: center;
     gap: var(--space-sm);
     cursor: pointer;
+    padding: var(--space-xs) 0;
 }
 
 .waveform-icon {
-    /* Figma sine: 144×34px icon inside the row */
-    width: clamp(60px, 10vw, 144px);
+    width: clamp(60px, 8vw, 120px);
     height: auto;
     display: block;
 }
 
 /* ============================================================================
  * Dropdown
- * Figma: border 1px #EEEEEE, border-radius 4px, padding 8px, fill-horizontal
  * ============================================================================ */
 .dropdown {
     display: flex;
     flex-direction: row;
     align-items: center;
-    justify-content: center;
     gap: var(--space-sm);
-    padding: var(--space-sm);
+    padding: var(--space-xs) var(--space-sm);
     border: 1px solid var(--color-border);
     border-radius: 4px;
     background: var(--color-bg);
     cursor: pointer;
-    width: 100%;
     transition: background 0.12s ease;
-    position: relative;
 }
 
-.dropdown:hover {
-    background: var(--color-border);
-}
+.dropdown:hover { background: var(--color-border); }
 
 .dropdown-label {
     font-family: var(--font-value);
@@ -633,23 +577,23 @@ html, body {
     text-overflow: ellipsis;
     white-space: nowrap;
     line-height: 1.2;
-    padding: 0 var(--space-sm);
-    text-align: left;
 }
 
 .dropdown-arrow {
     width: 10px;
-    height: 5px;
+    height: auto;
     flex-shrink: 0;
     opacity: 0.5;
+    display: block;
 }
 
-/* Dropdown stack (multiple dropdowns under one label) */
+/* Dropdown group: label + stack of dropdowns */
 .dropdown-group {
     display: flex;
     flex-direction: column;
-    gap: var(--space-sm);
+    gap: var(--space-xs);
     width: 100%;
+    min-width: 0;
 }
 
 .dropdown-group-label {
@@ -658,16 +602,75 @@ html, body {
     font-size: var(--text-tag);
     color: var(--color-text);
     letter-spacing: 0.01em;
-    line-height: 1.6;
+    line-height: 1.4;
+    white-space: nowrap;
 }
 
 /* ============================================================================
- * Debug Panel (hidden by default, Ctrl+Shift+D to show)
+ * LFO-specific layout helpers
+ * ============================================================================ */
+.lfo-left-col {
+    display: flex;
+    flex-direction: column;
+    gap: var(--card-gap);
+    flex-shrink: 0;
+    min-width: clamp(110px, 13vw, 180px);
+    max-width: clamp(110px, 13vw, 180px);
+}
+
+.lfo-faders {
+    display: flex;
+    flex-direction: row;
+    gap: var(--space-xl);
+    flex: 1;
+    align-items: flex-start;
+}
+
+/* ============================================================================
+ * Voicing-specific layout helpers
+ * ============================================================================ */
+.voicing-inner {
+    display: flex;
+    flex-direction: row;
+    gap: var(--space-xl);
+    flex: 1;
+    align-items: flex-start;
+    min-height: 0;
+}
+
+.voicing-selectors {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(10px, 1.8vh, 18px);
+    flex: 1;
+    min-width: 0;
+}
+
+/* ============================================================================
+ * Filter Config (type selector + 4 ADSR faders in a row)
+ * ============================================================================ */
+.filter-cfg-env-row {
+    display: flex;
+    flex-direction: row;
+    gap: var(--space-lg);
+    flex: 1;
+    align-items: flex-start;
+}
+
+/* ============================================================================
+ * filterEnvDepth — bipolar label highlight
+ * ============================================================================ */
+.fader--bipolar .fader-value {
+    color: var(--color-accent);
+}
+
+/* ============================================================================
+ * Debug Panel (Ctrl+Shift+D)
  * ============================================================================ */
 .debug-panel {
     display: none;
     position: fixed;
-    bottom: calc(var(--keyboard-strip-h) + 8px);
+    bottom: 12px;
     right: 12px;
     width: 400px;
     max-height: 220px;
@@ -675,7 +678,7 @@ html, body {
     border: 1px solid #444;
     border-radius: var(--card-radius);
     z-index: 9999;
-    overflow: hidden;
+    backdrop-filter: blur(4px);
 }
 
 .debug-panel.debug-panel--visible {
@@ -685,13 +688,13 @@ html, body {
 
 .debug-panel-title {
     font-family: var(--font-ui);
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 700;
     color: #aaa;
-    padding: 6px 10px;
+    padding: 5px 10px;
     border-bottom: 1px solid #444;
     flex-shrink: 0;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.06em;
 }
 
 .debug-log {
@@ -704,15 +707,15 @@ html, body {
     line-height: 1.5;
 }
 
-.log-entry { padding: 1px 0; }
-.log-entry.from-js    { color: #64b5f6; }
-.log-entry.from-cpp   { color: #81c784; }
-.log-entry.from-trace { color: #757575; }
-.log-entry.from-warn  { color: #ffb74d; }
-.log-entry.error      { color: #e57373; }
+.log-entry           { padding: 1px 0; }
+.log-entry.from-js   { color: #64b5f6; }
+.log-entry.from-cpp  { color: #81c784; }
+.log-entry.from-trace{ color: #616161; }
+.log-entry.from-warn { color: #ffb74d; }
+.log-entry.error     { color: #e57373; }
 
 /* ============================================================================
- * Status indicator (top-right subtle dot, replaces full status bar)
+ * Status indicator (top-right dot)
  * ============================================================================ */
 .status-indicator {
     position: fixed;
@@ -722,9 +725,9 @@ html, body {
     align-items: center;
     gap: 5px;
     font-family: var(--font-ui);
-    font-size: 10px;
+    font-size: 9px;
     color: var(--color-text-mid);
-    opacity: 0.7;
+    opacity: 0.6;
     pointer-events: none;
     z-index: 100;
 }
@@ -747,10 +750,8 @@ html, body {
     position: absolute;
     width: 1px;
     height: 1px;
-    padding: 0;
-    margin: -1px;
     overflow: hidden;
-    clip: rect(0, 0, 0, 0);
+    clip: rect(0,0,0,0);
     white-space: nowrap;
     border: 0;
 }

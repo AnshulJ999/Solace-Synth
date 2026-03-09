@@ -1,0 +1,9 @@
+<!-- SS Monogram: two interlocking S letterforms in accent orange -->
+<svg xmlns="http://www.w3.org/2000/svg" width="63" height="76" viewBox="0 0 63 76" fill="none">
+  <!-- Background pill -->
+  <rect width="63" height="76" rx="12" fill="#FF9E2F" fill-opacity="0.1"/>
+  <!-- First S -->
+  <text x="8" y="52" font-family="MuseoModerno, sans-serif" font-weight="700" font-size="44" fill="#FF9E2F" letter-spacing="-4">S</text>
+  <!-- Second S offset slightly -->
+  <text x="26" y="68" font-family="MuseoModerno, sans-serif" font-weight="700" font-size="32" fill="#FF9E2F" fill-opacity="0.5">S</text>
+</svg>

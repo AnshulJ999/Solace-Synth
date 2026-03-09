@@ -9,23 +9,20 @@
 </head>
 <body>
 
-<!-- ============================================================
-     Status Indicator (top-right, subtle connection dot)
-     ============================================================ -->
+<!-- Status indicator -->
 <div class="status-indicator" id="status-indicator" aria-live="polite">
     <span class="status-dot" id="status-dot"></span>
     <span id="status-text">connecting...</span>
 </div>
 
 <!-- ============================================================
-     Root Plugin Layout
+     Root Layout
      ============================================================ -->
 <div class="solace-root" id="solace-root">
 
     <!-- ==================== TOP BAR ==================== -->
     <header class="top-bar" role="banner">
 
-        <!-- Logo: SS monogram + title -->
         <div class="logo-group">
             <img
                 class="logo-monogram"
@@ -37,9 +34,8 @@
             <span class="logo-title">Solace Soft Synth</span>
         </div>
 
-        <!-- Preset nav + menu -->
         <div class="top-controls">
-            <div class="preset-selecter" role="group" aria-label="Preset selector">
+            <div class="preset-selector" role="group" aria-label="Preset selector">
                 <button class="preset-nav-btn" id="btn-preset-prev" aria-label="Previous preset">
                     <img src="assets/icons/btn-left.svg" alt="" aria-hidden="true">
                 </button>
@@ -64,16 +60,15 @@
         <!-- ---- ROW 1: Oscillators + Amp Envelope + Master ---- -->
         <div class="section-row" id="row-top">
 
-            <!-- Osc 1 / Osc Mix / Osc 2 combined card -->
+            <!-- Osc block: Osc1 | divider | OscMix | divider | Osc2 -->
             <section class="card card--osc-block" id="card-osc" aria-label="Oscillators">
                 <div class="card-row">
 
                     <!-- Oscillator 1 -->
-                    <div class="sub-section" id="section-osc1">
+                    <div class="sub-section sub-section--osc1" id="section-osc1">
                         <h2 class="section-heading">Oscillator 1</h2>
                         <div class="controls-row" id="osc1-controls">
 
-                            <!-- Waveform selector -->
                             <div class="waveform-selector" id="osc1-waveform-selector">
                                 <span class="waveform-selector-label">Waveform</span>
                                 <div class="waveform-icon-row" id="osc1-waveform-display" role="button" tabindex="0" aria-label="Oscillator 1 waveform">
@@ -81,7 +76,6 @@
                                 </div>
                             </div>
 
-                            <!-- Octave -->
                             <div class="arrow-selector" id="osc1-octave-selector" role="group" aria-label="Oscillator 1 octave">
                                 <span class="arrow-selector-label">Octave</span>
                                 <div class="arrow-selector-row">
@@ -95,7 +89,6 @@
                                 </div>
                             </div>
 
-                            <!-- Transpose -->
                             <div class="arrow-selector" id="osc1-transpose-selector" role="group" aria-label="Oscillator 1 transpose">
                                 <span class="arrow-selector-label">Transpose</span>
                                 <div class="arrow-selector-row">
@@ -109,15 +102,9 @@
                                 </div>
                             </div>
 
-                            <!-- Tuning fader -->
                             <div class="fader fader--standard" id="osc1-tuning-fader">
                                 <span class="fader-label">Tuning</span>
-                                <input
-                                    class="fader-input"
-                                    id="osc1Tuning"
-                                    type="range" min="-100" max="100" step="1" value="0"
-                                    aria-label="Oscillator 1 tuning"
-                                >
+                                <input class="fader-input" id="osc1Tuning" type="range" min="-100" max="100" step="1" value="0" aria-label="Oscillator 1 tuning">
                                 <span class="fader-value" id="osc1Tuning-value">0</span>
                             </div>
 
@@ -127,17 +114,12 @@
                     <div class="card-divider" role="separator"></div>
 
                     <!-- Osc Mix -->
-                    <div class="sub-section" id="section-osc-mix" style="flex: 0.5; min-width: 0;">
+                    <div class="sub-section sub-section--osc-mix" id="section-osc-mix">
                         <h2 class="section-heading">Osc Mix</h2>
-                        <div class="controls-row" id="osc-mix-controls" style="justify-content: center;">
+                        <div class="controls-row controls-row--center" id="osc-mix-controls">
                             <div class="fader fader--standard" id="osc-mix-fader">
                                 <span class="fader-label">Osc 2</span>
-                                <input
-                                    class="fader-input"
-                                    id="oscMix"
-                                    type="range" min="0" max="1" step="0.01" value="0.5"
-                                    aria-label="Oscillator mix"
-                                >
+                                <input class="fader-input" id="oscMix" type="range" min="0" max="1" step="0.01" value="0.5" aria-label="Oscillator mix">
                                 <span class="fader-value" id="oscMix-value">0.50</span>
                                 <span class="fader-label">Osc 1</span>
                             </div>
@@ -147,7 +129,7 @@
                     <div class="card-divider" role="separator"></div>
 
                     <!-- Oscillator 2 -->
-                    <div class="sub-section" id="section-osc2">
+                    <div class="sub-section sub-section--osc2" id="section-osc2">
                         <h2 class="section-heading">Oscillator 2</h2>
                         <div class="controls-row" id="osc2-controls">
 
@@ -186,12 +168,7 @@
 
                             <div class="fader fader--standard" id="osc2-tuning-fader">
                                 <span class="fader-label">Tuning</span>
-                                <input
-                                    class="fader-input"
-                                    id="osc2Tuning"
-                                    type="range" min="-100" max="100" step="1" value="0"
-                                    aria-label="Oscillator 2 tuning"
-                                >
+                                <input class="fader-input" id="osc2Tuning" type="range" min="-100" max="100" step="1" value="0" aria-label="Oscillator 2 tuning">
                                 <span class="fader-value" id="osc2Tuning-value">0</span>
                             </div>
 
@@ -258,12 +235,12 @@
         <!-- ---- ROW 2: Filter + LFO + Voicing ---- -->
         <div class="section-row" id="row-bottom">
 
-            <!-- Filter + Filter Config combined card -->
-            <section class="card card--filter-block" id="card-filter" aria-label="Filter">
+            <!-- Filter block: Filter | divider | Filter Config -->
+            <section class="card card--filter-block" id="card-filter" aria-label="Filter and Filter Configuration">
                 <div class="card-row">
 
                     <!-- Filter -->
-                    <div class="sub-section" id="section-filter" style="flex: 0.8;">
+                    <div class="sub-section sub-section--filter" id="section-filter">
                         <h2 class="section-heading">Filter</h2>
                         <div class="controls-row" id="filter-controls">
 
@@ -284,47 +261,65 @@
 
                     <div class="card-divider" role="separator"></div>
 
-                    <!-- Filter Configuration -->
-                    <div class="sub-section" id="section-filter-config">
+                    <!-- Filter Configuration: type selector + ADSR env faders in a row -->
+                    <div class="sub-section sub-section--filter-cfg" id="section-filter-config">
                         <h2 class="section-heading">Filter Configuration</h2>
-                        <div class="controls-row" id="filter-config-controls" style="flex-direction: column; align-items: flex-start; gap: var(--space-lg);">
 
-                            <!-- Filter Type selector -->
-                            <div class="arrow-selector" id="filter-type-selector" role="group" aria-label="Filter type" style="width: 100%;">
-                                <span class="arrow-selector-label">Filter Type</span>
-                                <div class="arrow-selector-row">
-                                    <button class="arrow-selector-btn" id="filter-type-prev" aria-label="Previous filter type">
-                                        <img src="assets/icons/chevron-back.svg" alt="" aria-hidden="true">
-                                    </button>
-                                    <span class="arrow-selector-value" id="filterType-value">LP 24 dB</span>
-                                    <button class="arrow-selector-btn" id="filter-type-next" aria-label="Next filter type">
-                                        <img src="assets/icons/chevron-forward.svg" alt="" aria-hidden="true">
-                                    </button>
+                        <!-- Column: type selector on top, then env faders row below -->
+                        <div class="controls-row--col" id="filter-cfg-inner">
+
+                            <!-- Filter Type + Env Depth row -->
+                            <div class="controls-row" id="filter-type-depth-row">
+
+                                <div class="arrow-selector" id="filter-type-selector" role="group" aria-label="Filter type">
+                                    <span class="arrow-selector-label">Filter Type</span>
+                                    <div class="arrow-selector-row">
+                                        <button class="arrow-selector-btn" id="filter-type-prev" aria-label="Previous filter type">
+                                            <img src="assets/icons/chevron-back.svg" alt="" aria-hidden="true">
+                                        </button>
+                                        <span class="arrow-selector-value" id="filterType-value">LP 24 dB</span>
+                                        <button class="arrow-selector-btn" id="filter-type-next" aria-label="Next filter type">
+                                            <img src="assets/icons/chevron-forward.svg" alt="" aria-hidden="true">
+                                        </button>
+                                    </div>
                                 </div>
+
+                                <!-- filterEnvDepth — Phase 6.4 bipolar parameter -->
+                                <div class="fader fader--small fader--bipolar" id="filter-env-depth-fader">
+                                    <span class="fader-label">Env Depth</span>
+                                    <input class="fader-input" id="filterEnvDepth" type="range" min="-1" max="1" step="0.01" value="0" aria-label="Filter envelope depth">
+                                    <span class="fader-value" id="filterEnvDepth-value">0.00</span>
+                                </div>
+
                             </div>
 
-                            <!-- Filter Envelope faders -->
-                            <div class="controls-row" id="filter-env-controls" style="flex: 0;">
+                            <!-- Filter Envelope ADSR — horizontal row -->
+                            <div class="filter-cfg-env-row" id="filter-env-controls">
+
                                 <div class="fader fader--standard" id="fenv-attack-fader">
                                     <span class="fader-label">Attack</span>
                                     <input class="fader-input" id="filterEnvAttack" type="range" min="0.001" max="5" step="0.001" value="0.01" aria-label="Filter envelope attack">
                                     <span class="fader-value" id="filterEnvAttack-value">0.01</span>
                                 </div>
+
                                 <div class="fader fader--standard" id="fenv-decay-fader">
                                     <span class="fader-label">Decay</span>
                                     <input class="fader-input" id="filterEnvDecay" type="range" min="0.001" max="5" step="0.001" value="0.3" aria-label="Filter envelope decay">
                                     <span class="fader-value" id="filterEnvDecay-value">0.30</span>
                                 </div>
+
                                 <div class="fader fader--standard" id="fenv-sustain-fader">
                                     <span class="fader-label">Sustain</span>
                                     <input class="fader-input" id="filterEnvSustain" type="range" min="0" max="1" step="0.01" value="0" aria-label="Filter envelope sustain">
                                     <span class="fader-value" id="filterEnvSustain-value">0.00</span>
                                 </div>
+
                                 <div class="fader fader--standard" id="fenv-release-fader">
                                     <span class="fader-label">Release</span>
                                     <input class="fader-input" id="filterEnvRelease" type="range" min="0.001" max="10" step="0.001" value="0.3" aria-label="Filter envelope release">
                                     <span class="fader-value" id="filterEnvRelease-value">0.30</span>
                                 </div>
+
                             </div>
 
                         </div>
@@ -336,10 +331,11 @@
             <!-- Low Frequency Oscillator -->
             <section class="card card--lfo" id="card-lfo" aria-label="Low Frequency Oscillator">
                 <h2 class="section-heading">Low Frequency Osc</h2>
+
                 <div class="controls-row" id="lfo-controls">
 
-                    <!-- LFO left column: waveform + targets -->
-                    <div style="display: flex; flex-direction: column; gap: var(--card-gap); width: clamp(100px, 11.1vw, 160px); flex-shrink: 0;">
+                    <!-- Left column: waveform + targets -->
+                    <div class="lfo-left-col">
                         <div class="waveform-selector" id="lfo-waveform-selector">
                             <span class="waveform-selector-label">Waveform</span>
                             <div class="waveform-icon-row" id="lfo-waveform-display" role="button" tabindex="0" aria-label="LFO waveform">
@@ -364,8 +360,8 @@
                         </div>
                     </div>
 
-                    <!-- LFO right column: Amount + Rate faders -->
-                    <div class="controls-row" style="flex: 1; gap: var(--space-lg);">
+                    <!-- Right: Amount + Rate faders -->
+                    <div class="lfo-faders">
                         <div class="fader fader--big" id="lfo-amount-fader">
                             <span class="fader-label">Amount</span>
                             <input class="fader-input" id="lfoAmount" type="range" min="0" max="1" step="0.01" value="0" aria-label="LFO amount">
@@ -381,13 +377,14 @@
                 </div>
             </section>
 
-            <!-- Voicing (lighter border, no shadow per Figma) -->
+            <!-- Voicing -->
             <section class="card card--voicing" id="card-voicing" aria-label="Voicing">
                 <h2 class="section-heading">Voicing</h2>
-                <div style="display: flex; flex-direction: row; flex: 1; gap: var(--space-lg); align-items: flex-start;">
 
-                    <!-- Selectors + dropdowns column -->
-                    <div style="display: flex; flex-direction: column; gap: clamp(14px, 2.1vh, 20px);">
+                <div class="voicing-inner">
+
+                    <!-- Selectors + dropdowns -->
+                    <div class="voicing-selectors">
 
                         <div class="arrow-selector" id="voice-count-selector" role="group" aria-label="Number of voices">
                             <span class="arrow-selector-label">No. of Voices</span>
@@ -408,7 +405,7 @@
                                 <button class="arrow-selector-btn" id="unison-prev" aria-label="Decrease unison">
                                     <img src="assets/icons/chevron-back.svg" alt="" aria-hidden="true">
                                 </button>
-                                <span class="arrow-selector-value" id="unisonCount-value">3</span>
+                                <span class="arrow-selector-value" id="unisonCount-value">1</span>
                                 <button class="arrow-selector-btn" id="unison-next" aria-label="Increase unison">
                                     <img src="assets/icons/chevron-forward.svg" alt="" aria-hidden="true">
                                 </button>
@@ -441,19 +438,16 @@
 
         </div><!-- /row-bottom -->
 
-    </main><!-- /content-area -->
+    </main>
 
 </div><!-- /solace-root -->
 
-<!-- ============================================================
-     Debug Panel (hidden — Ctrl+Shift+D to toggle)
-     ============================================================ -->
+<!-- Debug Panel (Ctrl+Shift+D) -->
 <div class="debug-panel" id="debug-panel" role="log" aria-label="Debug log" aria-live="off">
-    <div class="debug-panel-title">BRIDGE DEBUG LOG</div>
+    <div class="debug-panel-title">BRIDGE DEBUG LOG — Ctrl+Shift+D to close</div>
     <div class="debug-log" id="debug-log"></div>
 </div>
 
-<!-- Scripts -->
 <script src="bridge.js"></script>
 <script src="main.js"></script>
 

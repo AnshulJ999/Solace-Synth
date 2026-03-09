@@ -1,0 +1,5 @@
+<!-- Sine wave: smooth S-curve across full width -->
+<svg xmlns="http://www.w3.org/2000/svg" width="144" height="34" viewBox="0 0 144 34" fill="none">
+  <path d="M4 17 C22 17, 26 4, 36 4 C46 4, 50 17, 72 17 C94 17, 98 30, 108 30 C118 30, 122 17, 140 17"
+        stroke="#FF9E2F" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+</svg>

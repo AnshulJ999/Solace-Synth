@@ -18,4 +18,8 @@ This problem is for both Osc1 and Osc2.
 
 3) The ruler-type tick marks on the faders should be to the right-side of the faders. Currently they are on the faders themselves. They should be aligned to the right side. 
 
-4) 
+4) In the figma design, none of the faders have the value underneath them. However this is a serious design consideration, so for now we will keep the values. In future this may be a setting where we can optionally hide/show it. 
+
+Also, we may opt to show the values as a tooltip when hovering over a fader.
+
+5) 

@@ -66,9 +66,12 @@ class Fader {
             sizeClass   = 'fader--standard',
             bottomLabel = null,
             extraClass  = null,
+            // showTicks: true = show ruler tick marks on track (default: true for big/standard, false for small)
+            // Set showTicks: false in config to suppress.
+            showTicks   = (sizeClass !== 'fader--small'),
         } = this.config;
 
-        const classes = ['fader', sizeClass, extraClass].filter(Boolean).join(' ');
+        const classes = ['fader', sizeClass, extraClass, showTicks ? 'fader--ticks' : null].filter(Boolean).join(' ');
 
         const wrapper = document.createElement('div');
         wrapper.className = classes;

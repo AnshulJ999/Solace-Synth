@@ -135,10 +135,13 @@ struct SolaceVoiceParams
 //   the MIDI note frequency. At unisonCount=1 (default), behaviour is identical
 //   to Phase 6.6 -- no audible change.
 //
-//   Standard synth architecture (JP-8000 / Serum / Vital): unison oscillators
-//   are summed to MONO first, then passed through the shared filter + amp chain,
-//   then fanned out to stereo via per-voice constant-power pan gains. This keeps
-//   filter CPU cost fixed at one instance per voice regardless of unison count.
+//   Phase 6.7 stereo architecture: each unison voice's oscillator mix is
+//   accumulated into preFiltL and preFiltR separately using its individual
+//   constant-power pan gains BEFORE the filter stage. filterL and filterR
+//   each receive a different blend of detuned oscillators, producing
+//   genuinely different spectral content per channel. At N=1 spread=0,
+//   preFiltL == preFiltR and the output is centred mono (backward-compatible).
+//   CPU cost: 2 filter instances per polyphonic voice (1 per channel).
 //
 //   Detune distribution (symmetric around MIDI note pitch):
 //     N=1 → 0 cents (no detune).
@@ -535,8 +538,19 @@ public:
             const float sampleL    = filteredL * gainScalar;
             const float sampleR    = filteredR * gainScalar;
 
-            if (numChannels >= 1) outputBuffer.addSample (0, startSample, sampleL);
-            if (numChannels >= 2) outputBuffer.addSample (1, startSample, sampleR);
+            // Write to output buffer. Mono hosts (numChannels==1) get an
+            // explicit fold-down rather than the left channel only -- important
+            // because with spread>0 some unison voices pan mostly right and
+            // would be lost if we only wrote sampleL.
+            if (numChannels >= 2)
+            {
+                outputBuffer.addSample (0, startSample, sampleL);
+                outputBuffer.addSample (1, startSample, sampleR);
+            }
+            else if (numChannels == 1)
+            {
+                outputBuffer.addSample (0, startSample, 0.5f * (sampleL + sampleR));
+            }
 
             ++startSample;
 
@@ -614,7 +628,7 @@ private:
     // Incorporates equal-power unison normalisation: kBaseVoiceGain / sqrt(unisonCount).
     // At unisonCount=1, voiceGain = kBaseVoiceGain / sqrt(1) = kBaseVoiceGain.
     //
-    // Why kBaseVoiceGain = 0.15 (not 0.15 * sqrt(2) as before):
+    // Why kBaseVoiceGain = 0.15 * sqrt(2) (same value as before the dual-filter change):
     // With dual-filter stereo, at N=1 spread=0:
     //   panL = panR = sqrt(0.5) = 0.707
     //   preFiltL = osc * 0.707, preFiltR = osc * 0.707

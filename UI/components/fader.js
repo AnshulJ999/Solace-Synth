@@ -41,6 +41,7 @@ class Fader {
         this.config  = config;
         this._input         = null;
         this._display       = null;
+        this._wrapper       = null;
         this._suppressSync  = false;
         this._fmt = config.formatFn ?? ((v) => parseFloat(v).toFixed(2));
     }
@@ -72,6 +73,7 @@ class Fader {
         const wrapper = document.createElement('div');
         wrapper.className = classes;
         wrapper.id = `${this.paramId}-fader`;
+        this._wrapper = wrapper;
 
         // Top label
         const topLabelEl = document.createElement('span');
@@ -115,6 +117,7 @@ class Fader {
             if (this._suppressSync) return;
             const val = parseFloat(e.target.value);
             if (this._display) this._display.textContent = this._fmt(val);
+            this._updateFill(val);
             SolaceBridge.setParameter(this.paramId, val);
         });
 
@@ -123,8 +126,12 @@ class Fader {
             this._suppressSync = true;
             if (this._input)   this._input.value = val;
             if (this._display) this._display.textContent = this._fmt(val);
+            this._updateFill(val);
             this._suppressSync = false;
         });
+
+        // Initialise fill from defaultValue
+        this._updateFill(defaultValue);
 
         return this;
     }
@@ -136,5 +143,26 @@ class Fader {
     setValue(v) {
         if (this._input)   this._input.value = v;
         if (this._display) this._display.textContent = this._fmt(v);
+        this._updateFill(v);
+    }
+
+    /**
+     * Sets --val-percent CSS custom property on the fader wrapper.
+     * Value 0% = fully bottom, 100% = fully top.
+     *
+     * CSS usage (Phase 7.4):
+     *   .fader-input::-webkit-slider-runnable-track {
+     *       background: linear-gradient(
+     *           to top,
+     *           var(--color-fill-track) var(--val-percent),
+     *           var(--color-slider-track) var(--val-percent)
+     *       );
+     *   }
+     */
+    _updateFill(val) {
+        if (!this._wrapper) return;
+        const { min, max } = this.config;
+        const pct = ((parseFloat(val) - min) / (max - min)) * 100;
+        this._wrapper.style.setProperty('--val-percent', `${Math.min(100, Math.max(0, pct)).toFixed(2)}%`);
     }
 }

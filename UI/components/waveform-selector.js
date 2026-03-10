@@ -122,11 +122,14 @@ class WaveformSelector {
             });
         }
 
-        // C++ → update
+        // C++ → update (value-based lookup — robust against enum reordering)
         SolaceBridge.onParameterChanged(this.paramId, (val) => {
-            this._suppressSync = true;
-            this._apply(Math.round(val));
-            this._suppressSync = false;
+            const idx = this.waveforms.findIndex(wf => wf.value === Math.round(val));
+            if (idx >= 0) {
+                this._suppressSync = true;
+                this._apply(idx);
+                this._suppressSync = false;
+            }
         });
 
         // Apply initial state (display only, no bridge call)
@@ -137,7 +140,8 @@ class WaveformSelector {
 
     /** Programmatic update — no bridge send. */
     setValue(v) {
-        this._apply(Math.round(v));
+        const idx = this.waveforms.findIndex(wf => wf.value === Math.round(v));
+        if (idx >= 0) this._apply(idx);
     }
 
     // -------------------------------------------------------------------------

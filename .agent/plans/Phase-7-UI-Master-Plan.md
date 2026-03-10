@@ -8,17 +8,16 @@
 
 ---
 
-## Current State (as of 2026-03-09 rev 2)
+## Current State (as of 2026-03-11)
 
 | Area | Status |
 |------|--------|
 | WebView2 + bridge | ✅ Working (`setParameter`, `parameterChanged`, `uiReady`, `log`) |
 | CSS design system (`styles.css`) | ✅ Phase 7.1 complete. Figma-exact tokens, responsive clamp() sizes |
-| Layout scaffold (`index.html`) | ✅ Phase 7.2 complete. Two-row section grid, all controls present |
-| JS control binding (`main.js`) | ✅ Phase 7.2 complete. All params bound; correct LFO enum ordering |
+| Layout scaffold + component classes | ✅ Phase 7.2 + 7.3 complete. Mount-point shell; `Fader`, `ArrowSelector`, `WaveformSelector`, `Dropdown` in `UI/components/` |
+| JS orchestration (`main.js`) | ✅ Phase 7.3 complete. Thin orchestrator. ⚠️ LFO *target* enum ≠ Vision Doc — **pending** Anshul/Nabeel (see LFO section). |
 | SVG assets (`UI/assets/icons/`) | ⚠️ All icons are **hand-coded placeholders**. Not Figma exports (see below) |
-| Component JS classes | ❌ Phase 7.3 — next step |
-| Pixel-perfect Figma fidelity | ❌ Phase 7.4 — after components |
+| Pixel-perfect Figma fidelity | 🔄 Phase 7.4 — in progress |
 
 ---
 
@@ -94,7 +93,7 @@ Vision Document also says: "we can have the same list for velocity modulation ta
 
 ---
 
-## Phase 7.3 — Component Modularization ← NEXT STEP
+## Phase 7.3 — Component Modularization ✅ COMPLETE
 
 **Goal:** Break the monolithic `index.html` + `main.js` into proper JS component classes so each control type is owned by a reusable module. The HTML becomes a thin declarative shell.
 
@@ -145,16 +144,19 @@ Each component class must:
 
 ---
 
-## Phase 7.4 — Pixel-Perfect Polish
+## Phase 7.4 — Pixel-Perfect Polish ← CURRENT
 
-After components are in place, do a structured Figma gap pass. Only implement items that have been confirmed (see Pending table above).
+Structured Figma gap pass, confirmed items only.
 
 ### Confirmed gaps (implement in 7.4)
 
-1. **Waveform selector arrows** — add flanking `< >` arrows to waveform selector display
-2. **Filter label** — Gemini says Figma reads "Filter Type -" then `< LP 24 dB >`. Add the hyphen separator.
-3. **Logo** — swap placeholder SVG for real Figma export once Nabeel provides it
-4. **Sawtooth + Triangle icons** — swap when Nabeel provides
+1. **Waveform selector arrows** — ✅ Done in 7.3. LFO waveform uses `showArrows: true`; Osc1/Osc2 stay icon-only (space-constrained).
+2. **Filter label hyphen** — ~~Skipped — Anshul confirmed it looks fine without it.~~
+3. **Track fill from bottom** — ✅ Confirmed by Anshul. `--val-percent` CSS hook wired in `fader.js`. CSS styling pending in `styles.css`.
+4. **Tick marks** — ✅ Confirmed by Anshul, but should be togglable (optional setting). Implement as a CSS class toggle.
+5. **Fader vertical labels** — Confirmed in Figma but not always ideal. Implement as responsive: vertical at small window sizes, horizontal otherwise.
+6. **Logo** — swap placeholder SVG for real Figma export once Nabeel provides it
+7. **Sawtooth + Triangle icons** — swap when Nabeel provides
 
 ### Pending confirmation (do NOT implement until confirmed)
 

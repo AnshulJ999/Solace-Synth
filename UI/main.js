@@ -254,6 +254,9 @@
         new Dropdown("velocityModTarget2", VEL_MOD_TARGET_OPTIONS, { ariaLabel: "Velocity Mod Target 2", defaultIndex: 0 }) // None
             .mount(mount("mount-velocityModTarget2"));
 
+        // unisonDetune + unisonSpread: deliberately NOT mounted — no UI controls in V1 (engine-only by design).
+        // C++ APVTS params exist; bridge silently skips them on syncAllParameters (no registered listeners = no-op). This is correct.
+
         logDebug("All components mounted");
     };
 

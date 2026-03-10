@@ -1,6 +1,6 @@
 /* ============================================================================
  * Solace Synth — UI Design System
- * Phase 7.1/7.2 (rev 2): Design System + Layout Fixes
+ * Phase 7.1–7.4: Design System + Layout + Components + Visual Polish
  *
  * All values sourced from Figma MCP extraction (2026-03-09).
  * File: Synth Project / Mockup / Interface 3 (node 118:665)
@@ -35,6 +35,7 @@
 
     /* Slider */
     --color-slider-track:        #CCCCCC;
+    --color-fill-track:          #999999;    /* Fader fill: darker grey from bottom up to thumb (Phase 7.4) */
     --color-slider-thumb-bg:     #FFFFFF;
     --color-slider-thumb-stroke: #FF9E2F;
 
@@ -407,11 +408,16 @@ html, body {
     width: var(--slider-thumb-w);
 }
 
-/* Webkit: track */
+/* Webkit: track — dynamic fill from bottom using --val-percent set by Fader component.
+   to top = toward max-value end (top of track). Default 0% = no fill (all track grey). */
 .fader-input::-webkit-slider-runnable-track {
     width: var(--slider-track-w);
     border-radius: 999px;
-    background: var(--color-slider-track);
+    background: linear-gradient(
+        to top,
+        var(--color-fill-track) var(--val-percent, 0%),
+        var(--color-slider-track) var(--val-percent, 0%)
+    );
 }
 
 /* Webkit: thumb */
@@ -436,11 +442,15 @@ html, body {
     border-color: var(--color-accent-hover);
 }
 
-/* Firefox: track */
+/* Firefox: track — same fill gradient. JUCE WebView is Chromium/Blink so this is best-effort. */
 .fader-input::-moz-range-track {
     width: var(--slider-track-w);
     border-radius: 999px;
-    background: var(--color-slider-track);
+    background: linear-gradient(
+        to top,
+        var(--color-fill-track) var(--val-percent, 0%),
+        var(--color-slider-track) var(--val-percent, 0%)
+    );
 }
 
 /* Firefox: thumb */
@@ -678,6 +688,50 @@ html, body {
  * ============================================================================ */
 .fader--bipolar .fader-value {
     color: var(--color-accent);
+}
+
+/* ============================================================================
+ * Fader tick marks — optional ruler graduations along the track
+ *
+ * Off by default. Add class 'fader--ticks' to any .fader element to enable.
+ * Tick marks are at 10% intervals along the track height.
+ * The fill gradient is replicated so the ticks layer on top of it.
+ *
+ * Usage (JS):  faderEl.classList.add('fader--ticks');
+ * Usage (CSS): .my-section .fader { } + add class via settings toggle (Phase 7.5)
+ * ============================================================================ */
+.fader--ticks .fader-input::-webkit-slider-runnable-track {
+    background:
+        /* Layer 1 (top): subtle 0.75px tick marks at every 10% of track height */
+        repeating-linear-gradient(
+            to top,
+            transparent 0%,
+            transparent calc(10% - 0.75px),
+            rgba(0, 0, 0, 0.18) calc(10% - 0.75px),
+            rgba(0, 0, 0, 0.18) 10%
+        ),
+        /* Layer 2 (bottom): dynamic fill from bottom */
+        linear-gradient(
+            to top,
+            var(--color-fill-track) var(--val-percent, 0%),
+            var(--color-slider-track) var(--val-percent, 0%)
+        );
+}
+
+.fader--ticks .fader-input::-moz-range-track {
+    background:
+        repeating-linear-gradient(
+            to top,
+            transparent 0%,
+            transparent calc(10% - 0.75px),
+            rgba(0, 0, 0, 0.18) calc(10% - 0.75px),
+            rgba(0, 0, 0, 0.18) 10%
+        ),
+        linear-gradient(
+            to top,
+            var(--color-fill-track) var(--val-percent, 0%),
+            var(--color-slider-track) var(--val-percent, 0%)
+        );
 }
 
 /* ============================================================================

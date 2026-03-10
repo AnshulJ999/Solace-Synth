@@ -10,11 +10,16 @@
 // tremolo, resonance sweep). One instance lives inside each SolaceVoice.
 //
 // Free-running design (Phase 6.6):
-//   The LFO runs from the moment the voice is allocated and is intentionally
-//   NEVER reset at note-on. Each voice in a chord therefore starts with a
-//   different LFO phase, creating natural shimmer on pads and filter sweeps.
-//   A key-synced LFO (reset at note-on) is a different character and is out
-//   of scope for V1.
+//   Each instance is seeded with a unique random initial phase at construction,
+//   so chord voices have independent LFO positions from the very first note.
+//   The phase is NEVER reset at note-on -- voices retain their divergent phases
+//   throughout their lifetimes, creating natural shimmer on pads and sweeps.
+//   Note: the LFO advances only during active voice rendering (not while idle).
+//   "Free-running" here means "random initial phase + never key-synced" --
+//   the perceptual goal of per-voice phase diversity is fully achieved without
+//   any idle-voice CPU overhead.
+//   A synchronised LFO (reset at note-on) is a different character and is
+//   out of scope for V1.
 //
 // Waveform index mapping (matches APVTS "lfoWaveform" int range 0-4):
 //   0 = Sine      -- smooth periodic sweep (classic vibrato, filter wah)
@@ -52,7 +57,35 @@ public:
         SandH    = 4
     };
 
-    SolaceLFO() = default;
+    // Constructor: seed each instance with a unique random initial phase and
+    // S&H hold value, and re-seed the per-instance juce::Random.
+    //
+    // Why this is necessary:
+    //   (a) Initial phase -- All 16 voice LFOs would otherwise start at
+    //       currentAngle = 0.0. A simultaneous chord gives all voices the same
+    //       LFO phase -- no shimmer. The random seed gives immediate per-voice
+    //       phase diversity from the very first note.
+    //
+    //   (b) S&H initial value -- sAndHValue = 0.0 by default and only receives
+    //       a real random value after the first phase wrap. At slow rates this
+    //       means 1+ seconds of silent S&H modulation on first use. Seeding
+    //       here makes S&H effective immediately.
+    //
+    //   (c) juce::Random seed -- The default juce::Random() constructor uses
+    //       seed = 1 for every instance. Without re-seeding, all voices produce
+    //       the same S&H random sequence and latch identical values at the same
+    //       time -- defeating per-voice independence entirely.
+    //
+    // Thread safety: all SolaceVoice instances are constructed sequentially
+    // on the message thread in PluginProcessor's constructor, so sequential
+    // calls to getSystemRandom() do not race.
+    SolaceLFO()
+    {
+        auto& sys    = juce::Random::getSystemRandom();
+        currentAngle = sys.nextDouble() * juce::MathConstants<double>::twoPi;
+        sAndHValue   = sys.nextFloat() * 2.0f - 1.0f;
+        random.setSeed (sys.nextInt64());
+    }
 
     // ========================================================================
     // setShape -- select the LFO waveform.
@@ -127,8 +160,9 @@ public:
     // reset -- restart the phase accumulator from zero.
     //
     // Exists for completeness. Do NOT call from SolaceVoice::startNote() --
-    // the LFO is free-running so that different chord voices accumulate
-    // progressively different LFO phases, creating organic shimmer.
+    // each voice has a unique random initial phase from construction, giving
+    // organic chord shimmer. Calling reset() in startNote() would destroy that
+    // independence and produce key-synced behaviour (all voices back to 0).
     // ========================================================================
     void reset() noexcept
     {
@@ -185,7 +219,8 @@ private:
     Shape shape = Sine;
 
     // Phase accumulator -- kept in [0, 2pi].
-    // Starts at 0.0 and advances from voice allocation. Never reset at note-on.
+    // Seeded with a unique random value at construction (see constructor).
+    // Never reset at note-on -- retains its phase across notes for organic shimmer.
     double currentAngle = 0.0;
 
     // Per-sample phase increment = (hz / sampleRate) * 2pi.
@@ -193,11 +228,13 @@ private:
     double angleDelta = 0.0;
 
     // S&H hold value -- updated once per LFO cycle on phase wrap.
-    // Initial value 0.0 (silence/center) until the first cycle completes.
+    // Seeded with a random value at construction so S&H is effective immediately,
+    // not silent for the entire first cycle at slow LFO rates.
     float sAndHValue = 0.0f;
 
-    // Per-LFO-instance RNG for S&H -- gives each voice an independent random
-    // sequence. Using an instance member (not getSystemRandom()) guarantees
-    // different voices produce different S&H patterns simultaneously.
+    // Per-LFO-instance RNG for S&H. Re-seeded at construction (see constructor)
+    // because juce::Random() default constructor uses seed = 1 for all instances --
+    // without re-seeding, all voices would produce the same S&H sequence and
+    // latch identical values simultaneously, breaking per-voice independence.
     juce::Random random;
 };

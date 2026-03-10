@@ -225,9 +225,10 @@ Anshul rebuilds plugin → Full test in DAW → Feedback to friend → Repeat
 - `stopNote(allowTailOff=false)` -- ALL THREE: `ampEnvelope.reset()` + `filterEnvelope.reset()` + `filter.reset()` + `clearCurrentNote()`
 
 **LFO (Phase 6.6):**
-- Do NOT call `lfo.reset()` in `startNote()` -- LFO is free-running from voice allocation
-- Per-voice LFO phase drift on chords creates organic shimmer (confirmed by plan + Gemini)
-- Resetting on note-on would produce a key-synced LFO -- different and less organic character
+- Do NOT call `lfo.reset()` in `startNote()` -- each voice has a random initial phase from construction; resetting to 0 would produce key-synced behaviour
+- Per-voice LFO phase diversity guaranteed by seeding `currentAngle` randomly in `SolaceLFO`'s constructor (via `getSystemRandom()`)
+- "Free-running" means "random initial phase + never reset at note-on" -- LFO does NOT advance while the voice is idle (only during active rendering), but the perceptual goal is fully achieved
+- `juce::Random` re-seeded per-instance in constructor: default `juce::Random()` uses seed=1 for all instances; without re-seeding, all S&H sequences would be identical across voices
 
 **kVoiceGain:**
 - Now: `0.15f` static (V1 acceptable with mixed velocities)
@@ -581,6 +582,10 @@ Do NOT implement features suggested solely by Claude Code/Codex reviews without 
   - `PluginProcessor.cpp` — 6 new APVTS params: `lfoWaveform` (int 0-4, def 0=Sine), `lfoRate` (float 0.01-50Hz, skew 0.3, def 1.0), `lfoAmount` (float 0-1, def 0.0=no effect), `lfoTarget1` (int 0-7, def 1=FilterCutoff), `lfoTarget2` (int 0-7, def 0=None), `lfoTarget3` (int 0-7, def 0=None). 6 `voiceParams` atomics populated before voice creation loop.
   - LFO target enum (in SolaceVoiceParams comment): 0=None, 1=FilterCutoff, 2=Osc1Pitch, 3=Osc2Pitch, 4=Osc1Level, 5=Osc2Level, 6=AmpLevel, 7=FilterRes.
   - Key design: `lfoAmount=0.0` default means zero LFO effect on launch — user opts in. `lfoTarget1=1` (FilterCutoff) is the most natural default first target.
+  - **Post-Codex-review fixes (2026-03-10):** 3 bugs fixed in `SolaceLFO.h`:
+    - (1) LFO phase alignment: all voices started at `currentAngle=0.0` → simultaneous chord had no phase diversity. Fixed: constructor seeds `currentAngle` via `getSystemRandom().nextDouble() * 2π`.
+    - (2) S&H initial silence: `sAndHValue=0.0f` default → up to 1 full LFO cycle of silent modulation on first S&H use. Fixed: constructor seeds `sAndHValue` via `getSystemRandom().nextFloat() * 2 - 1`.
+    - (3) `juce::Random` seed=1 default: all instances produced identical S&H sequences. Fixed: constructor calls `random.setSeed(getSystemRandom().nextInt64())` for true per-voice independence.
 - [ ] Phase 6.7: Unison (with level normalization)
 - [ ] Phase 6.8: Voicing params (voice count, velocity mod targets)
 - [ ] Phase 7: Full Figma UI implementation

@@ -67,9 +67,15 @@ SolaceSynthProcessor::SolaceSynthProcessor()
     voiceParams.unisonDetune = apvts.getRawParameterValue ("unisonDetune");
     voiceParams.unisonSpread = apvts.getRawParameterValue ("unisonSpread");
 
-    // Create 16 voices. We always create the maximum number up front — JUCE's
-    // Synthesiser does not support safe voice addition/removal at runtime.
-    // A polyphony cap (Phase 6.8) will be implemented inside startNote() later.
+    // --- Phase 6.8: Voicing Parameters ---
+    voiceParams.velocityRange      = apvts.getRawParameterValue ("velocityRange");
+    voiceParams.velocityModTarget1 = apvts.getRawParameterValue ("velocityModTarget1");
+    voiceParams.velocityModTarget2 = apvts.getRawParameterValue ("velocityModTarget2");
+    voiceParams.voiceCount         = apvts.getRawParameterValue ("voiceCount");
+
+    // Create 16 voices. All 16 are always allocated -- SolaceSynthesiser::noteOn()
+    // enforces the runtime voiceCount polyphony cap by reading the APVTS value each
+    // processBlock and passing it to setVoiceLimit().
     constexpr int numVoices = 16;
     for (int i = 0; i < numVoices; ++i)
         synth.addVoice (new SolaceVoice (voiceParams));
@@ -314,6 +320,38 @@ juce::AudioProcessorValueTreeState::ParameterLayout SolaceSynthProcessor::create
         juce::NormalisableRange<float> (0.0f, 1.0f, 0.01f),
         0.5f));  // default: 0.5 = moderate stereo width
 
+    // --- Phase 6.8: Voicing Parameters ---
+    // voiceCount: int 1-16. Default 16 = full polyphony. The polyphony cap is
+    //   enforced per-block in processBlock() via SolaceSynthesiser::setVoiceLimit().
+    //   When the cap is reached and a new note arrives, JUCE steals the oldest voice
+    //   (standard hardware synth behaviour) rather than dropping the new note.
+    // velocityRange: float 0.0-1.0. Bridge between velocity and the mod targets.
+    //   0.0 = no dynamics (all notes at full level / full attack).
+    //   1.0 = full sensitivity (level/attack scales with velocity).
+    // velocityModTarget1/2: int 0-4.
+    //   0=None, 1=AmpLevel, 2=AmpAttack, 3=FilterCutoff, 4=FilterResonance.
+    //   Two routing slots; both can be active simultaneously.
+    params.push_back (std::make_unique<juce::AudioParameterInt> (
+        juce::ParameterID { "voiceCount", 1 },
+        "Voice Count",
+        1, 16, 16));  // default: 16 = full polyphony
+
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (
+        juce::ParameterID { "velocityRange", 1 },
+        "Velocity Range",
+        juce::NormalisableRange<float> (0.0f, 1.0f, 0.01f),
+        1.0f));  // default: 1.0 = full velocity sensitivity
+
+    params.push_back (std::make_unique<juce::AudioParameterInt> (
+        juce::ParameterID { "velocityModTarget1", 1 },
+        "Velocity Mod Target 1",
+        0, 4, 2));  // default: 2 = AmpAttack (Figma default)
+
+    params.push_back (std::make_unique<juce::AudioParameterInt> (
+        juce::ParameterID { "velocityModTarget2", 1 },
+        "Velocity Mod Target 2",
+        0, 4, 0));  // default: 0 = None
+
     return { params.begin(), params.end() };
 }
 
@@ -420,7 +458,7 @@ void SolaceSynthProcessor::prepareToPlay (double sampleRate, int samplesPerBlock
     SolaceLog::info ("prepareToPlay: sampleRate=" + juce::String (sampleRate)
         + " samplesPerBlock=" + juce::String (samplesPerBlock)
         + " voices=" + juce::String (synth.getNumVoices())
-        + " params: amp(4) osc1(4) filter(3) filterEnv(5) osc2+mix(5) lfo(6) unison(3)");
+        + " params: amp(4) osc1(4) filter(3) filterEnv(5) osc2+mix(5) lfo(6) unison(3) voicing(4)");
 }
 
 void SolaceSynthProcessor::releaseResources()
@@ -454,6 +492,12 @@ void SolaceSynthProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     // (UI thread). We extract them here (audio thread) and merge them with
     // any incoming hardware MIDI — so both sources trigger the Synthesiser.
     keyboardState.processNextMidiBuffer (midiMessages, 0, buffer.getNumSamples(), true);
+
+    // --- Update polyphony cap (Phase 6.8) ---
+    // SolaceSynthesiser::noteOn() checks voiceLimit before admitting new notes.
+    // When at the cap it lets JUCE's voice-stealing algorithm pick the oldest
+    // voice to stop and hand to the new note -- steal mode, not drop mode.
+    synth.setVoiceLimit (static_cast<int> (apvts.getRawParameterValue ("voiceCount")->load()));
 
     // --- Render all active voices ---
     // The Synthesiser scans the now-merged midiMessages buffer for events,

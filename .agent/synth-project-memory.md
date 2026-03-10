@@ -605,7 +605,29 @@ Do NOT implement features suggested solely by Claude Code/Codex reviews without 
     - **(LOW)** Signal flow comment referenced old `kVoiceGain` (deleted). Updated to `voiceGain`.
   - **unisonSpread is live per-block** (affects panL/panR in pre-filter accumulation). unisonCount and unisonDetune snapshotted at note-on (resizing active oscillator array mid-note is not audio-thread safe; user hears change on next note).
   - **Default unisonCount=1:** Confirmed by user. Figma shows 3, but plan says 1. Default 1 chosen for backward compatibility and no loudness surprise on first launch.
-- [ ] Phase 6.8: Voicing params (voice count, velocity mod targets)
+  - **Post-review fixes (2026-03-11, caught by Claude Code — after Phase 6.8 landed):**
+    - **(MEDIUM)** Mono host fold-down bug: when `numChannels == 1`, code wrote only `sampleL`. With spread>0, right-panned unison voices were dropped. Fixed: explicit `else if (numChannels == 1)` now writes `0.5f * (sampleL + sampleR)`.
+    - **(LOW)** Architecture header comment (lines 138-141) still referenced old "mono first, shared filter" approach. Updated to describe actual dual-filter pre-filter panning architecture.
+    - **(LOW)** `kBaseVoiceGain` comment header said "= 0.15 (not 0.15 * sqrt(2))" but actual value is `0.15 * sqrt(2)` and body proved this. Fixed to "same value as before the dual-filter change".
+- [x] **Phase 6.8: Voicing Parameters** — COMPLETE (2026-03-11)
+  - **Architecture: SolaceSynthesiser subclass for polyphony cap (steal mode)**
+    - `juce::Synthesiser synth` in `PluginProcessor.h` replaced with `SolaceSynthesiser synth` (new subclass defined in same header, above `SolaceSynthProcessor`).
+    - `SolaceSynthesiser` overrides `noteOn()`. Per-call: counts active voices via `isVoiceActive()`. In both below-cap and at-cap cases, calls `Synthesiser::noteOn()`. At cap, JUCE's `findVoiceToSteal()` picks the oldest voice, stops it, and assigns it to the new note — **steal mode**: player always hears the new note, oldest note dies. (Contrast drop mode where new note would be silent beyond cap.)
+    - `setVoiceLimit(int)` called in `processBlock()` before `synth.renderNextBlock()`, syncing the APVTS `voiceCount` value each block. All 16 `SolaceVoice` instances are always allocated; the limit is dynamic at the synth-allocation level, not voice level.
+    - Rationale for synth subclass: voice allocation is a synthesiser-level concern. A per-voice counter (e.g. shared `atomic<int>`) is fragile because JUCE's voice stealer calls `stopNote(false)` then `startNote()` on the same voice in sequence — a bail in `startNote()` would drop the new note instead of stealing.
+  - **Velocity Modulation:**
+    - `SolaceVoiceParams` extended with 4 pointers: `velocityRange`, `velocityModTarget1`, `velocityModTarget2`, `voiceCount`.
+    - 4 new `jassert` checks in `SolaceVoice` constructor.
+    - In `startNote()`: reads `velocityRange` and both targets. Computes booleans `velToAmpLevel`, `velToAmpAttack`, `velToFilterCut`, `velToFilterRes`.
+    - **Target 1 — AmpLevel:** `velocityScale = jmap(velRange, 0, 1, 1.0, velocity)`. Range=0 → all notes at full level. Range=1 → level scales with velocity.
+    - **Target 2 — AmpAttack:** `modAttack = baseAttack * jmap(vel * range, 0, 1, 1.0, 0.1)`. Hard hit → shorter attack (10% of base). Soft hit → full attack. 0.1 floor prevents click.
+    - **Target 3 — FilterCutoff:** `velModCutoffHz = vel * range * 5000 Hz`. Stored as private member, added to `modulatedCutoff` each sample alongside filterEnv and LFO.
+    - **Target 4 — FilterRes:** `velModRes = vel * range * 0.5`. Stored as private member, added inside `jlimit(0,1,...)` clamp alongside LFO res mod.
+    - All mods are additive (consistent with LFO target pattern from 6.6).
+  - **APVTS params added (PluginProcessor.cpp):**
+    - `voiceCount` (int 1-16, def 16), `velocityRange` (float 0-1, step 0.01, def 1.0), `velocityModTarget1` (int 0-4, def 2=AmpAttack), `velocityModTarget2` (int 0-4, def 0=None).
+  - **Velocity mod target enum:** 0=None, 1=AmpLevel, 2=AmpAttack, 3=FilterCutoff, 4=FilterResonance.
+  - **Default `velocityModTarget1=2` (AmpAttack):** Matches Figma. Gives expressiveness without changing loudness dynamics (users who want loudness control set target to AmpLevel).
 - [ ] Phase 7: Full Figma UI implementation
 - [ ] GitHub Actions CI + pluginval
 

@@ -3,9 +3,67 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_audio_utils/juce_audio_utils.h>
 #include <juce_dsp/juce_dsp.h>
+#include <atomic>
 #include "SolaceLogger.h"
 #include "DSP/SolaceVoice.h"
 #include "DSP/SolaceSound.h"
+
+// ============================================================================
+// SolaceSynthesiser — juce::Synthesiser subclass with runtime polyphony cap.
+//
+// Override noteOn() to enforce a dynamic voice limit. When the number of
+// currently active voices equals or exceeds voiceLimit, JUCE's normal note-on
+// path is still called -- which triggers its voice-stealing algorithm so the
+// oldest playing voice is stopped and re-used for the new note. When we are
+// below the cap, the new note simply gets the next free voice.
+//
+// This is the JUCE-idiomatic approach: polyphony policy lives in the Synthesiser
+// subclass, not in SolaceVoice::startNote(). The Synthesiser owns voice
+// allocation; the voice only knows how to render one note.
+//
+// All 16 SolaceVoice instances are always created and pre-prepared. At runtime
+// only voiceLimit voices are engaged for new notes; the rest stay silent.
+//
+// Thread safety: setVoiceLimit() is called from processBlock (audio thread).
+// voiceLimit is read inside noteOn() which is also audio thread. No UI-thread
+// access needed -- we read from an APVTS atomic, not from this field.
+// ============================================================================
+class SolaceSynthesiser : public juce::Synthesiser
+{
+public:
+    // Called once per processBlock to sync the current APVTS voiceCount value.
+    // Call BEFORE synth.renderNextBlock() to ensure it's current.
+    void setVoiceLimit (int limit) noexcept
+    {
+        voiceLimit = juce::jlimit (1, 16, limit);
+    }
+
+    void noteOn (int midiChannel, int midiNoteNumber, float velocity) override
+    {
+        // Count voices currently producing audio (held + in release tail).
+        int activeCount = 0;
+        for (int i = 0; i < getNumVoices(); ++i)
+            if (getVoice (i)->isVoiceActive())
+                ++activeCount;
+
+        if (activeCount >= voiceLimit)
+        {
+            // At the polyphony cap: call the base noteOn() so JUCE's voice-
+            // stealing algorithm picks the oldest/lowest-priority voice to stop
+            // and immediately assigns it to this new note. The caller hears the
+            // new note start and an old note stop -- standard hardware behaviour.
+            // (Contrast with silently dropping the note, which would feel broken.)
+            juce::Synthesiser::noteOn (midiChannel, midiNoteNumber, velocity);
+            return;
+        }
+
+        // Below cap: normal path -- JUCE finds a free voice.
+        juce::Synthesiser::noteOn (midiChannel, midiNoteNumber, velocity);
+    }
+
+private:
+    int voiceLimit = 16;  // updated each processBlock from APVTS voiceCount
+};
 
 // ============================================================================
 // Solace Synth — Audio Processor (DSP Engine)
@@ -72,11 +130,9 @@ private:
     // Thread-safe: MidiKeyboardState uses an internal lock for cross-thread access.
     juce::MidiKeyboardState keyboardState;
 
-    // Polyphonic synthesiser engine
-    // Manages a pool of SolaceVoice instances and routes MIDI to them.
-    // Call setCurrentPlaybackSampleRate() in prepareToPlay.
-    // Call renderNextBlock() in processBlock (after clearing the buffer).
-    juce::Synthesiser synth;
+    // Polyphonic synthesiser engine — custom subclass adds runtime polyphony cap.
+    // All 16 voices are always allocated. voiceLimit is updated each processBlock.
+    SolaceSynthesiser synth;
 
     // File-based logger — output goes to %TEMP%/SolaceSynth/ (trace.log, debug.log, info.log)
     std::unique_ptr<SolaceLogger> solaceLogger;

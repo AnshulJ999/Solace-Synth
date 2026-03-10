@@ -90,6 +90,22 @@ struct SolaceVoiceParams
     const std::atomic<float>* unisonCount  = nullptr;  // int stored as float
     const std::atomic<float>* unisonDetune = nullptr;  // float, 0-100 cents
     const std::atomic<float>* unisonSpread = nullptr;  // float, 0.0-1.0
+
+    // --- Phase 6.8: Voicing Parameters ---
+    // velocityRange: float, 0.0-1.0. How strongly velocity modulates the targets.
+    //   0.0 = flat (all notes same level/attack). 1.0 = full velocity sensitivity.
+    //   Read at note-on and applied immediately per target.
+    // velocityModTarget1/2: int 0-4. Two velocity-to-parameter routing slots.
+    //   0=None, 1=AmpLevel, 2=AmpAttack, 3=FilterCutoff, 4=FilterResonance.
+    //   These are additive modulations on top of the knob values (same pattern
+    //   as LFO targets in Phase 6.6).
+    // voiceCount: int 1-16 stored as float. Read only by SolaceSynthesiser in
+    //   PluginProcessor.h -- NOT read inside SolaceVoice. Kept here for
+    //   symmetry and to keep all APVTS pointers in one struct.
+    const std::atomic<float>* velocityRange      = nullptr;
+    const std::atomic<float>* velocityModTarget1 = nullptr;
+    const std::atomic<float>* velocityModTarget2 = nullptr;
+    const std::atomic<float>* voiceCount         = nullptr;
 };
 
 // ============================================================================
@@ -230,6 +246,12 @@ public:
         jassert (params.unisonCount  != nullptr);
         jassert (params.unisonDetune != nullptr);
         jassert (params.unisonSpread != nullptr);
+
+        // Phase 6.8
+        jassert (params.velocityRange      != nullptr);
+        jassert (params.velocityModTarget1 != nullptr);
+        jassert (params.velocityModTarget2 != nullptr);
+        jassert (params.voiceCount         != nullptr);
     }
 
     // ========================================================================
@@ -339,15 +361,61 @@ public:
         );
         filterEnvelope.trigger();
 
-        // --- Amplitude Envelope (Phase 6.1) ---
-        velocityScale = velocity;
+        // --- Amplitude Envelope (Phase 6.1 + 6.8 velocity modulation) ---
+        // velocityRange=0 → flat dynamics (velocityScale fixed at 1.0, attack unchanged).
+        // velocityRange=1 → full velocity sensitivity.
+        //
+        // Velocity mod targets (Phase 6.8):
+        //   1 = AmpLevel:    velocityScale = lerp(1.0, velocity, velocityRange)
+        //                    velocityRange=0 → all notes at full level.
+        //                    velocityRange=1 → level scales linearly with velocity.
+        //   2 = AmpAttack:   attackTime = attackParam * lerp(1.0, 0.1, vel * range)
+        //                    Hard hit → shorter attack (bite). Soft hit → full attack.
+        //                    0.1 floor prevents zero-length clicks at vel=1.
+        //   3 = FilterCutoff: modulatedCutoff += vel * range * kVelCutoffRange
+        //                     Applied additively at note-on, consistent with
+        //                     filter-env and LFO modulation patterns.
+        //   4 = FilterRes:   modulatedRes = baseRes + vel * range * kVelResRange
+        //
+        // Note: filter cutoff/resonance mods (targets 3, 4) require applying
+        // the velocity offset before the filter env in renderNextBlock(). We store
+        // them as velocity-derived offsets in velModCutoffHz and velModRes so they
+        // are only computed once at note-on and referenced each block.
+        const float velRange = juce::jlimit (0.0f, 1.0f, params.velocityRange->load());
+        const int   velTgt1  = static_cast<int> (params.velocityModTarget1->load());
+        const int   velTgt2  = static_cast<int> (params.velocityModTarget2->load());
+
+        // Velocity-to-amplitude-level (target 1):
+        //   Range=0 → all notes at full level. Range=1 → level = velocity.
+        const bool velToAmpLevel   = (velTgt1 == 1 || velTgt2 == 1);
+        const bool velToAmpAttack  = (velTgt1 == 2 || velTgt2 == 2);
+        const bool velToFilterCut  = (velTgt1 == 3 || velTgt2 == 3);
+        const bool velToFilterRes  = (velTgt1 == 4 || velTgt2 == 4);
+
+        velocityScale = velToAmpLevel
+            ? juce::jmap (velRange, 0.0f, 1.0f, 1.0f, velocity)  // lerp(1.0, velocity, velRange)
+            : velocity;
+
+        const float baseAttack = params.ampAttack->load();
+        const float modAttack  = velToAmpAttack
+            ? baseAttack * juce::jmap (velocity * velRange, 0.0f, 1.0f, 1.0f, 0.1f)
+            : baseAttack;
+
         ampEnvelope.setParameters (
-            params.ampAttack->load(),
+            modAttack,
             params.ampDecay->load(),
             params.ampSustain->load(),
             params.ampRelease->load()
         );
         ampEnvelope.trigger();
+
+        // Velocity → filter modulation (stored for use in renderNextBlock()).
+        // Cutoff: hard note opens filter more (+kVelCutoffRange Hz at vel=1, range=1).
+        // Res:    hard note adds resonance boost (+kVelResRange at vel=1, range=1).
+        constexpr float kVelCutoffRange = 5000.0f;
+        constexpr float kVelResRange    = 0.5f;
+        velModCutoffHz = velToFilterCut ? velocity * velRange * kVelCutoffRange : 0.0f;
+        velModRes      = velToFilterRes ? velocity * velRange * kVelResRange    : 0.0f;
 
         // LFO (Phase 6.6): no reset here -- free-running by design.
         // Pan gains (Phase 6.7): initialised in renderNextBlock() per-block from
@@ -512,11 +580,14 @@ public:
             // They diverge sonically only because their inputs (preFiltL vs preFiltR)
             // carry different detuned oscillator blends.
             const float filterEnvVal = filterEnvelope.getNextSample();
-            float modulatedCutoff    = baseCutoffHz + filterEnvVal * envDepth * kModRange;
+            float modulatedCutoff    = baseCutoffHz
+                                     + filterEnvVal * envDepth * kModRange
+                                     + velModCutoffHz;   // Phase 6.8: velocity mod
             if (lfoToFilterCutoff)   modulatedCutoff += lfoSample * kLFOCutoffRange;
 
+            // Resonance: base + velocity mod offset (Phase 6.8) + LFO. Clamped 0-1.
             const float modulatedRes = juce::jlimit (0.0f, 1.0f,
-                baseResonance + (lfoToFilterRes ? lfoSample * kLFOResRange : 0.0f));
+                baseResonance + velModRes + (lfoToFilterRes ? lfoSample * kLFOResRange : 0.0f));
 
             filterL.setCutoff    (modulatedCutoff); filterR.setCutoff    (modulatedCutoff);
             filterL.setResonance (modulatedRes);    filterR.setResonance (modulatedRes);
@@ -623,6 +694,11 @@ private:
 
     // Velocity scaling -- set at note-on, multiplied per sample.
     float velocityScale = 0.0f;
+
+    // Phase 6.8 velocity-to-filter offsets. Computed once at note-on and applied
+    // every sample in renderNextBlock() alongside the filter envelope and LFO.
+    float velModCutoffHz = 0.0f;  // additive Hz offset from velocity -> filter cutoff
+    float velModRes      = 0.0f;  // additive [0-1] offset from velocity -> resonance
 
     // Per-voice output gain, updated at note-on.
     // Incorporates equal-power unison normalisation: kBaseVoiceGain / sqrt(unisonCount).

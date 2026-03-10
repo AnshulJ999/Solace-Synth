@@ -1,10 +1,12 @@
 # Solace Synth — Project Memory
 
 **Created:** 2026-03-08
-**Last Updated:** 2026-03-11 (Phase 6 FULLY COMPLETE. All DSP 6.1-6.9 code-complete, build confirmed successful. All LOW comment issues fixed. Two open design questions for Nabeel documented under Phase 6.8. Next: Phase 7 UI polish in a new session.)
-**Status:** Active -- Phases 0-5 done + Phase 6 (6.1-6.9) COMPLETE + build verified. Phase 7.1 + 7.2 scaffold already done. Next: Phase 7 UI polish and Figma alignment.
+**Last Updated:** 2026-03-11 (Phase 7.3 prep: merged UI master plan created, LFO target mismatch flagged)
+**Status:** Active — Phase 6 (DSP 6.1-6.9) COMPLETE. Phase 7.1 + 7.2 (scaffold) COMPLETE. Next: Phase 7.3 (component modularization).
 
-For UI: Up till phase 7.2 was done. UI prototype works, but needs lots of polishing and tweaks and further refinement.
+**⚠️ Critical pending item:** LFO target list in `main.js` does NOT match Vision Document (Nabeel's answer 5). Current code has `FilterCutoff, Osc1Pitch...` but Vision Doc requires a different 8-item list including Distortion, Master Volume, Osc Mix, etc. Must be reconciled before DSP LFO wiring. See `.agent/plans/Phase-7-UI-Master-Plan.md`.
+
+**UI plan:** `.agent/plans/Phase-7-UI-Master-Plan.md` — this is the authoritative merged plan. Old files (`Phase 7 — UI Roadmap.md`, `Phase-7.4-Pixel-Perfect-Audit.md`) are kept as references only.
 
 ---
 

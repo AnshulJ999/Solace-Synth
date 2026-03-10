@@ -62,6 +62,11 @@ SolaceSynthProcessor::SolaceSynthProcessor()
     voiceParams.lfoTarget2  = apvts.getRawParameterValue ("lfoTarget2");
     voiceParams.lfoTarget3  = apvts.getRawParameterValue ("lfoTarget3");
 
+    // --- Phase 6.7: Unison ---
+    voiceParams.unisonCount  = apvts.getRawParameterValue ("unisonCount");
+    voiceParams.unisonDetune = apvts.getRawParameterValue ("unisonDetune");
+    voiceParams.unisonSpread = apvts.getRawParameterValue ("unisonSpread");
+
     // Create 16 voices. We always create the maximum number up front — JUCE's
     // Synthesiser does not support safe voice addition/removal at runtime.
     // A polyphony cap (Phase 6.8) will be implemented inside startNote() later.
@@ -284,6 +289,31 @@ juce::AudioProcessorValueTreeState::ParameterLayout SolaceSynthProcessor::create
         "LFO Target 3",
         0, 7, 0));  // default: 0 = None
 
+    // --- Phase 6.7: Unison ---
+    // unisonCount: int 1-8. Default 1 = no unison (identical to pre-6.7 behaviour).
+    //   At unisonCount=1, detuneOffset=0 and all pan gains collapse to centre --
+    //   the output is audibly identical to Phase 6.6 (regression-safe default).
+    // unisonDetune: 0-100 cents, default 0.0. Linear slider -- musical range is
+    //   concentrated in the lower end (0-30 cents) so no skew needed.
+    // unisonSpread: 0-1, default 0.5. Moderate width on first use. Full left/right
+    //   (1.0) is too wide for casual listening; 0.5 gives a pleasant default image.
+    params.push_back (std::make_unique<juce::AudioParameterInt> (
+        juce::ParameterID { "unisonCount", 1 },
+        "Unison Count",
+        1, 8, 1));  // default: 1 = no unison
+
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (
+        juce::ParameterID { "unisonDetune", 1 },
+        "Unison Detune",
+        juce::NormalisableRange<float> (0.0f, 100.0f, 0.1f),
+        0.0f));  // default: 0 = no detune
+
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (
+        juce::ParameterID { "unisonSpread", 1 },
+        "Unison Spread",
+        juce::NormalisableRange<float> (0.0f, 1.0f, 0.01f),
+        0.5f));  // default: 0.5 = moderate stereo width
+
     return { params.begin(), params.end() };
 }
 
@@ -390,7 +420,7 @@ void SolaceSynthProcessor::prepareToPlay (double sampleRate, int samplesPerBlock
     SolaceLog::info ("prepareToPlay: sampleRate=" + juce::String (sampleRate)
         + " samplesPerBlock=" + juce::String (samplesPerBlock)
         + " voices=" + juce::String (synth.getNumVoices())
-        + " params: amp(4) osc1(4) filter(3) filterEnv(5) osc2+mix(5) lfo(6)");
+        + " params: amp(4) osc1(4) filter(3) filterEnv(5) osc2+mix(5) lfo(6) unison(3)");
 }
 
 void SolaceSynthProcessor::releaseResources()

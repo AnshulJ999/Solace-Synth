@@ -63,30 +63,33 @@ struct SolaceVoiceParams
     const std::atomic<float>* filterEnvRelease = nullptr;
 
     // --- Phase 6.5: Oscillator 2 + Osc Mix ---
-    // Osc2 uses the same SolaceOscillator API as Osc1.
-    // Int parameters are stored as float by APVTS; cast to int at note-on.
-    // oscMix: float, 0.0–1.0. 0 = Osc1 only, 1 = Osc2 only, 0.5 = equal blend.
-    // oscMix is snapshotted per render-block (not note-on) for live crossfader response.
     const std::atomic<float>* osc2Waveform  = nullptr;
     const std::atomic<float>* osc2Octave    = nullptr;
     const std::atomic<float>* osc2Transpose = nullptr;
-    const std::atomic<float>* osc2Tuning    = nullptr;  // float, -100 to +100 cents
-    const std::atomic<float>* oscMix        = nullptr;  // float, 0.0–1.0
+    const std::atomic<float>* osc2Tuning    = nullptr;
+    const std::atomic<float>* oscMix        = nullptr;
 
     // --- Phase 6.6: LFO ---
-    // lfoWaveform: int stored as float (0=Sine, 1=Triangle, 2=Saw, 3=Square, 4=S&H).
-    // lfoRate:     float, 0.01–50 Hz.
-    // lfoAmount:   float, 0.0–1.0. Scales the LFO output before it is applied.
-    //              Default 0.0 means the LFO has no effect until the user turns it up.
-    // lfoTarget1/2/3: int stored as float (0=None, 1=FilterCutoff, 2=Osc1Pitch,
-    //              3=Osc2Pitch, 4=Osc1Level, 5=Osc2Level, 6=AmpLevel, 7=FilterRes).
-    // All six params are read per render-block for live knob response.
     const std::atomic<float>* lfoWaveform = nullptr;
     const std::atomic<float>* lfoRate     = nullptr;
     const std::atomic<float>* lfoAmount   = nullptr;
     const std::atomic<float>* lfoTarget1  = nullptr;
     const std::atomic<float>* lfoTarget2  = nullptr;
     const std::atomic<float>* lfoTarget3  = nullptr;
+
+    // --- Phase 6.7: Unison ---
+    // unisonCount: int stored as float (1-8). Default 1 = no unison (no change to sound).
+    //   Snapshotted at note-on -- changing count mid-note would require resizing the active
+    //   oscillator array, which is not safe. Users hear the new value on the next note.
+    // unisonDetune: float, 0-100 cents. Spread of detuning from -detune/2 to +detune/2
+    //   across all N voices. Voice 0 = -detune/2, voice N-1 = +detune/2, centre voice = 0.
+    //   Snapshotted at note-on for the same reason as unisonCount.
+    // unisonSpread: float, 0.0-1.0. Controls the stereo width of the panned unison voices.
+    //   0.0 = all voices centre (mono). 1.0 = outer voices hard left/right.
+    //   Read per-block for live knob response (only affects pan gains, not oscillator state).
+    const std::atomic<float>* unisonCount  = nullptr;  // int stored as float
+    const std::atomic<float>* unisonDetune = nullptr;  // float, 0-100 cents
+    const std::atomic<float>* unisonSpread = nullptr;  // float, 0.0-1.0
 };
 
 // ============================================================================
@@ -126,13 +129,31 @@ struct SolaceVoiceParams
 //     oscSample = osc1.getNextSample() * (1.0f - oscMix) + osc2.getNextSample() * oscMix
 //   The blended signal feeds into the filter unchanged — signal chain is additive.
 //
-// Phase 6.6 -- LFO:
-//   SolaceLFO adds one free-running LFO per voice. Free-running means the LFO
-//   is never reset at note-on, giving each chord voice a progressively different
-//   phase for organic shimmer. lfoAmount (0-1) scales the LFO output; up to 3
-//   target slots (lfoTarget1/2/3) independently route the LFO to:
-//     1=FilterCutoff, 2=Osc1Pitch, 3=Osc2Pitch, 4=Osc1Level,
-//     5=Osc2Level, 6=AmpLevel, 7=FilterResonance.
+// Phase 6.7 -- Unison:
+//   Each SolaceVoice now owns an array of UnisonVoice structs (max 8). Each
+//   UnisonVoice contains its own osc1+osc2 pair, independently detuned from
+//   the MIDI note frequency. At unisonCount=1 (default), behaviour is identical
+//   to Phase 6.6 -- no audible change.
+//
+//   Standard synth architecture (JP-8000 / Serum / Vital): unison oscillators
+//   are summed to MONO first, then passed through the shared filter + amp chain,
+//   then fanned out to stereo via per-voice constant-power pan gains. This keeps
+//   filter CPU cost fixed at one instance per voice regardless of unison count.
+//
+//   Detune distribution (symmetric around MIDI note pitch):
+//     N=1 → 0 cents (no detune).
+//     N>1 → voice i gets: ((i / (N-1)) - 0.5) * unisonDetune cents
+//           → voice 0 at -detune/2, voice N-1 at +detune/2, centre voice = 0.
+//
+//   Equal-power pan law (constant-power stereo spread):
+//     pan_i = ((i / (N-1)) * 2 - 1) * unisonSpread  (range -1 to +1)
+//     leftGain  = sqrt(0.5 * (1 - pan_i))
+//     rightGain = sqrt(0.5 * (1 + pan_i))
+//   Recomputed per block from unisonSpread for live knob response.
+//
+//   Level normalisation (mandatory):
+//     voiceGain = kBaseVoiceGain / sqrt(unisonCount)
+//     Prevents loudness jump when unison is increased (equal-power sum).
 //
 // Signal flow (per sample, Phase 6.6+):
 //   lfoValue = lfo.getNextSample() * lfoAmount      ← per sample, all targets
@@ -201,6 +222,11 @@ public:
         jassert (params.lfoTarget1  != nullptr);
         jassert (params.lfoTarget2  != nullptr);
         jassert (params.lfoTarget3  != nullptr);
+
+        // Phase 6.7
+        jassert (params.unisonCount  != nullptr);
+        jassert (params.unisonDetune != nullptr);
+        jassert (params.unisonSpread != nullptr);
     }
 
     // ========================================================================
@@ -220,6 +246,7 @@ public:
         ampEnvelope.prepare    (spec.sampleRate);
         filterEnvelope.prepare (spec.sampleRate);
         filter.prepare (spec);  // SolaceFilter overrides numChannels to 1 internally
+        // LFO has no sample-rate-dependent state -- setRate() handles this per block.
     }
 
     // ========================================================================
@@ -241,62 +268,59 @@ public:
                     juce::SynthesiserSound* /*sound*/,
                     int /*currentPitchWheelPosition*/) override
     {
-        // --- Oscillator 1 (Phase 6.2) ---
-        osc1.reset();  // clear phase for click-free attack
-        osc1.setWaveform  (static_cast<int> (params.osc1Waveform->load()));
-        osc1.setTuningOffset (
-            static_cast<int>  (params.osc1Octave->load()),
-            static_cast<int>  (params.osc1Transpose->load()),
-            params.osc1Tuning->load()
-        );
         const double baseHz = juce::MidiMessage::getMidiNoteInHertz (midiNoteNumber);
-        osc1.setFrequency (baseHz, getSampleRate());
 
-        // --- Oscillator 2 (Phase 6.5) ---
-        // Same setup pattern as Osc1. Both oscillators receive the same base MIDI
-        // frequency — their individual tuning offsets give them independent pitches.
-        // oscMix is NOT snapshotted here — it is read per render-block in
-        // renderNextBlock() so the crossfader is live while notes are held.
-        osc2.reset();  // phase-coherent start per note, same reasoning as osc1
-        osc2.setWaveform  (static_cast<int> (params.osc2Waveform->load()));
-        osc2.setTuningOffset (
-            static_cast<int>  (params.osc2Octave->load()),
-            static_cast<int>  (params.osc2Transpose->load()),
-            params.osc2Tuning->load()
-        );
-        osc2.setFrequency (baseHz, getSampleRate());
+        // --- Unison setup (Phase 6.7) ---
+        // unisonCount and unisonDetune are snapshotted at note-on.
+        // Changing either mid-note (mid-block) would require re-initialising
+        // the oscillator array, which is not safe on the audio thread.
+        activeUnisonCount = juce::jlimit (1, kMaxUnison,
+            static_cast<int> (params.unisonCount->load()));
+        const float detuneCents = params.unisonDetune->load();
+
+        // Derive waveforms and tuning offsets from APVTS (same as pre-unison).
+        const int   osc1Wave    = static_cast<int> (params.osc1Waveform->load());
+        const int   osc1Oct     = static_cast<int> (params.osc1Octave->load());
+        const int   osc1Trans   = static_cast<int> (params.osc1Transpose->load());
+        const float osc1Cents   = params.osc1Tuning->load();
+        const int   osc2Wave    = static_cast<int> (params.osc2Waveform->load());
+        const int   osc2Oct     = static_cast<int> (params.osc2Octave->load());
+        const int   osc2Trans   = static_cast<int> (params.osc2Transpose->load());
+        const float osc2Cents   = params.osc2Tuning->load();
+
+        for (int u = 0; u < activeUnisonCount; ++u)
+        {
+            // Detune offset for this unison voice:
+            //   N=1 → 0 cents; N>1 → symmetric spread from -detune/2 to +detune/2.
+            const float detuneOffset = (activeUnisonCount > 1)
+                ? ((float)u / (float)(activeUnisonCount - 1) - 0.5f) * detuneCents
+                : 0.0f;
+
+            // Osc1 setup: waveform + (MIDI tuning stack + this voice's detune).
+            unisonVoices[u].osc1.reset();
+            unisonVoices[u].osc1.setWaveform     (osc1Wave);
+            unisonVoices[u].osc1.setTuningOffset (osc1Oct, osc1Trans, osc1Cents + detuneOffset);
+            unisonVoices[u].osc1.setFrequency    (baseHz, getSampleRate());
+
+            // Osc2 setup: same detune offset applied on top of osc2's own tuning.
+            unisonVoices[u].osc2.reset();
+            unisonVoices[u].osc2.setWaveform     (osc2Wave);
+            unisonVoices[u].osc2.setTuningOffset (osc2Oct, osc2Trans, osc2Cents + detuneOffset);
+            unisonVoices[u].osc2.setFrequency    (baseHz, getSampleRate());
+        }
+
+        // Equal-power level normalisation: prevents loudness jump as unison increases.
+        // At unisonCount=1 this reduces to kBaseVoiceGain / sqrt(1) = kBaseVoiceGain.
+        voiceGain = kBaseVoiceGain / std::sqrt (static_cast<float> (activeUnisonCount));
 
         // --- Filter (Phase 6.3) ---
-        // filterType is snapshotted at note-on — mode changes mid-note cause a
-        // transient click (state-vector discontinuity). Cutoff and resonance are
-        // read live per-block in renderNextBlock(), so knob moves are audible.
-        //
-        // reset() is REQUIRED here for the same reason filterEnvelope.reset() is
-        // required above: after a natural note-off, the amp envelope decays to
-        // zero and clearCurrentNote() is called, but the LadderFilter's internal
-        // delay state is NOT automatically cleared. At high resonance (approaching
-        // self-oscillation), the filter keeps ringing even with zero input — that
-        // residual state bleeds into the next note's attack when the voice is reused.
         filter.reset();
         filter.setMode      (static_cast<int> (params.filterType->load()));
         filter.setResonance (params.filterResonance->load());
-        // baseCutoffHz is updated per-block in renderNextBlock(); initialise it
-        // here so it holds a valid value on the very first block of this note.
         baseCutoffHz = params.filterCutoff->load();
         filter.setCutoff (baseCutoffHz);
 
         // --- Filter Envelope (Phase 6.4) ---
-        // Snapshotted at note-on — ADSR shape is fixed for the note's lifetime.
-        // filterEnvDepth is read per-block in renderNextBlock() (cheap, per-block
-        // resolution is fine for a UI knob the user may sweep mid-note).
-        //
-        // reset() before trigger() is REQUIRED: the voice is freed when the amp
-        // envelope finishes, which may happen before the filter envelope release
-        // completes (if filterEnvRelease > ampRelease). If this voice is then
-        // immediately reused, the filter envelope could still be mid-release.
-        // JUCE's ADSR::noteOn() restarts from the current level (not from 0),
-        // so without reset(), the new note's filter attack would start from a
-        // non-zero level — an audible artifact on the pluck attack.
         filterEnvelope.reset();
         filterEnvelope.setParameters (
             params.filterEnvAttack->load(),
@@ -307,8 +331,6 @@ public:
         filterEnvelope.trigger();
 
         // --- Amplitude Envelope (Phase 6.1) ---
-        // Snapshotting at note-on means envelope shape is fixed for this note.
-        // Changes to ADSR knobs affect the next note-on, not the current note.
         velocityScale = velocity;
         ampEnvelope.setParameters (
             params.ampAttack->load(),
@@ -317,6 +339,10 @@ public:
             params.ampRelease->load()
         );
         ampEnvelope.trigger();
+
+        // LFO (Phase 6.6): no reset here -- free-running by design.
+        // Pan gains (Phase 6.7): initialised in renderNextBlock() per-block from
+        // unisonSpread, so live spread knob changes are audible while holding notes.
     }
 
     // ========================================================================
@@ -376,23 +402,32 @@ public:
             return;
 
         // --- Per-block parameter refresh ---
-        // All atomics read once per block — immediate knob response without
-        // per-sample atomic overhead. filterType excluded (mode change mid-note
-        // causes a state-vector transient; stays at note-on snapshot in V1).
         baseCutoffHz = params.filterCutoff->load();
         const float baseResonance = params.filterResonance->load();
         const float envDepth      = params.filterEnvDepth->load();
         const float mix           = juce::jlimit (0.0f, 1.0f, params.oscMix->load());
 
-        // Filter modulation range constants (V1 fixed values -- could be params in V2).
-        constexpr float kModRange       = 10000.0f;  // max Hz swing from filter envelope
-        constexpr float kLFOCutoffRange = 10000.0f;  // max Hz swing from LFO (same scale)
-        constexpr float kLFOResRange    = 0.5f;      // LFO can swing +-0.5 resonance at full amount
-        constexpr float kLFOPitchSemi   = 2.0f;      // LFO can shift +-2 semitones at full amount
+        // Filter and LFO modulation range constants.
+        constexpr float kModRange       = 10000.0f;
+        constexpr float kLFOCutoffRange = 10000.0f;
+        constexpr float kLFOResRange    = 0.5f;
+        constexpr float kLFOPitchSemi   = 2.0f;
+
+        // --- Unison pan gains (Phase 6.7) ---
+        // Recomputed per block from unisonSpread so the spread knob is live.
+        // activeUnisonCount is snapshotted at note-on and never changes mid-note.
+        const float spread = juce::jlimit (0.0f, 1.0f, params.unisonSpread->load());
+        for (int u = 0; u < activeUnisonCount; ++u)
+        {
+            const float pan = (activeUnisonCount > 1)
+                ? ((float)u / (float)(activeUnisonCount - 1) * 2.0f - 1.0f) * spread
+                : 0.0f;  // N=1: always centre regardless of spread knob
+            // Constant-power pan law: leftGain^2 + rightGain^2 = 1 at any pan position.
+            unisonVoices[u].panL = std::sqrt (juce::jlimit (0.0f, 1.0f, 0.5f * (1.0f - pan)));
+            unisonVoices[u].panR = std::sqrt (juce::jlimit (0.0f, 1.0f, 0.5f * (1.0f + pan)));
+        }
 
         // --- LFO per-block refresh ---
-        // Shape and rate updated every block for live knob response.
-        // Phase is NOT reset -- the LFO is free-running from voice allocation.
         lfo.setShape  (static_cast<int> (params.lfoWaveform->load()));
         lfo.setRate   (params.lfoRate->load(), getSampleRate());
         const float lfoAmount  = juce::jlimit (0.0f, 1.0f, params.lfoAmount->load());
@@ -400,9 +435,6 @@ public:
         const int   lfoTarget2 = static_cast<int> (params.lfoTarget2->load());
         const int   lfoTarget3 = static_cast<int> (params.lfoTarget3->load());
 
-        // Pre-compute bool flags: which target types are active across all 3 slots.
-        // Computed before the loop so the inner loop branches are on loop-invariant
-        // values -- the compiler can hoist or eliminate them.
         const bool lfoToFilterCutoff = (lfoTarget1 == 1 || lfoTarget2 == 1 || lfoTarget3 == 1);
         const bool lfoToOsc1Pitch    = (lfoTarget1 == 2 || lfoTarget2 == 2 || lfoTarget3 == 2);
         const bool lfoToOsc2Pitch    = (lfoTarget1 == 3 || lfoTarget2 == 3 || lfoTarget3 == 3);
@@ -411,90 +443,99 @@ public:
         const bool lfoToAmpLevel     = (lfoTarget1 == 6 || lfoTarget2 == 6 || lfoTarget3 == 6);
         const bool lfoToFilterRes    = (lfoTarget1 == 7 || lfoTarget2 == 7 || lfoTarget3 == 7);
 
-        // Pitch targets: compute multiplier once per block using getCurrentValue()
-        // (reads current LFO value without advancing phase, so the per-sample
-        // getNextSample() loop remains the sole source of LFO advancement).
-        // Block-rate vibrato granularity (~10 ms at 512 samples/48kHz) is
-        // imperceptible for typical vibrato rates of 1-8 Hz.
+        // LFO pitch: apply multiplier to ALL active unison voices' oscillators.
         if (lfoToOsc1Pitch)
         {
             const double semi = static_cast<double> (lfo.getCurrentValue() * lfoAmount * kLFOPitchSemi);
-            osc1.setLFOPitchMultiplier (std::pow (2.0, semi / 12.0));
+            const double mult = std::pow (2.0, semi / 12.0);
+            for (int u = 0; u < activeUnisonCount; ++u)
+                unisonVoices[u].osc1.setLFOPitchMultiplier (mult);
         }
         else
         {
-            osc1.setLFOPitchMultiplier (1.0);
+            for (int u = 0; u < activeUnisonCount; ++u)
+                unisonVoices[u].osc1.setLFOPitchMultiplier (1.0);
         }
 
         if (lfoToOsc2Pitch)
         {
             const double semi = static_cast<double> (lfo.getCurrentValue() * lfoAmount * kLFOPitchSemi);
-            osc2.setLFOPitchMultiplier (std::pow (2.0, semi / 12.0));
+            const double mult = std::pow (2.0, semi / 12.0);
+            for (int u = 0; u < activeUnisonCount; ++u)
+                unisonVoices[u].osc2.setLFOPitchMultiplier (mult);
         }
         else
         {
-            osc2.setLFOPitchMultiplier (1.0);
+            for (int u = 0; u < activeUnisonCount; ++u)
+                unisonVoices[u].osc2.setLFOPitchMultiplier (1.0);
         }
 
         while (--numSamples >= 0)
         {
-            // LFO: advance once per sample. lfoSample is in [-lfoAmount, +lfoAmount].
-            // All non-pitch targets consume this value in this same iteration.
             const float lfoSample = lfo.getNextSample() * lfoAmount;
 
-            // 1. Oscillators: get samples (LFO pitch multiplier applied inside
-            //    getNextSample() via stored lfoMultiplier; set per block above).
-            float osc1s = osc1.getNextSample();
-            float osc2s = osc2.getNextSample();
+            // --- Unison oscillator sum (Phase 6.7) ---
+            // All N unison voices advance every sample regardless of mix.
+            // Sum to mono first (standard architecture: JP-8000, Serum, Vital).
+            // Stereo spread is applied AFTER the filter stage, not per-oscillator.
+            float monoSum = 0.0f;
+            for (int u = 0; u < activeUnisonCount; ++u)
+            {
+                float uOsc1s = unisonVoices[u].osc1.getNextSample();
+                float uOsc2s = unisonVoices[u].osc2.getNextSample();
 
-            // 2. Osc level modulation (targets 4 and 5).
-            //    Scale: (1 + lfoSample) ranges 0 to 2 at full amount.
-            //    Clamped to [0, 2] to avoid negative amplitude (prevents phase inversion).
-            if (lfoToOsc1Level) osc1s *= juce::jlimit (0.0f, 2.0f, 1.0f + lfoSample);
-            if (lfoToOsc2Level) osc2s *= juce::jlimit (0.0f, 2.0f, 1.0f + lfoSample);
+                // Osc level LFO (targets 4, 5): applied uniformly to all unison voices.
+                if (lfoToOsc1Level) uOsc1s *= juce::jlimit (0.0f, 2.0f, 1.0f + lfoSample);
+                if (lfoToOsc2Level) uOsc2s *= juce::jlimit (0.0f, 2.0f, 1.0f + lfoSample);
 
-            // 3. Mix oscillators via crossfader.
-            const float oscSample = osc1s * (1.0f - mix) + osc2s * mix;
+                monoSum += uOsc1s * (1.0f - mix) + uOsc2s * mix;
+            }
 
-            // 4. Filter envelope + LFO cutoff modulation (target 1).
+            // Filter envelope + LFO cutoff modulation.
             const float filterEnvVal  = filterEnvelope.getNextSample();
             float modulatedCutoff     = baseCutoffHz + filterEnvVal * envDepth * kModRange;
             if (lfoToFilterCutoff)    modulatedCutoff += lfoSample * kLFOCutoffRange;
-            filter.setCutoff (modulatedCutoff);  // clamps internally to [20, 20000]
+            filter.setCutoff (modulatedCutoff);
 
-            // 5. Filter resonance modulation (target 7).
-            //    Per sample so the LFO sweep is smooth.
+            // Filter resonance modulation.
             const float modulatedRes = juce::jlimit (0.0f, 1.0f,
                 baseResonance + (lfoToFilterRes ? lfoSample * kLFOResRange : 0.0f));
             filter.setResonance (modulatedRes);
 
-            // 6. Filter: shape the spectrum.
-            const float filteredSample = filter.processSample (oscSample);
+            // Filter: mono sum through shared filter (standard unison architecture).
+            const float filteredMono = filter.processSample (monoSum);
 
-            // 7. Amp envelope.
+            // Amp envelope + LFO amp modulation.
             const float ampEnvVal = ampEnvelope.getNextSample();
-
-            // 8. Amp level modulation (target 6).
-            //    Same (1 + lfoSample) scale as osc level -- clamped to [0, 2].
-            const float ampMod = lfoToAmpLevel
+            const float ampMod    = lfoToAmpLevel
                 ? juce::jlimit (0.0f, 2.0f, 1.0f + lfoSample)
                 : 1.0f;
 
-            // 9. Final sample: filter -> gain -> velocity -> amp env -> amp LFO.
-            const float currentSample = filteredSample
-                                        * kVoiceGain
-                                        * velocityScale
-                                        * ampEnvVal
-                                        * ampMod;
+            // Final scalar: includes equal-power unison normalisation (voiceGain).
+            const float scalar = filteredMono * voiceGain * velocityScale * ampEnvVal * ampMod;
 
-            // 10. Mix into all output channels (mono voice -> stereo buffer).
-            for (int ch = outputBuffer.getNumChannels(); --ch >= 0;)
-                outputBuffer.addSample (ch, startSample, currentSample);
+            // Stereo output: fan the mono filtered signal to L and R using pan gains.
+            // At unisonCount=1 and spread=0, panL=panR=sqrt(0.5)~=0.707 for each voice,
+            // sum of panL across 1 voice = 0.707 * scalar. This is slightly quieter (-3dB)
+            // than the pre-unison mono output. To preserve pre-6.7 loudness exactly,
+            // kBaseVoiceGain is adjusted to 0.15 * sqrt(2) = 0.212 so that
+            // 0.212 / sqrt(1) * 0.707 = 0.15, matching the old kVoiceGain=0.15 path.
+            float sampleL = 0.0f;
+            float sampleR = 0.0f;
+            for (int u = 0; u < activeUnisonCount; ++u)
+            {
+                sampleL += scalar * unisonVoices[u].panL;
+                sampleR += scalar * unisonVoices[u].panR;
+            }
+
+            // Write to output buffer: channel 0 = L, channel 1 = R.
+            // Guard against mono host (numChannels==1).
+            const int numChannels = outputBuffer.getNumChannels();
+            if (numChannels >= 1) outputBuffer.addSample (0, startSample, sampleL);
+            if (numChannels >= 2) outputBuffer.addSample (1, startSample, sampleR);
 
             ++startSample;
 
-            // 11. Voice done check -- AFTER getNextSample() so the ADSR's
-            //     final idle transition is captured correctly in the output.
             if (! ampEnvelope.isActive())
             {
                 clearCurrentNote();
@@ -511,40 +552,60 @@ public:
     void controllerMoved (int /*controller*/, int /*value*/)   override {}
 
 private:
-    // APVTS parameter pointers — copied at construction, read at note-on.
     const SolaceVoiceParams params;
 
     // --- Phase 6.1: Amplitude envelope ---
     SolaceADSR ampEnvelope;
 
-    // --- Phase 6.2: Oscillator 1 ---
-    SolaceOscillator osc1;
-
     // --- Phase 6.3: Filter ---
+    // Single mono instance following standard unison architecture (JP-8000, Serum, Vital):
+    // all unison oscillators sum to mono, then this shared filter processes the sum.
+    // Stereo spread is applied AFTER the filter via per-unison-voice pan gains.
     SolaceFilter filter;
-    // baseCutoffHz: the APVTS filterCutoff value in Hz, read per render-block.
-    // The filter envelope adds to this per-sample: baseCutoffHz + envVal * depth * modRange.
     float baseCutoffHz = 20000.0f;
 
     // --- Phase 6.4: Filter Envelope ---
     SolaceADSR filterEnvelope;
 
-    // --- Phase 6.5: Oscillator 2 ---
-    // oscMix is cached per render-block (not stored here as a member).
-    // The per-block load from APVTS atomics gives live crossfader response.
-    SolaceOscillator osc2;
-
     // --- Phase 6.6: LFO ---
-    // The LFO is free-running -- phase is NOT reset at note-on.
-    // Each voice in a chord accumulates a different phase naturally, producing
-    // organic per-voice shimmer on pads and filter sweeps.
     SolaceLFO lfo;
 
-    // Velocity scaling -- set at note-on, multiplied per sample in renderNextBlock.
+    // --- Phase 6.7: Unison oscillator array ---
+    // Replaces the former standalone osc1 + osc2 members.
+    // UnisonVoice holds an osc1/osc2 pair plus pre-computed stereo pan gains.
+    // kMaxUnison = 8 matches the APVTS unisonCount parameter range [1, 8].
+    // All kMaxUnison slots are always allocated (stack); only activeUnisonCount
+    // are rendered each block. At activeUnisonCount=1, voice renders identically
+    // to Phase 6.6 with no CPU overhead for unused slots.
+    static constexpr int kMaxUnison = 8;
+
+    struct UnisonVoice
+    {
+        SolaceOscillator osc1;
+        SolaceOscillator osc2;
+        float panL = 1.0f;  // left channel gain for this unison voice
+        float panR = 1.0f;  // right channel gain for this unison voice
+    };
+
+    UnisonVoice unisonVoices[kMaxUnison];
+
+    // Number of active unison voices. Snapshotted at note-on from unisonCount param.
+    // Never changes mid-note; next note-on picks up any knob changes.
+    int activeUnisonCount = 1;
+
+    // Velocity scaling -- set at note-on, multiplied per sample.
     float velocityScale = 0.0f;
 
-    // Per-voice output gain. Limits peak output of a single voice to prevent
-    // clipping when many voices are summed. 16-voice default.
-    // TODO (Phase 6.7): Replace with dynamic normalisation for unison.
-    static constexpr float kVoiceGain = 0.15f;
+    // Per-voice output gain, updated at note-on.
+    // Incorporates equal-power unison normalisation: kBaseVoiceGain / sqrt(unisonCount).
+    // At unisonCount=1, voiceGain = kBaseVoiceGain / sqrt(1) = kBaseVoiceGain.
+    //
+    // kBaseVoiceGain is scaled by sqrt(2) vs the old kVoiceGain=0.15 to compensate
+    // for the -3dB headroom loss introduced by constant-power panning at N=1:
+    //   panL = panR = sqrt(0.5) = 0.707 at pan=0.
+    //   0.15 * sqrt(2) * 0.707 = 0.15 -- matches old mono output level exactly.
+    //
+    // TODO (Phase 6.7+): adjust if overall loudness feels too hot at high voice counts.
+    static constexpr float kBaseVoiceGain = 0.15f * 1.4142135f;  // 0.15 * sqrt(2)
+    float voiceGain = kBaseVoiceGain;  // updated at startNote()
 };

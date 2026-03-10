@@ -1,8 +1,8 @@
 # Solace Synth — Project Memory
 
 **Created:** 2026-03-08
-**Last Updated:** 2026-03-10 (Phase 6.6 LFO — code complete. SolaceLFO.h + SolaceOscillator.h + SolaceVoice.h done by Antigravity; PluginProcessor.cpp completed by Claude. Awaiting build + listening test.)
-**Status:** Active — Phases 0-5 complete + Phases 6.1–6.6 code complete. Next: build + listening test for 6.6, then Phase 6.7 (Unison).
+**Last Updated:** 2026-03-11 (Phase 6.7 Unison -- code complete. UnisonVoice[8] array, constant-power pan, equal-power level normalisation, stereo output. Awaiting build + listening test.)
+**Status:** Active -- Phases 0-5 complete + Phases 6.1-6.7 code complete. Next: build + test 6.7, then Phase 6.8 (Voicing Parameters).
 
 For UI: Up till phase 7.2 was done. UI prototype works, but needs lots of polishing and tweaks and further refinement.
 

@@ -38,31 +38,82 @@ public:
         voiceLimit = juce::jlimit (1, 16, limit);
     }
 
-    void noteOn (int midiChannel, int midiNoteNumber, float velocity) override
+protected:
+    // ========================================================================
+    // findFreeVoice — restricts the free-voice search to [0, voiceLimit).
+    //
+    // This is the key JUCE extension point for polyphony capping. The base
+    // Synthesiser::noteOn() calls findFreeVoice() to pick the next voice.
+    // By restricting the scan to the first voiceLimit voices, inactive voices
+    // beyond the cap are never touched — voices [voiceLimit, 15] stay silent
+    // regardless of how many notes are playing.
+    //
+    // When all voiceLimit voices are active and stealIfNoneAvailable is true,
+    // we delegate to findVoiceToSteal() (also capped) to pick a victim.
+    // ========================================================================
+    juce::SynthesiserVoice* findFreeVoice (juce::SynthesiserSound* soundToPlay,
+                                           int midiChannel,
+                                           int midiNoteNumber,
+                                           bool stealIfNoneAvailable) const override
     {
-        // Count voices currently producing audio (held + in release tail).
-        int activeCount = 0;
-        for (int i = 0; i < getNumVoices(); ++i)
-            if (getVoice (i)->isVoiceActive())
-                ++activeCount;
+        const int limit = voiceLimit;
 
-        if (activeCount >= voiceLimit)
+        // Scan only within [0, limit) for a free (non-active) voice.
+        for (int i = 0; i < limit; ++i)
         {
-            // At the polyphony cap: call the base noteOn() so JUCE's voice-
-            // stealing algorithm picks the oldest/lowest-priority voice to stop
-            // and immediately assigns it to this new note. The caller hears the
-            // new note start and an old note stop -- standard hardware behaviour.
-            // (Contrast with silently dropping the note, which would feel broken.)
-            juce::Synthesiser::noteOn (midiChannel, midiNoteNumber, velocity);
-            return;
+            auto* v = getVoice (i);
+            if (v != nullptr && !v->isVoiceActive())
+                return v;
         }
 
-        // Below cap: normal path -- JUCE finds a free voice.
-        juce::Synthesiser::noteOn (midiChannel, midiNoteNumber, velocity);
+        // No free voice within the cap. Steal one if stealing is enabled.
+        if (stealIfNoneAvailable)
+            return findVoiceToSteal (soundToPlay, midiChannel, midiNoteNumber);
+
+        return nullptr;
+    }
+
+    // ========================================================================
+    // findVoiceToSteal — steals from within [0, voiceLimit) only.
+    //
+    // Prefers releasing voices (fading out, least audible to steal), then
+    // falls back to the oldest held voice. This is a simplified version of
+    // JUCE's default algorithm, restricted to the capped voice pool.
+    // ========================================================================
+    juce::SynthesiserVoice* findVoiceToSteal (juce::SynthesiserSound* /*soundToPlay*/,
+                                               int /*midiChannel*/,
+                                               int /*midiNoteNumber*/) const override
+    {
+        const int limit = voiceLimit;
+
+        juce::SynthesiserVoice* oldestHeld     = nullptr;
+        juce::SynthesiserVoice* oldestReleased = nullptr;
+
+        for (int i = 0; i < limit; ++i)
+        {
+            auto* v = getVoice (i);
+            if (v == nullptr || !v->isVoiceActive())
+                continue;
+
+            if (v->isPlayingButReleased())
+            {
+                // Prefer stealing releasing voices -- they are already fading.
+                if (oldestReleased == nullptr || v->wasStartedBefore (*oldestReleased))
+                    oldestReleased = v;
+            }
+            else
+            {
+                if (oldestHeld == nullptr || v->wasStartedBefore (*oldestHeld))
+                    oldestHeld = v;
+            }
+        }
+
+        // Releasing voice first (least audible). Fall back to oldest held.
+        return oldestReleased != nullptr ? oldestReleased : oldestHeld;
     }
 
 private:
-    int voiceLimit = 16;  // updated each processBlock from APVTS voiceCount
+    int voiceLimit = 16;  // updated each processBlock via setVoiceLimit()
 };
 
 // ============================================================================

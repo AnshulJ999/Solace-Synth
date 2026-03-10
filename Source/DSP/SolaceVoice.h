@@ -174,18 +174,31 @@ struct SolaceVoiceParams
 //     voiceGain = kBaseVoiceGain / sqrt(unisonCount)
 //     Prevents loudness jump when unison is increased (equal-power sum).
 //
-// Signal flow (per sample, Phase 6.6+):
-//   lfoValue = lfo.getNextSample() * lfoAmount      ← per sample, all targets
-//   [Osc pitch targets: LFO multiplier set per block, applied in getNextSample()]
-//   osc1.getNextSample() → osc1s (with pitch LFO baked in if target)
-//   osc2.getNextSample() → osc2s (with pitch LFO baked in if target)
-//   [Osc level targets: scale osc1s/osc2s by (1 + lfoValue)]
-//   blendedOsc = osc1s * (1-mix) + osc2s * mix
-//   filter.setCutoff(baseCutoffHz + filterEnv + [LFO if target 1])
-//   filter.setResonance(baseRes + [LFO if target 7])
-//   filter.processSample(blendedOsc)
-//   * kVoiceGain * velocity * ampEnvVal * [LFO if target 6]
-//     → output buffer
+// Signal flow (per sample, Phase 6.7+ / 6.8 velocity mods):
+//   [Per block] unisonSpread read -> per-voice panL/panR recomputed
+//   [Per block] lfoWaveform/rate/amount/targets read; osc pitch LFO mult set
+//   [Per block] baseCutoffHz, baseResonance, envDepth, oscMix read
+//
+//   [Per sample, inner loop over activeUnisonCount voices]:
+//     osc1/osc2 advance -> apply osc-level LFO if targeted
+//     uMixed = blend(osc1s, osc2s, oscMix)
+//     preFiltL += uMixed * panL[u]    -- pre-filter stereo accumulation
+//     preFiltR += uMixed * panR[u]
+//
+//   [Per sample, after all unison voices]:
+//     filterEnvVal = filterEnvelope.getNextSample()
+//     modulatedCutoff = baseCutoffHz + filterEnvVal*envDepth*kModRange
+//                     + velModCutoffHz + [lfoSample*kLFOCutoffRange if target]
+//     modulatedRes    = jlimit(0,1, baseRes + velModRes + [lfoSample*kLFOResRange if target])
+//     filterL.setCutoff/setResonance(modulatedCutoff, modulatedRes)
+//     filterR.setCutoff/setResonance(modulatedCutoff, modulatedRes)
+//     filteredL = filterL.processSample(preFiltL)
+//     filteredR = filterR.processSample(preFiltR)
+//     ampEnvVal = ampEnvelope.getNextSample()
+//     gainScalar = voiceGain * velocityScale * ampEnvVal * ampMod
+//     sampleL = filteredL * gainScalar  -> outputBuffer channel 0
+//     sampleR = filteredR * gainScalar  -> outputBuffer channel 1
+//     (mono host: 0.5*(sampleL+sampleR) -> channel 0)
 //
 // Architecture rules (audio thread):
 //   - No allocations, no locks, no logging, no I/O.
@@ -251,7 +264,10 @@ public:
         jassert (params.velocityRange      != nullptr);
         jassert (params.velocityModTarget1 != nullptr);
         jassert (params.velocityModTarget2 != nullptr);
-        jassert (params.voiceCount         != nullptr);
+        // Note: params.voiceCount is intentionally NOT asserted here.
+        // It is read by SolaceSynthesiser in processBlock(), not by SolaceVoice.
+        // Keeping it in SolaceVoiceParams is a design symmetry choice only.
+        jassert (params.voiceCount != nullptr);  // still valid: pointer must exist
     }
 
     // ========================================================================

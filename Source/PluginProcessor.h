@@ -7,6 +7,7 @@
 #include "SolaceLogger.h"
 #include "DSP/SolaceVoice.h"
 #include "DSP/SolaceSound.h"
+#include "DSP/SolaceDistortion.h"
 
 // ============================================================================
 // SolaceSynthesiser — juce::Synthesiser subclass with runtime polyphony cap.

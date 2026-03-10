@@ -352,6 +352,18 @@ juce::AudioProcessorValueTreeState::ParameterLayout SolaceSynthProcessor::create
         "Velocity Mod Target 2",
         0, 4, 0));  // default: 0 = None
 
+    // --- Phase 6.9: Master Distortion ---
+    // Applied globally to the stereo mix after all voices have rendered.
+    // tanh soft-clip: y = tanh(k*x) / tanh(k), k = 1 + drive * 9.
+    // Default drive=0.0 leaves sound near-clean. drive=1.0 = heavy saturation.
+    // Processing per-sample ensures correct non-linear behaviour
+    // (applyGain() is linear and can't be used for per-sample saturation).
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (
+        juce::ParameterID { "masterDistortion", 1 },
+        "Master Distortion",
+        juce::NormalisableRange<float> (0.0f, 1.0f, 0.01f),
+        0.0f));  // default: 0.0 = near-clean
+
     return { params.begin(), params.end() };
 }
 
@@ -504,9 +516,27 @@ void SolaceSynthProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     // routes them to SolaceVoice instances, and renders audio for this block.
     synth.renderNextBlock (buffer, midiMessages, 0, buffer.getNumSamples());
 
+    // --- Apply master distortion (Phase 6.9) ---
+    // Soft-clip the mixed audio before the volume stage. Distortion character
+    // changes with signal level, so it must come before the volume scaling.
+    // Process each channel independently (L and R get the same drive, but have
+    // different sample values from stereo unison spread, so outputs differ).
+    const float drive = apvts.getRawParameterValue ("masterDistortion")->load();
+    if (drive > 0.0f)
+    {
+        const int numSamples  = buffer.getNumSamples();
+        const int numChannels = buffer.getNumChannels();
+        for (int ch = 0; ch < numChannels; ++ch)
+        {
+            float* channelData = buffer.getWritePointer (ch);
+            for (int i = 0; i < numSamples; ++i)
+                channelData[i] = SolaceDistortion::processSample (channelData[i], drive);
+        }
+    }
+
     // --- Apply master volume from APVTS ---
     // Get the current (possibly automated) value and scale all channels.
-    auto masterVolume = apvts.getRawParameterValue ("masterVolume")->load();
+    const float masterVolume = apvts.getRawParameterValue ("masterVolume")->load();
 
     for (int channel = 0; channel < getTotalNumOutputChannels(); ++channel)
         buffer.applyGain (channel, 0, buffer.getNumSamples(), masterVolume);

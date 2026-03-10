@@ -68,46 +68,11 @@
                     <div class="sub-section sub-section--osc1" id="section-osc1">
                         <h2 class="section-heading">Oscillator 1</h2>
                         <div class="controls-row controls-row--osc" id="osc1-controls">
-
-                            <div class="waveform-selector" id="osc1-waveform-selector">
-                                <span class="waveform-selector-label">Waveform</span>
-                                <div class="waveform-icon-row" id="osc1-waveform-display" role="button" tabindex="0" aria-label="Oscillator 1 waveform">
-                                    <img class="waveform-icon" src="assets/icons/waveform-sine-icon.svg" alt="Sinewave" id="osc1-waveform-icon">
-                                </div>
-                            </div>
-
-                            <div class="arrow-selector" id="osc1-octave-selector" role="group" aria-label="Oscillator 1 octave">
-                                <span class="arrow-selector-label">Octave</span>
-                                <div class="arrow-selector-row">
-                                    <button class="arrow-selector-btn" id="osc1-octave-prev" aria-label="Decrease octave">
-                                        <img src="assets/icons/chevron-back.svg" alt="" aria-hidden="true">
-                                    </button>
-                                    <span class="arrow-selector-value" id="osc1-octave-value">0</span>
-                                    <button class="arrow-selector-btn" id="osc1-octave-next" aria-label="Increase octave">
-                                        <img src="assets/icons/chevron-forward.svg" alt="" aria-hidden="true">
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div class="arrow-selector" id="osc1-transpose-selector" role="group" aria-label="Oscillator 1 transpose">
-                                <span class="arrow-selector-label">Transpose</span>
-                                <div class="arrow-selector-row">
-                                    <button class="arrow-selector-btn" id="osc1-transpose-prev" aria-label="Decrease transpose">
-                                        <img src="assets/icons/chevron-back.svg" alt="" aria-hidden="true">
-                                    </button>
-                                    <span class="arrow-selector-value" id="osc1-transpose-value">0</span>
-                                    <button class="arrow-selector-btn" id="osc1-transpose-next" aria-label="Increase transpose">
-                                        <img src="assets/icons/chevron-forward.svg" alt="" aria-hidden="true">
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div class="fader fader--standard" id="osc1-tuning-fader">
-                                <span class="fader-label">Tuning</span>
-                                <input class="fader-input" id="osc1Tuning" type="range" min="-100" max="100" step="1" value="0" aria-label="Oscillator 1 tuning">
-                                <span class="fader-value" id="osc1Tuning-value">0</span>
-                            </div>
-
+                            <!-- Components mount here -->
+                            <div id="mount-osc1Waveform"></div>
+                            <div id="mount-osc1Octave"></div>
+                            <div id="mount-osc1Transpose"></div>
+                            <div id="mount-osc1Tuning"></div>
                         </div>
                     </div>
 
@@ -117,12 +82,7 @@
                     <div class="sub-section sub-section--osc-mix" id="section-osc-mix">
                         <h2 class="section-heading">Osc Mix</h2>
                         <div class="controls-row controls-row--center" id="osc-mix-controls">
-                            <div class="fader fader--standard" id="osc-mix-fader">
-                                <span class="fader-label">Osc 2</span>
-                                <input class="fader-input" id="oscMix" type="range" min="0" max="1" step="0.01" value="0.5" aria-label="Oscillator mix">
-                                <span class="fader-value" id="oscMix-value">0.50</span>
-                                <span class="fader-label">Osc 1</span>
-                            </div>
+                            <div id="mount-oscMix"></div>
                         </div>
                     </div>
 
@@ -132,46 +92,11 @@
                     <div class="sub-section sub-section--osc2" id="section-osc2">
                         <h2 class="section-heading">Oscillator 2</h2>
                         <div class="controls-row controls-row--osc" id="osc2-controls">
-
-                            <div class="waveform-selector" id="osc2-waveform-selector">
-                                <span class="waveform-selector-label">Waveform</span>
-                                <div class="waveform-icon-row" id="osc2-waveform-display" role="button" tabindex="0" aria-label="Oscillator 2 waveform">
-                                    <img class="waveform-icon" src="assets/icons/waveform-square-icon.svg" alt="Squarewave" id="osc2-waveform-icon">
-                                </div>
-                            </div>
-
-                            <div class="arrow-selector" id="osc2-octave-selector" role="group" aria-label="Oscillator 2 octave">
-                                <span class="arrow-selector-label">Octave</span>
-                                <div class="arrow-selector-row">
-                                    <button class="arrow-selector-btn" id="osc2-octave-prev" aria-label="Decrease octave">
-                                        <img src="assets/icons/chevron-back.svg" alt="" aria-hidden="true">
-                                    </button>
-                                    <span class="arrow-selector-value" id="osc2-octave-value">1</span>
-                                    <button class="arrow-selector-btn" id="osc2-octave-next" aria-label="Increase octave">
-                                        <img src="assets/icons/chevron-forward.svg" alt="" aria-hidden="true">
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div class="arrow-selector" id="osc2-transpose-selector" role="group" aria-label="Oscillator 2 transpose">
-                                <span class="arrow-selector-label">Transpose</span>
-                                <div class="arrow-selector-row">
-                                    <button class="arrow-selector-btn" id="osc2-transpose-prev" aria-label="Decrease transpose">
-                                        <img src="assets/icons/chevron-back.svg" alt="" aria-hidden="true">
-                                    </button>
-                                    <span class="arrow-selector-value" id="osc2-transpose-value">0</span>
-                                    <button class="arrow-selector-btn" id="osc2-transpose-next" aria-label="Increase transpose">
-                                        <img src="assets/icons/chevron-forward.svg" alt="" aria-hidden="true">
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div class="fader fader--standard" id="osc2-tuning-fader">
-                                <span class="fader-label">Tuning</span>
-                                <input class="fader-input" id="osc2Tuning" type="range" min="-100" max="100" step="1" value="0" aria-label="Oscillator 2 tuning">
-                                <span class="fader-value" id="osc2Tuning-value">0</span>
-                            </div>
-
+                            <!-- Components mount here -->
+                            <div id="mount-osc2Waveform"></div>
+                            <div id="mount-osc2Octave"></div>
+                            <div id="mount-osc2Transpose"></div>
+                            <div id="mount-osc2Tuning"></div>
                         </div>
                     </div>
 
@@ -182,31 +107,10 @@
             <section class="card card--amp-env" id="card-amp-env" aria-label="Amplifier Envelope">
                 <h2 class="section-heading">Amplifier Envelope</h2>
                 <div class="controls-row" id="amp-env-controls">
-
-                    <div class="fader fader--standard" id="amp-attack-fader">
-                        <span class="fader-label">Attack</span>
-                        <input class="fader-input" id="ampAttack" type="range" min="0.001" max="5" step="0.001" value="0.01" aria-label="Amp attack">
-                        <span class="fader-value" id="ampAttack-value">0.01</span>
-                    </div>
-
-                    <div class="fader fader--standard" id="amp-decay-fader">
-                        <span class="fader-label">Decay</span>
-                        <input class="fader-input" id="ampDecay" type="range" min="0.001" max="5" step="0.001" value="0.1" aria-label="Amp decay">
-                        <span class="fader-value" id="ampDecay-value">0.10</span>
-                    </div>
-
-                    <div class="fader fader--standard" id="amp-sustain-fader">
-                        <span class="fader-label">Sustain</span>
-                        <input class="fader-input" id="ampSustain" type="range" min="0" max="1" step="0.01" value="0.8" aria-label="Amp sustain">
-                        <span class="fader-value" id="ampSustain-value">0.80</span>
-                    </div>
-
-                    <div class="fader fader--standard" id="amp-release-fader">
-                        <span class="fader-label">Release</span>
-                        <input class="fader-input" id="ampRelease" type="range" min="0.001" max="10" step="0.001" value="0.3" aria-label="Amp release">
-                        <span class="fader-value" id="ampRelease-value">0.30</span>
-                    </div>
-
+                    <div id="mount-ampAttack"></div>
+                    <div id="mount-ampDecay"></div>
+                    <div id="mount-ampSustain"></div>
+                    <div id="mount-ampRelease"></div>
                 </div>
             </section>
 
@@ -214,19 +118,8 @@
             <section class="card card--master" id="card-master" aria-label="Master">
                 <h2 class="section-heading">Master</h2>
                 <div class="controls-row" id="master-controls">
-
-                    <div class="fader fader--standard" id="master-distortion-fader">
-                        <span class="fader-label">Distortion</span>
-                        <input class="fader-input" id="masterDistortion" type="range" min="0" max="1" step="0.01" value="0" aria-label="Master distortion">
-                        <span class="fader-value" id="masterDistortion-value">0.00</span>
-                    </div>
-
-                    <div class="fader fader--standard" id="master-level-fader">
-                        <span class="fader-label">Level</span>
-                        <input class="fader-input" id="masterVolume" type="range" min="0" max="1" step="0.01" value="0.8" aria-label="Master level">
-                        <span class="fader-value" id="masterVolume-value">0.80</span>
-                    </div>
-
+                    <div id="mount-masterDistortion"></div>
+                    <div id="mount-masterVolume"></div>
                 </div>
             </section>
 
@@ -243,19 +136,8 @@
                     <div class="sub-section sub-section--filter" id="section-filter">
                         <h2 class="section-heading">Filter</h2>
                         <div class="controls-row" id="filter-controls">
-
-                            <div class="fader fader--big" id="filter-cutoff-fader">
-                                <span class="fader-label">Cutoff</span>
-                                <input class="fader-input" id="filterCutoff" type="range" min="20" max="20000" step="1" value="20000" aria-label="Filter cutoff">
-                                <span class="fader-value" id="filterCutoff-value">20k</span>
-                            </div>
-
-                            <div class="fader fader--big" id="filter-resonance-fader">
-                                <span class="fader-label">Resonance</span>
-                                <input class="fader-input" id="filterResonance" type="range" min="0" max="1" step="0.01" value="0" aria-label="Filter resonance">
-                                <span class="fader-value" id="filterResonance-value">0.00</span>
-                            </div>
-
+                            <div id="mount-filterCutoff"></div>
+                            <div id="mount-filterResonance"></div>
                         </div>
                     </div>
 
@@ -265,62 +147,24 @@
                     <div class="sub-section sub-section--filter-cfg" id="section-filter-config">
                         <h2 class="section-heading">Filter Configuration</h2>
 
-                        <!-- Column: type selector on top, then env faders row below -->
+                        <!-- Column: type row on top, env faders below -->
                         <div class="controls-row--col" id="filter-cfg-inner">
 
-                            <!-- Filter Type + Env Depth row -->
-                            <div class="controls-row" id="filter-type-depth-row">
-
-                                <div class="arrow-selector" id="filter-type-selector" role="group" aria-label="Filter type">
-                                    <span class="arrow-selector-label">Filter Type</span>
-                                    <div class="arrow-selector-row">
-                                        <button class="arrow-selector-btn" id="filter-type-prev" aria-label="Previous filter type">
-                                            <img src="assets/icons/chevron-back.svg" alt="" aria-hidden="true">
-                                        </button>
-                                        <span class="arrow-selector-value" id="filterType-value">LP 24 dB</span>
-                                        <button class="arrow-selector-btn" id="filter-type-next" aria-label="Next filter type">
-                                            <img src="assets/icons/chevron-forward.svg" alt="" aria-hidden="true">
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <!-- filterEnvDepth — HIDDEN: not in Figma design (confirmed 2026-03-09).
-                                     Keeping element + binding for when/if Nabeel adds it to design. -->
-                                <div class="fader fader--small fader--bipolar" id="filter-env-depth-fader" hidden>
-                                    <span class="fader-label">Env Depth</span>
-                                    <input class="fader-input" id="filterEnvDepth" type="range" min="-1" max="1" step="0.01" value="0" aria-label="Filter envelope depth">
-                                    <span class="fader-value" id="filterEnvDepth-value">0.00</span>
-                                </div>
-
+                            <!-- Filter Type  +  filterEnvDepth (hidden — not in Figma design) -->
+                            <div class="controls-row" id="filter-type-row">
+                                <div id="mount-filterType"></div>
+                                <!-- filterEnvDepth HIDDEN: not in Figma design (confirmed 2026-03-09).
+                                     Component still mounts + bridge listener registered.
+                                     Unhide only when Nabeel adds it to the design. -->
+                                <div id="mount-filterEnvDepth" hidden></div>
                             </div>
 
-                            <!-- Filter Envelope ADSR — horizontal row -->
+                            <!-- Filter Envelope ADSR — horizontal row of small faders -->
                             <div class="filter-cfg-env-row" id="filter-env-controls">
-
-                                <div class="fader fader--small" id="fenv-attack-fader">
-                                    <span class="fader-label">Attack</span>
-                                    <input class="fader-input" id="filterEnvAttack" type="range" min="0.001" max="5" step="0.001" value="0.01" aria-label="Filter envelope attack">
-                                    <span class="fader-value" id="filterEnvAttack-value">0.01</span>
-                                </div>
-
-                                <div class="fader fader--small" id="fenv-decay-fader">
-                                    <span class="fader-label">Decay</span>
-                                    <input class="fader-input" id="filterEnvDecay" type="range" min="0.001" max="5" step="0.001" value="0.3" aria-label="Filter envelope decay">
-                                    <span class="fader-value" id="filterEnvDecay-value">0.30</span>
-                                </div>
-
-                                <div class="fader fader--small" id="fenv-sustain-fader">
-                                    <span class="fader-label">Sustain</span>
-                                    <input class="fader-input" id="filterEnvSustain" type="range" min="0" max="1" step="0.01" value="0" aria-label="Filter envelope sustain">
-                                    <span class="fader-value" id="filterEnvSustain-value">0.00</span>
-                                </div>
-
-                                <div class="fader fader--small" id="fenv-release-fader">
-                                    <span class="fader-label">Release</span>
-                                    <input class="fader-input" id="filterEnvRelease" type="range" min="0.001" max="10" step="0.001" value="0.3" aria-label="Filter envelope release">
-                                    <span class="fader-value" id="filterEnvRelease-value">0.30</span>
-                                </div>
-
+                                <div id="mount-filterEnvAttack"></div>
+                                <div id="mount-filterEnvDecay"></div>
+                                <div id="mount-filterEnvSustain"></div>
+                                <div id="mount-filterEnvRelease"></div>
                             </div>
 
                         </div>
@@ -335,44 +179,22 @@
 
                 <div class="controls-row" id="lfo-controls">
 
-                    <!-- Left column: waveform + targets -->
+                    <!-- Left column: waveform selector + target dropdowns -->
                     <div class="lfo-left-col">
-                        <div class="waveform-selector" id="lfo-waveform-selector">
-                            <span class="waveform-selector-label">Waveform</span>
-                            <div class="waveform-icon-row" id="lfo-waveform-display" role="button" tabindex="0" aria-label="LFO waveform">
-                                <img class="waveform-icon" src="assets/icons/waveform-sine-icon.svg" alt="Sinewave" id="lfo-waveform-icon">
-                            </div>
-                        </div>
+                        <div id="mount-lfoWaveform"></div>
 
                         <div class="dropdown-group">
                             <span class="dropdown-group-label">LFO Targets</span>
-                            <div class="dropdown" id="lfoTarget1-dropdown" role="button" tabindex="0" aria-label="LFO Target 1">
-                                <span class="dropdown-label" id="lfoTarget1-value">Filter - Cutoff</span>
-                                <img class="dropdown-arrow" src="assets/icons/arrow-dropdown.svg" alt="" aria-hidden="true">
-                            </div>
-                            <div class="dropdown" id="lfoTarget2-dropdown" role="button" tabindex="0" aria-label="LFO Target 2">
-                                <span class="dropdown-label" id="lfoTarget2-value">Osc 2 - Level</span>
-                                <img class="dropdown-arrow" src="assets/icons/arrow-dropdown.svg" alt="" aria-hidden="true">
-                            </div>
-                            <div class="dropdown" id="lfoTarget3-dropdown" role="button" tabindex="0" aria-label="LFO Target 3">
-                                <span class="dropdown-label" id="lfoTarget3-value">None</span>
-                                <img class="dropdown-arrow" src="assets/icons/arrow-dropdown.svg" alt="" aria-hidden="true">
-                            </div>
+                            <div id="mount-lfoTarget1"></div>
+                            <div id="mount-lfoTarget2"></div>
+                            <div id="mount-lfoTarget3"></div>
                         </div>
                     </div>
 
                     <!-- Right: Amount + Rate faders -->
                     <div class="lfo-faders">
-                        <div class="fader fader--big" id="lfo-amount-fader">
-                            <span class="fader-label">Amount</span>
-                            <input class="fader-input" id="lfoAmount" type="range" min="0" max="1" step="0.01" value="0" aria-label="LFO amount">
-                            <span class="fader-value" id="lfoAmount-value">0.00</span>
-                        </div>
-                        <div class="fader fader--big" id="lfo-rate-fader">
-                            <span class="fader-label">Rate</span>
-                            <input class="fader-input" id="lfoRate" type="range" min="0.01" max="50" step="0.01" value="1" aria-label="LFO rate">
-                            <span class="fader-value" id="lfoRate-value">1.00</span>
-                        </div>
+                        <div id="mount-lfoAmount"></div>
+                        <div id="mount-lfoRate"></div>
                     </div>
 
                 </div>
@@ -384,55 +206,20 @@
 
                 <div class="voicing-inner">
 
-                    <!-- Selectors + dropdowns -->
+                    <!-- Left: voice/unison selectors + vel mod dropdowns -->
                     <div class="voicing-selectors">
-
-                        <div class="arrow-selector" id="voice-count-selector" role="group" aria-label="Number of voices">
-                            <span class="arrow-selector-label">No. of Voices</span>
-                            <div class="arrow-selector-row">
-                                <button class="arrow-selector-btn" id="voice-count-prev" aria-label="Decrease voices">
-                                    <img src="assets/icons/chevron-back.svg" alt="" aria-hidden="true">
-                                </button>
-                                <span class="arrow-selector-value" id="voiceCount-value">16</span>
-                                <button class="arrow-selector-btn" id="voice-count-next" aria-label="Increase voices">
-                                    <img src="assets/icons/chevron-forward.svg" alt="" aria-hidden="true">
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="arrow-selector" id="unison-selector" role="group" aria-label="Unison voices">
-                            <span class="arrow-selector-label">Unison</span>
-                            <div class="arrow-selector-row">
-                                <button class="arrow-selector-btn" id="unison-prev" aria-label="Decrease unison">
-                                    <img src="assets/icons/chevron-back.svg" alt="" aria-hidden="true">
-                                </button>
-                                <span class="arrow-selector-value" id="unisonCount-value">1</span>
-                                <button class="arrow-selector-btn" id="unison-next" aria-label="Increase unison">
-                                    <img src="assets/icons/chevron-forward.svg" alt="" aria-hidden="true">
-                                </button>
-                            </div>
-                        </div>
+                        <div id="mount-voiceCount"></div>
+                        <div id="mount-unisonCount"></div>
 
                         <div class="dropdown-group">
                             <span class="dropdown-group-label">Velocity Mod Targets</span>
-                            <div class="dropdown" id="velModTarget1-dropdown" role="button" tabindex="0" aria-label="Velocity Mod Target 1">
-                                <span class="dropdown-label" id="velocityModTarget1-value">Amp - Attack</span>
-                                <img class="dropdown-arrow" src="assets/icons/arrow-dropdown.svg" alt="" aria-hidden="true">
-                            </div>
-                            <div class="dropdown" id="velModTarget2-dropdown" role="button" tabindex="0" aria-label="Velocity Mod Target 2">
-                                <span class="dropdown-label" id="velocityModTarget2-value">None</span>
-                                <img class="dropdown-arrow" src="assets/icons/arrow-dropdown.svg" alt="" aria-hidden="true">
-                            </div>
+                            <div id="mount-velocityModTarget1"></div>
+                            <div id="mount-velocityModTarget2"></div>
                         </div>
-
                     </div>
 
-                    <!-- Velocity fader -->
-                    <div class="fader fader--big" id="velocity-fader">
-                        <span class="fader-label">Velocity</span>
-                        <input class="fader-input" id="velocityRange" type="range" min="0" max="1" step="0.01" value="1" aria-label="Velocity range">
-                        <span class="fader-value" id="velocityRange-value">1.00</span>
-                    </div>
+                    <!-- Right: velocity range fader -->
+                    <div id="mount-velocityRange"></div>
 
                 </div>
             </section>
@@ -450,6 +237,10 @@
 </div>
 
 <script src="bridge.js"></script>
+<script src="components/fader.js"></script>
+<script src="components/arrow-selector.js"></script>
+<script src="components/waveform-selector.js"></script>
+<script src="components/dropdown.js"></script>
 <script src="main.js"></script>
 
 </body>

@@ -1,21 +1,23 @@
 /* ============================================================================
- * Solace Synth — Main UI Logic
- * Phase 7.2 rev 2: Fixed LFO enum ordering, added filterEnvDepth, fixed defaults
+ * Solace Synth — Main UI Orchestrator
+ * Phase 7.3: Component-based architecture
  *
  * Responsibilities:
- *   - Bridge initialization
- *   - Bind all parameter controls (faders, arrow selectors, waveform selectors, dropdowns)
- *   - Handle C++ → JS parameterChanged events to keep UI in sync
+ *   - Bridge initialization + status indicator
+ *   - Instantiate and mount all UI components into their mount-point divs
  *   - Debug panel toggle (Ctrl+Shift+D)
- *   - Status indicator updates
+ *   - Application-level logging
  *
+ * Components handle all parameter binding internally.
  * Source of truth: C++ APVTS. JS reflects and requests — never owns state.
  *
- * LFO target enum (verified against synth-project-memory.md line 397):
+ * LFO target enum (⚠️ PENDING RECONCILIATION with Vision Document.
+ *   Current values match old synth-project-memory spec, NOT Vision Doc answer 5.
+ *   Do NOT wire DSP LFO until Anshul confirms the target list.):
  *   0=None, 1=FilterCutoff, 2=Osc1Pitch, 3=Osc2Pitch,
  *   4=Osc1Level, 5=Osc2Level, 6=AmpLevel, 7=FilterResonance
  *
- * Velocity mod target enum (verified against synth-project-memory.md line 398):
+ * Velocity mod target enum (⚠️ same pending status):
  *   0=None, 1=AmpLevel, 2=AmpAttack, 3=FilterCutoff, 4=FilterResonance
  * ============================================================================ */
 
@@ -23,69 +25,11 @@
     "use strict";
 
     // =========================================================================
-    // Constants
+    // Logging
     // =========================================================================
     const LOG = { TRACE: 0, DEBUG: 1, INFO: 2, WARN: 3, ERROR: 4 };
     const MAX_LOG_ENTRIES = 100;
 
-    // =========================================================================
-    // Waveform icon definitions
-    // Sawtooth + Triangle now have proper SVGs (still placeholders until Nabeel
-    // provides the Figma originals, but they render correctly).
-    // =========================================================================
-    const OSC_WAVEFORMS = [
-        { value: 0, label: "Sine",     icon: "assets/icons/waveform-sine-icon.svg",     alt: "Sine wave"     },
-        { value: 1, label: "Sawtooth", icon: "assets/icons/waveform-sawtooth-icon.svg", alt: "Sawtooth wave" },
-        { value: 2, label: "Square",   icon: "assets/icons/waveform-square-icon.svg",   alt: "Square wave"   },
-        { value: 3, label: "Triangle", icon: "assets/icons/waveform-triangle-icon.svg", alt: "Triangle wave" },
-    ];
-
-    const LFO_WAVEFORMS = [
-        { value: 0, label: "Sine",     icon: "assets/icons/waveform-sine-icon.svg",     alt: "Sine wave"       },
-        { value: 1, label: "Triangle", icon: "assets/icons/waveform-triangle-icon.svg", alt: "Triangle wave"   },
-        { value: 2, label: "Sawtooth", icon: "assets/icons/waveform-sawtooth-icon.svg", alt: "Sawtooth wave"   },
-        { value: 3, label: "Square",   icon: "assets/icons/waveform-square-icon.svg",   alt: "Square wave"     },
-        { value: 4, label: "S&H",      icon: "assets/icons/waveform-sh-icon.svg",       alt: "Sample and Hold" },
-    ];
-
-    // =========================================================================
-    // Enum option lists — values match APVTS integer parameters exactly
-    // =========================================================================
-    const FILTER_TYPES = [
-        { value: 0, label: "LP 12 dB" },
-        { value: 1, label: "LP 24 dB" },
-        { value: 2, label: "HP 12 dB" },
-    ];
-
-    // LFO targets — order confirmed: synth-project-memory.md line 397
-    const LFO_TARGET_OPTIONS = [
-        { value: 0, label: "None"               },
-        { value: 1, label: "Filter - Cutoff"    },
-        { value: 2, label: "Osc 1 - Pitch"      },
-        { value: 3, label: "Osc 2 - Pitch"      },
-        { value: 4, label: "Osc 1 - Level"      },
-        { value: 5, label: "Osc 2 - Level"      },
-        { value: 6, label: "Amp - Level"         },
-        { value: 7, label: "Filter - Resonance" },
-    ];
-
-    // Velocity mod targets — order confirmed: synth-project-memory.md line 398
-    const VEL_MOD_TARGET_OPTIONS = [
-        { value: 0, label: "None"               },
-        { value: 1, label: "Amp - Level"         },
-        { value: 2, label: "Amp - Attack"        },
-        { value: 3, label: "Filter - Cutoff"    },
-        { value: 4, label: "Filter - Resonance" },
-    ];
-
-    // =========================================================================
-    // State
-    // =========================================================================
-    let isUpdatingFromCpp = false;
-
-    // =========================================================================
-    // Logging
-    // =========================================================================
     const debugLog = document.getElementById("debug-log");
 
     const log = (level, message) => {
@@ -96,7 +40,10 @@
 
         const entry = document.createElement("div");
         entry.className = `log-entry ${css[level] ?? ""}`;
-        const ts = new Date().toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit", fractionalSecondDigits: 2 });
+        const ts = new Date().toLocaleTimeString("en-US", {
+            hour12: false, hour: "2-digit", minute: "2-digit",
+            second: "2-digit", fractionalSecondDigits: 2,
+        });
         entry.textContent = `[${ts}] [${labels[level]}] ${message}`;
         debugLog.appendChild(entry);
 
@@ -110,11 +57,10 @@
         }
     };
 
-    const logTrace = (m) => log(LOG.TRACE, m);
-    const logDebug = (m) => log(LOG.DEBUG, m);
     const logInfo  = (m) => log(LOG.INFO,  m);
     const logWarn  = (m) => log(LOG.WARN,  m);
     const logError = (m) => log(LOG.ERROR, m);
+    const logDebug = (m) => log(LOG.DEBUG, m);
 
     // =========================================================================
     // Status indicator
@@ -126,8 +72,8 @@
         if (statusText) statusText.textContent = text;
         if (!statusDot) return;
         statusDot.className = "status-dot";
-        if (state === "connected") statusDot.classList.add("status-dot--connected");
-        if (state === "error")     statusDot.classList.add("status-dot--error");
+        if (state === "connected")    statusDot.classList.add("status-dot--connected");
+        if (state === "error")        statusDot.classList.add("status-dot--error");
     };
 
     // =========================================================================
@@ -143,286 +89,187 @@
     });
 
     // =========================================================================
-    // bindFader
-    // Connects a <input type="range"> to an APVTS paramId via the bridge.
-    // formatFn: optional fn(value) → string for the value display.
+    // Option arrays
     // =========================================================================
-    const bindFader = (paramId, formatFn) => {
-        const input   = document.getElementById(paramId);
-        const display = document.getElementById(`${paramId}-value`);
 
-        if (!input) {
-            logWarn(`bindFader: #${paramId} not found in DOM`);
-            return;
-        }
+    const OSC_WAVEFORMS = [
+        { value: 0, label: "Sine",     icon: "assets/icons/waveform-sine-icon.svg",     alt: "Sine wave"     },
+        { value: 1, label: "Sawtooth", icon: "assets/icons/waveform-sawtooth-icon.svg", alt: "Sawtooth wave" },
+        { value: 2, label: "Square",   icon: "assets/icons/waveform-square-icon.svg",   alt: "Square wave"   },
+        { value: 3, label: "Triangle", icon: "assets/icons/waveform-triangle-icon.svg", alt: "Triangle wave" },
+    ];
 
-        const fmt = formatFn ?? ((v) => parseFloat(v).toFixed(2));
+    const LFO_WAVEFORMS = [
+        { value: 0, label: "Sine",     icon: "assets/icons/waveform-sine-icon.svg",     alt: "Sine wave"       },
+        { value: 1, label: "Triangle", icon: "assets/icons/waveform-triangle-icon.svg", alt: "Triangle wave"   },
+        { value: 2, label: "Sawtooth", icon: "assets/icons/waveform-sawtooth-icon.svg", alt: "Sawtooth wave"   },
+        { value: 3, label: "Square",   icon: "assets/icons/waveform-square-icon.svg",   alt: "Square wave"     },
+        { value: 4, label: "S&H",      icon: "assets/icons/waveform-sh-icon.svg",       alt: "Sample and Hold" },
+    ];
 
-        input.addEventListener("input", (e) => {
-            if (isUpdatingFromCpp) return;
-            const val = parseFloat(e.target.value);
-            logTrace(`fader ${paramId} → ${val}`);
-            if (display) display.textContent = fmt(val);
-            SolaceBridge.setParameter(paramId, val);
-        });
+    const FILTER_TYPES = [
+        { value: 0, label: "LP 12 dB" },
+        { value: 1, label: "LP 24 dB" },
+        { value: 2, label: "HP 12 dB" },
+    ];
 
-        SolaceBridge.onParameterChanged(paramId, (val) => {
-            logTrace(`C++ → ${paramId} = ${val}`);
-            isUpdatingFromCpp = true;
-            input.value = val;
-            if (display) display.textContent = fmt(val);
-            isUpdatingFromCpp = false;
-        });
+    const OCTAVE_OPTIONS     = [-3,-2,-1,0,1,2,3].map(v => ({ value: v, label: String(v) }));
+    const TRANSPOSE_OPTIONS  = Array.from({ length: 25 }, (_, i) => ({ value: i - 12, label: String(i - 12) }));
+    const VOICE_COUNT_OPTIONS= Array.from({ length: 16 }, (_, i) => ({ value: i + 1, label: String(i + 1) }));
+    const UNISON_OPTIONS     = Array.from({ length: 8  }, (_, i) => ({ value: i + 1, label: String(i + 1) }));
+
+    // ⚠️ PENDING: These enums do not match Vision Document answer 5.
+    //    Leaving unchanged until Anshul/Nabeel confirm the final target list.
+    const LFO_TARGET_OPTIONS = [
+        { value: 0, label: "None"              },
+        { value: 1, label: "Filter - Cutoff"   },
+        { value: 2, label: "Osc 1 - Pitch"     },
+        { value: 3, label: "Osc 2 - Pitch"     },
+        { value: 4, label: "Osc 1 - Level"     },
+        { value: 5, label: "Osc 2 - Level"     },
+        { value: 6, label: "Amp - Level"        },
+        { value: 7, label: "Filter - Resonance"},
+    ];
+
+    const VEL_MOD_TARGET_OPTIONS = [
+        { value: 0, label: "None"              },
+        { value: 1, label: "Amp - Level"        },
+        { value: 2, label: "Amp - Attack"       },
+        { value: 3, label: "Filter - Cutoff"   },
+        { value: 4, label: "Filter - Resonance"},
+    ];
+
+    // =========================================================================
+    // Helper: get mount element, warn if missing
+    // =========================================================================
+    const mount = (id) => {
+        const el = document.getElementById(id);
+        if (!el) logWarn(`mount point #${id} not found`);
+        return el;
     };
 
     // =========================================================================
-    // bindWaveformSelector
-    // Click cycles through waveforms, updating icon + sending param to C++.
+    // Mount all components
+    // Called before signalUiReady so bridge listeners are registered
+    // before C++ sends the initial syncAllParameters.
     // =========================================================================
-    const bindWaveformSelector = (paramId, iconId, waveforms, defaultIndex = 0) => {
-        const iconEl = document.getElementById(iconId);
-        if (!iconEl) {
-            logWarn(`bindWaveformSelector: #${iconId} not found`);
-            return;
-        }
-
-        const row = iconEl.closest(".waveform-icon-row");
-        let currentIndex = defaultIndex;
-
-        const apply = (index) => {
-            currentIndex = ((index % waveforms.length) + waveforms.length) % waveforms.length;
-            const wf = waveforms[currentIndex];
-            iconEl.src = wf.icon;
-            iconEl.alt = wf.alt;
-        };
-
-        const handleActivate = () => {
-            if (isUpdatingFromCpp) return;
-            apply(currentIndex + 1);
-            SolaceBridge.setParameter(paramId, waveforms[currentIndex].value);
-            logTrace(`${paramId} → ${waveforms[currentIndex].label}`);
-        };
-
-        row?.addEventListener("click", handleActivate);
-        row?.addEventListener("keydown", (e) => {
-            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleActivate(); }
-        });
-
-        SolaceBridge.onParameterChanged(paramId, (val) => {
-            isUpdatingFromCpp = true;
-            apply(Math.round(val));
-            isUpdatingFromCpp = false;
-        });
-
-        apply(defaultIndex);
-    };
-
-    // =========================================================================
-    // bindArrowSelector
-    // Prev/next buttons step through an options array.
-    // =========================================================================
-    const bindArrowSelector = (paramId, options, displayId, prevBtnId, nextBtnId, defaultIndex = 0) => {
-        const display = document.getElementById(displayId);
-        const prevBtn = document.getElementById(prevBtnId);
-        const nextBtn = document.getElementById(nextBtnId);
-
-        if (!display || !prevBtn || !nextBtn) {
-            logWarn(`bindArrowSelector: missing elements for ${paramId}`);
-            return;
-        }
-
-        let currentIndex = defaultIndex;
-
-        const apply = (index) => {
-            currentIndex = ((index % options.length) + options.length) % options.length;
-            display.textContent = options[currentIndex].label;
-        };
-
-        prevBtn.addEventListener("click", () => {
-            if (isUpdatingFromCpp) return;
-            apply(currentIndex - 1);
-            SolaceBridge.setParameter(paramId, options[currentIndex].value);
-            logTrace(`${paramId} ← ${options[currentIndex].label}`);
-        });
-
-        nextBtn.addEventListener("click", () => {
-            if (isUpdatingFromCpp) return;
-            apply(currentIndex + 1);
-            SolaceBridge.setParameter(paramId, options[currentIndex].value);
-            logTrace(`${paramId} → ${options[currentIndex].label}`);
-        });
-
-        SolaceBridge.onParameterChanged(paramId, (val) => {
-            const idx = options.findIndex(o => o.value === Math.round(val));
-            if (idx >= 0) {
-                isUpdatingFromCpp = true;
-                apply(idx);
-                isUpdatingFromCpp = false;
-            }
-        });
-
-        apply(defaultIndex);
-    };
-
-    // =========================================================================
-    // bindDropdown
-    // Click cycles through options (full dropdown popup deferred to Phase 7.3).
-    // =========================================================================
-    const bindDropdown = (paramId, options, dropdownId, displayId, defaultIndex = 0) => {
-        const dropdown = document.getElementById(dropdownId);
-        const display  = document.getElementById(displayId);
-
-        if (!dropdown || !display) {
-            logWarn(`bindDropdown: missing elements for ${paramId}`);
-            return;
-        }
-
-        let currentIndex = defaultIndex;
-
-        const apply = (index) => {
-            currentIndex = ((index % options.length) + options.length) % options.length;
-            display.textContent = options[currentIndex].label;
-        };
-
-        const handleActivate = () => {
-            if (isUpdatingFromCpp) return;
-            apply(currentIndex + 1);
-            SolaceBridge.setParameter(paramId, options[currentIndex].value);
-            logTrace(`${paramId} → ${options[currentIndex].label}`);
-        };
-
-        dropdown.addEventListener("click", handleActivate);
-        dropdown.addEventListener("keydown", (e) => {
-            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleActivate(); }
-        });
-
-        SolaceBridge.onParameterChanged(paramId, (val) => {
-            const idx = options.findIndex(o => o.value === Math.round(val));
-            if (idx >= 0) {
-                isUpdatingFromCpp = true;
-                apply(idx);
-                isUpdatingFromCpp = false;
-            }
-        });
-
-        apply(defaultIndex);
-    };
-
-    // =========================================================================
-    // Formatters
-    // =========================================================================
-    const fmtFreq    = (v) => v >= 1000 ? `${(v / 1000).toFixed(2)}k` : `${Math.round(v)}`;
-    const fmtSemis   = (v) => `${Math.round(v)}`;
-    const fmtSeconds = (v) => parseFloat(v).toFixed(3);
-    const fmtBipolar = (v) => parseFloat(v).toFixed(2);   // filterEnvDepth shows e.g. "+0.50" or "-0.75"
-
-    // =========================================================================
-    // Bind all controls
-    // =========================================================================
-    const bindAllControls = () => {
+    const mountAllComponents = () => {
 
         // --- Oscillator 1 ---
-        bindWaveformSelector("osc1Waveform", "osc1-waveform-icon", OSC_WAVEFORMS, 0);
-        bindArrowSelector(
-            "osc1Octave",
-            [-3,-2,-1,0,1,2,3].map(v => ({ value: v, label: String(v) })),
-            "osc1-octave-value", "osc1-octave-prev", "osc1-octave-next",
-            3   // default index 3 → value 0
-        );
-        bindArrowSelector(
-            "osc1Transpose",
-            Array.from({ length: 25 }, (_, i) => ({ value: i - 12, label: String(i - 12) })),
-            "osc1-transpose-value", "osc1-transpose-prev", "osc1-transpose-next",
-            12  // default index 12 → value 0
-        );
-        bindFader("osc1Tuning", fmtSemis);
+        new WaveformSelector("osc1Waveform", OSC_WAVEFORMS, { defaultIndex: 0, showArrows: false })
+            .mount(mount("mount-osc1Waveform"));
+
+        new ArrowSelector("osc1Octave", OCTAVE_OPTIONS, { label: "Octave", ariaLabel: "Oscillator 1 octave", defaultIndex: 3 })
+            .mount(mount("mount-osc1Octave"));   // defaultIndex 3 → value 0
+
+        new ArrowSelector("osc1Transpose", TRANSPOSE_OPTIONS, { label: "Transpose", ariaLabel: "Oscillator 1 transpose", defaultIndex: 12 })
+            .mount(mount("mount-osc1Transpose")); // defaultIndex 12 → value 0
+
+        new Fader("osc1Tuning", {
+            label: "Tuning", min: -100, max: 100, step: 1, defaultValue: 0,
+            formatFn: v => Math.round(v).toString(), sizeClass: "fader--standard",
+        }).mount(mount("mount-osc1Tuning"));
 
         // --- Osc Mix ---
-        bindFader("oscMix");
+        new Fader("oscMix", {
+            label: "Osc 2", bottomLabel: "Osc 1",
+            min: 0, max: 1, step: 0.01, defaultValue: 0.5,
+            sizeClass: "fader--standard",
+        }).mount(mount("mount-oscMix"));
 
         // --- Oscillator 2 ---
-        bindWaveformSelector("osc2Waveform", "osc2-waveform-icon", OSC_WAVEFORMS, 2);  // default: Square
-        bindArrowSelector(
-            "osc2Octave",
-            [-3,-2,-1,0,1,2,3].map(v => ({ value: v, label: String(v) })),
-            "osc2-octave-value", "osc2-octave-prev", "osc2-octave-next",
-            4   // default index 4 → value 1
-        );
-        bindArrowSelector(
-            "osc2Transpose",
-            Array.from({ length: 25 }, (_, i) => ({ value: i - 12, label: String(i - 12) })),
-            "osc2-transpose-value", "osc2-transpose-prev", "osc2-transpose-next",
-            12  // default 0
-        );
-        bindFader("osc2Tuning", fmtSemis);
+        new WaveformSelector("osc2Waveform", OSC_WAVEFORMS, { defaultIndex: 2, showArrows: false }) // default: Square
+            .mount(mount("mount-osc2Waveform"));
+
+        new ArrowSelector("osc2Octave", OCTAVE_OPTIONS, { label: "Octave", ariaLabel: "Oscillator 2 octave", defaultIndex: 4 })
+            .mount(mount("mount-osc2Octave"));   // defaultIndex 4 → value 1
+
+        new ArrowSelector("osc2Transpose", TRANSPOSE_OPTIONS, { label: "Transpose", ariaLabel: "Oscillator 2 transpose", defaultIndex: 12 })
+            .mount(mount("mount-osc2Transpose"));
+
+        new Fader("osc2Tuning", {
+            label: "Tuning", min: -100, max: 100, step: 1, defaultValue: 0,
+            formatFn: v => Math.round(v).toString(), sizeClass: "fader--standard",
+        }).mount(mount("mount-osc2Tuning"));
 
         // --- Amplifier Envelope ---
-        bindFader("ampAttack",  fmtSeconds);
-        bindFader("ampDecay",   fmtSeconds);
-        bindFader("ampSustain");
-        bindFader("ampRelease", fmtSeconds);
+        const fmtSec = v => parseFloat(v).toFixed(3);
+        new Fader("ampAttack",  { label: "Attack",  min: 0.001, max: 5,  step: 0.001, defaultValue: 0.01, formatFn: fmtSec, sizeClass: "fader--standard" }).mount(mount("mount-ampAttack"));
+        new Fader("ampDecay",   { label: "Decay",   min: 0.001, max: 5,  step: 0.001, defaultValue: 0.1,  formatFn: fmtSec, sizeClass: "fader--standard" }).mount(mount("mount-ampDecay"));
+        new Fader("ampSustain", { label: "Sustain", min: 0,     max: 1,  step: 0.01,  defaultValue: 0.8,  sizeClass: "fader--standard" }).mount(mount("mount-ampSustain"));
+        new Fader("ampRelease", { label: "Release", min: 0.001, max: 10, step: 0.001, defaultValue: 0.3,  formatFn: fmtSec, sizeClass: "fader--standard" }).mount(mount("mount-ampRelease"));
 
         // --- Master ---
-        bindFader("masterDistortion");
-        bindFader("masterVolume");
+        new Fader("masterDistortion", { label: "Distortion", min: 0, max: 1, step: 0.01, defaultValue: 0,   sizeClass: "fader--standard" }).mount(mount("mount-masterDistortion"));
+        new Fader("masterVolume",     { label: "Level",      min: 0, max: 1, step: 0.01, defaultValue: 0.8, sizeClass: "fader--standard" }).mount(mount("mount-masterVolume"));
 
         // --- Filter ---
-        bindFader("filterCutoff", fmtFreq);
-        bindFader("filterResonance");
+        const fmtFreq = v => v >= 1000 ? `${(v / 1000).toFixed(2)}k` : `${Math.round(v)}`;
+        new Fader("filterCutoff",    { label: "Cutoff",    min: 20,  max: 20000, step: 1,    defaultValue: 20000, formatFn: fmtFreq, sizeClass: "fader--big" }).mount(mount("mount-filterCutoff"));
+        new Fader("filterResonance", { label: "Resonance", min: 0,   max: 1,     step: 0.01, defaultValue: 0,     sizeClass: "fader--big" }).mount(mount("mount-filterResonance"));
 
         // --- Filter Configuration ---
-        bindArrowSelector(
-            "filterType",
-            FILTER_TYPES,
-            "filterType-value", "filter-type-prev", "filter-type-next",
-            1   // default: LP 24 dB
-        );
-        bindFader("filterEnvDepth",   fmtBipolar);  // Phase 6.4 bipolar (-1 → +1)
-        bindFader("filterEnvAttack",  fmtSeconds);
-        bindFader("filterEnvDecay",   fmtSeconds);
-        bindFader("filterEnvSustain");
-        bindFader("filterEnvRelease", fmtSeconds);
+        new ArrowSelector("filterType", FILTER_TYPES, { label: "Filter Type", ariaLabel: "Filter type", defaultIndex: 1 }) // default: LP 24 dB
+            .mount(mount("mount-filterType"));
+
+        // filterEnvDepth — mounts into a hidden div; bridge listener registered but invisible.
+        // Unhide #mount-filterEnvDepth only when Nabeel adds it to the Figma design.
+        new Fader("filterEnvDepth", {
+            label: "Env Depth", min: -1, max: 1, step: 0.01, defaultValue: 0,
+            sizeClass: "fader--small", extraClass: "fader--bipolar",
+        }).mount(mount("mount-filterEnvDepth"));
+
+        new Fader("filterEnvAttack",  { label: "Attack",  min: 0.001, max: 5,  step: 0.001, defaultValue: 0.01, formatFn: fmtSec, sizeClass: "fader--small" }).mount(mount("mount-filterEnvAttack"));
+        new Fader("filterEnvDecay",   { label: "Decay",   min: 0.001, max: 5,  step: 0.001, defaultValue: 0.3,  formatFn: fmtSec, sizeClass: "fader--small" }).mount(mount("mount-filterEnvDecay"));
+        new Fader("filterEnvSustain", { label: "Sustain", min: 0,     max: 1,  step: 0.01,  defaultValue: 0,    sizeClass: "fader--small" }).mount(mount("mount-filterEnvSustain"));
+        new Fader("filterEnvRelease", { label: "Release", min: 0.001, max: 10, step: 0.001, defaultValue: 0.3,  formatFn: fmtSec, sizeClass: "fader--small" }).mount(mount("mount-filterEnvRelease"));
 
         // --- LFO ---
-        bindWaveformSelector("lfoWaveform", "lfo-waveform-icon", LFO_WAVEFORMS, 0);
-        bindFader("lfoAmount");
-        bindFader("lfoRate", (v) => parseFloat(v).toFixed(2));
-        bindDropdown("lfoTarget1", LFO_TARGET_OPTIONS, "lfoTarget1-dropdown", "lfoTarget1-value", 1);  // Filter Cutoff
-        bindDropdown("lfoTarget2", LFO_TARGET_OPTIONS, "lfoTarget2-dropdown", "lfoTarget2-value", 5);  // Osc 2 Level
-        bindDropdown("lfoTarget3", LFO_TARGET_OPTIONS, "lfoTarget3-dropdown", "lfoTarget3-value", 0);  // None
+        // showArrows: true — Figma shows < icon > flanking arrows on LFO waveform selector
+        new WaveformSelector("lfoWaveform", LFO_WAVEFORMS, { defaultIndex: 0, showArrows: true })
+            .mount(mount("mount-lfoWaveform"));
+
+        new Fader("lfoAmount", { label: "Amount", min: 0, max: 1, step: 0.01, defaultValue: 0, sizeClass: "fader--big" }).mount(mount("mount-lfoAmount"));
+        new Fader("lfoRate",   { label: "Rate",   min: 0.01, max: 50, step: 0.01, defaultValue: 1, sizeClass: "fader--big" }).mount(mount("mount-lfoRate"));
+
+        new Dropdown("lfoTarget1", LFO_TARGET_OPTIONS, { ariaLabel: "LFO Target 1", defaultIndex: 1 }) // Filter Cutoff
+            .mount(mount("mount-lfoTarget1"));
+        new Dropdown("lfoTarget2", LFO_TARGET_OPTIONS, { ariaLabel: "LFO Target 2", defaultIndex: 5 }) // Osc 2 Level
+            .mount(mount("mount-lfoTarget2"));
+        new Dropdown("lfoTarget3", LFO_TARGET_OPTIONS, { ariaLabel: "LFO Target 3", defaultIndex: 0 }) // None
+            .mount(mount("mount-lfoTarget3"));
 
         // --- Voicing ---
-        bindArrowSelector(
-            "voiceCount",
-            Array.from({ length: 16 }, (_, i) => ({ value: i + 1, label: String(i + 1) })),
-            "voiceCount-value", "voice-count-prev", "voice-count-next",
-            15  // default index 15 → value 16
-        );
-        bindArrowSelector(
-            "unisonCount",
-            Array.from({ length: 8 }, (_, i) => ({ value: i + 1, label: String(i + 1) })),
-            "unisonCount-value", "unison-prev", "unison-next",
-            0   // FIX: was 2 (showing 3). Now 0 → value 1, matching APVTS default.
-        );
-        bindFader("velocityRange");
-        bindDropdown("velocityModTarget1", VEL_MOD_TARGET_OPTIONS, "velModTarget1-dropdown", "velocityModTarget1-value", 2);  // Amp Attack
-        bindDropdown("velocityModTarget2", VEL_MOD_TARGET_OPTIONS, "velModTarget2-dropdown", "velocityModTarget2-value", 0);  // None
+        new ArrowSelector("voiceCount", VOICE_COUNT_OPTIONS, { label: "No. of Voices", ariaLabel: "Number of voices", defaultIndex: 15 }) // default 16
+            .mount(mount("mount-voiceCount"));
 
-        logDebug("All controls bound");
+        new ArrowSelector("unisonCount", UNISON_OPTIONS, { label: "Unison", ariaLabel: "Unison voices", defaultIndex: 0 }) // default 1
+            .mount(mount("mount-unisonCount"));
+
+        new Fader("velocityRange", { label: "Velocity", min: 0, max: 1, step: 0.01, defaultValue: 1, sizeClass: "fader--big" })
+            .mount(mount("mount-velocityRange"));
+
+        new Dropdown("velocityModTarget1", VEL_MOD_TARGET_OPTIONS, { ariaLabel: "Velocity Mod Target 1", defaultIndex: 2 }) // Amp Attack
+            .mount(mount("mount-velocityModTarget1"));
+        new Dropdown("velocityModTarget2", VEL_MOD_TARGET_OPTIONS, { ariaLabel: "Velocity Mod Target 2", defaultIndex: 0 }) // None
+            .mount(mount("mount-velocityModTarget2"));
+
+        logDebug("All components mounted");
     };
 
     // =========================================================================
     // Initialize
     // =========================================================================
     const init = async () => {
-        logInfo("=== Solace Synth UI — Phase 7.2 (rev 2) ===");
+        logInfo("=== Solace Synth UI — Phase 7.3 ===");
 
         try {
             const bridgeOk = SolaceBridge.init();
             logInfo(`Bridge: ${bridgeOk ? "JUCE backend detected" : "browser preview mode"}`);
 
-            // Bind controls before signalUiReady so C++ initial sync hits registered listeners
-            bindAllControls();
+            // Mount components BEFORE signalUiReady so bridge listeners are registered
+            // when C++ fires the initial syncAllParameters bulk event.
+            mountAllComponents();
 
             if (!bridgeOk) {
                 setStatus("preview mode", "disconnected");

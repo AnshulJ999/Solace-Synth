@@ -264,10 +264,10 @@ public:
         jassert (params.velocityRange      != nullptr);
         jassert (params.velocityModTarget1 != nullptr);
         jassert (params.velocityModTarget2 != nullptr);
-        // Note: params.voiceCount is intentionally NOT asserted here.
-        // It is read by SolaceSynthesiser in processBlock(), not by SolaceVoice.
-        // Keeping it in SolaceVoiceParams is a design symmetry choice only.
-        jassert (params.voiceCount != nullptr);  // still valid: pointer must exist
+        // params.voiceCount is NOT required by SolaceVoice — it is read directly
+        // from APVTS in SolaceSynthesiser::processBlock(). The pointer must still
+        // be non-null (hence the jassert) but SolaceVoice never dereferences it.
+        jassert (params.voiceCount != nullptr);
     }
 
     // ========================================================================

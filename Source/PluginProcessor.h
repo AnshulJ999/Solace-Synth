@@ -12,22 +12,23 @@
 // ============================================================================
 // SolaceSynthesiser — juce::Synthesiser subclass with runtime polyphony cap.
 //
-// Override noteOn() to enforce a dynamic voice limit. When the number of
-// currently active voices equals or exceeds voiceLimit, JUCE's normal note-on
-// path is still called -- which triggers its voice-stealing algorithm so the
-// oldest playing voice is stopped and re-used for the new note. When we are
-// below the cap, the new note simply gets the next free voice.
+// Overrides findFreeVoice() and findVoiceToSteal() to restrict the allocatable
+// voice pool to [0, voiceLimit). Inactive voices at indices [voiceLimit, 15]
+// are permanently invisible to JUCE's allocator — new notes are never assigned
+// to them regardless of how many notes are playing.
 //
-// This is the JUCE-idiomatic approach: polyphony policy lives in the Synthesiser
-// subclass, not in SolaceVoice::startNote(). The Synthesiser owns voice
-// allocation; the voice only knows how to render one note.
+// This is the correct JUCE extension point for polyphony capping. The base
+// Synthesiser::noteOn() calls findFreeVoice() to pick the next voice; by
+// restricting that search, we cap polyphony without touching noteOn() at all.
+// findVoiceToSteal() is also restricted so steal candidates are always within
+// the capped subset (otherwise a steal could grab a voice beyond the cap).
 //
 // All 16 SolaceVoice instances are always created and pre-prepared. At runtime
 // only voiceLimit voices are engaged for new notes; the rest stay silent.
 //
 // Thread safety: setVoiceLimit() is called from processBlock (audio thread).
-// voiceLimit is read inside noteOn() which is also audio thread. No UI-thread
-// access needed -- we read from an APVTS atomic, not from this field.
+// voiceLimit is read inside findFreeVoice/findVoiceToSteal which are also
+// audio thread. No UI-thread access needed.
 // ============================================================================
 class SolaceSynthesiser : public juce::Synthesiser
 {

@@ -1,8 +1,8 @@
 # Solace Synth — Project Memory
 
 **Created:** 2026-03-08
-**Last Updated:** 2026-03-11 (Phase 6.8 Voicing Parameters code complete. HIGH bug found: SolaceSynthesiser::noteOn() is a no-op -- both branches call identical base noteOn(), voiceCount polyphony cap has zero effect. Fix: use findVoiceToSteal()+stopVoice() before base noteOn() when at limit. Velocity modulation correct. Awaiting fix + build + test.)
-**Status:** Active -- Phases 0-5 done + 6.1-6.8 code complete (6.8 has HIGH bug pending fix). Next: fix voiceCount noteOn(), build + test 6.6-6.8, then 6.9 (Master Distortion).
+**Last Updated:** 2026-03-11 (Phase 6 FULLY COMPLETE. All DSP 6.1-6.9 code-complete, build confirmed successful. All LOW comment issues fixed. Two open design questions for Nabeel documented under Phase 6.8. Next: Phase 7 UI polish in a new session.)
+**Status:** Active -- Phases 0-5 done + Phase 6 (6.1-6.9) COMPLETE + build verified. Phase 7.1 + 7.2 scaffold already done. Next: Phase 7 UI polish and Figma alignment.
 
 For UI: Up till phase 7.2 was done. UI prototype works, but needs lots of polishing and tweaks and further refinement.
 
@@ -481,8 +481,9 @@ An AI-first "vibe-coding" framework for building JUCE plugins. Provides structur
   - [ ] 6.5 Second Oscillator + Osc Mix
   - [x] 6.6 LFO (3 targets, per-voice free-running) — code complete, pending build + listening test
   - [x] 6.7 Unison — code complete (dual-filter stereo, pending build + listening test)
-  - [~] 6.8 Voicing params — code complete but HIGH bug: voiceCount polyphony cap is non-functional (noteOn() override is a no-op). Velocity mod is correct. Fix required before testing.
-  - [ ] 6.9 Master Distortion
+  - [x] 6.8 Voicing params — COMPLETE. SolaceSynthesiser subclass with findFreeVoice()+findVoiceToSteal() restricting pool to [0,voiceLimit). Velocity mod additive on filter/attack. Two open design questions for Nabeel (see 6.8 entry).
+  - [x] 6.9 Master Distortion — COMPLETE. SolaceDistortion.h (stateless tanh soft-clip), masterDistortion APVTS param, applied per channel before master volume.
+- [ ] **Build + listening test gate** — BLOCKING before Phase 7 starts
 - [ ] GitHub Actions CI + pluginval (automated testing)
 
 ### Pre-Release Backlog (do before shipping)

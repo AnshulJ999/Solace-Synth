@@ -470,7 +470,7 @@ void SolaceSynthProcessor::prepareToPlay (double sampleRate, int samplesPerBlock
     SolaceLog::info ("prepareToPlay: sampleRate=" + juce::String (sampleRate)
         + " samplesPerBlock=" + juce::String (samplesPerBlock)
         + " voices=" + juce::String (synth.getNumVoices())
-        + " params: amp(4) osc1(4) filter(3) filterEnv(5) osc2+mix(5) lfo(6) unison(3) voicing(4)");
+        + " params: amp(4) osc1(4) filter(3) filterEnv(5) osc2+mix(5) lfo(6) unison(3) voicing(4) distortion(1)");
 }
 
 void SolaceSynthProcessor::releaseResources()
@@ -506,9 +506,10 @@ void SolaceSynthProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     keyboardState.processNextMidiBuffer (midiMessages, 0, buffer.getNumSamples(), true);
 
     // --- Update polyphony cap (Phase 6.8) ---
-    // SolaceSynthesiser::noteOn() checks voiceLimit before admitting new notes.
-    // When at the cap it lets JUCE's voice-stealing algorithm pick the oldest
-    // voice to stop and hand to the new note -- steal mode, not drop mode.
+    // SolaceSynthesiser::findFreeVoice() and findVoiceToSteal() restrict the
+    // searchable voice pool to [0, voiceLimit). Voices beyond the cap are
+    // never touched by the allocator -- steal mode is automatic when all
+    // voiceLimit voices are occupied (JUCE picks the oldest/quietest).
     synth.setVoiceLimit (static_cast<int> (apvts.getRawParameterValue ("voiceCount")->load()));
 
     // --- Render all active voices ---

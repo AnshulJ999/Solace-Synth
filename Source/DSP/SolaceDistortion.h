@@ -4,16 +4,16 @@
 // Phase 6.9: Global post-process applied per sample to the final stereo mix,
 // after synth.renderNextBlock() and before the master volume gain stage.
 //
-// Algorithm: hyperbolic tangent soft-clip, gain-normalised so output never
-// exceeds ±1.0 at any drive level:
+// Algorithm: hyperbolic tangent soft-clip, gain-normalised to prevent loudness
+// jump across drive settings:
 //
 //   k = 1.0 + drive * 9.0          (maps drive 0.0→1.0 to k 1.0→10.0)
 //   y = tanh(k * x) / tanh(k)      (normalised tanh soft-clip)
 //
-//   drive=0.0 → k=1.0 → mild saturation (tanh is near-linear for small x,
-//               but tanh(1)≈0.762 normalisation adds ≈1.31× for large x).
-//               The plan specifies "near-linear" at drive=0 — this matches.
-//   drive=1.0 → k=10.0 → heavy saturation, sine wave sounds nearly square.
+//   Output is bounded by ±(|x| / tanh(k)) * tanh(k * |x|). For inputs within
+//   [-1.0, +1.0], output is guaranteed within ±1.0. For inputs outside that
+//   range (possible with dense chords + high resonance), output may exceed ±1.0
+//   but remains finite -- no NaN or inf at any valid drive setting.
 //
 // Design decisions:
 //   - No state — purely sample-in sample-out. No prepare() needed.

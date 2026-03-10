@@ -10,6 +10,10 @@ SolaceSynthProcessor::SolaceSynthProcessor()
                         .withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
       apvts (*this, nullptr, "PARAMETERS", createParameterLayout())
 {
+    // Cache parameter pointers for fast access in the audio thread
+    masterVolumeParameter = apvts.getRawParameterValue ("masterVolume");
+    jassert (masterVolumeParameter != nullptr);
+
     // Set up multi-level file logging
     // Log files: %TEMP%/SolaceSynth/ (trace.log, debug.log, info.log)
     solaceLogger = std::make_unique<SolaceLogger>();
@@ -174,7 +178,7 @@ void SolaceSynthProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     // --- Apply master volume from APVTS ---
     // Get the current (possibly automated) value and scale all channels.
-    auto masterVolume = apvts.getRawParameterValue ("masterVolume")->load();
+    auto masterVolume = masterVolumeParameter->load();
 
     for (int channel = 0; channel < getTotalNumOutputChannels(); ++channel)
         buffer.applyGain (channel, 0, buffer.getNumSamples(), masterVolume);

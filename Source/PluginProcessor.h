@@ -68,6 +68,9 @@ private:
     // Parameter tree — defines all automatable parameters
     juce::AudioProcessorValueTreeState apvts;
 
+    // Cached parameter pointers (for fast access in processBlock)
+    std::atomic<float>* masterVolumeParameter = nullptr;
+
     // MIDI keyboard state — shared between Editor (UI thread) and processBlock (audio thread).
     // Thread-safe: MidiKeyboardState uses an internal lock for cross-thread access.
     juce::MidiKeyboardState keyboardState;

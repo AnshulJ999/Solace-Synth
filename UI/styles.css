@@ -78,8 +78,8 @@
 
     /* Slider */
     --slider-track-w:    8px;
-    --slider-thumb-w:    16px;
-    --slider-thumb-h:    20px;
+    --slider-thumb-w:    14px;
+    --slider-thumb-h:    18px;
     --slider-thumb-r:    6px;
     --slider-thumb-border: 3px;
 }
@@ -424,8 +424,9 @@ html, body {
 }
 
 /* Native range input — rotated to vertical via writing-mode.
- * Width = track width (not thumb). The thumb overflows 4px on each side
- * which centres it perfectly. Webkit hit-tests the thumb area regardless. */
+ * Important: keep the input box as wide as the thumb hit-area, not the track.
+ * The narrow track is then centered inside the wider input so the thumb can
+ * sit symmetrically over it in WebView2/Chromium. */
 .fader-input {
     -webkit-appearance: none;
     appearance: none;
@@ -437,11 +438,11 @@ html, body {
     padding: 0;
     border: none;
     overflow: visible;
-    width: var(--slider-track-w);
+    width: var(--slider-thumb-w);
 }
 
 /* Webkit: track — dynamic fill from bottom via --val-percent (Fader._updateFill).
-   margin:0 auto centers the 8px track within the 16px input click area. */
+   margin: 0 auto centers the narrow track inside the wider input hit-area. */
 .fader-input::-webkit-slider-runnable-track {
     width: var(--slider-track-w);
     border-radius: 999px;
@@ -459,6 +460,7 @@ html, body {
     appearance: none;
     width: var(--slider-thumb-w);
     height: var(--slider-thumb-h);
+    margin-left: calc((var(--slider-track-w) - var(--slider-thumb-w)) / 2);
     background: var(--color-slider-thumb-bg);
     border: var(--slider-thumb-border) solid var(--color-slider-thumb-stroke);
     border-radius: var(--slider-thumb-r);

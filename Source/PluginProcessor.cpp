@@ -131,8 +131,6 @@ void SolaceSynthProcessor::prepareToPlay (double sampleRate, int samplesPerBlock
 
     SolaceLog::info ("prepareToPlay: sampleRate=" + juce::String (sampleRate)
         + " samplesPerBlock=" + juce::String (samplesPerBlock));
-
-    juce::ignoreUnused (samplesPerBlock);
 }
 
 void SolaceSynthProcessor::releaseResources()

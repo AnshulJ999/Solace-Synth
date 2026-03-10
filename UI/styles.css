@@ -428,7 +428,9 @@ html, body {
     white-space: nowrap;
 }
 
-/* Native range input — rotated to vertical via writing-mode */
+/* Native range input — rotated to vertical via writing-mode.
+ * Width = track width (not thumb). The thumb overflows 4px on each side
+ * which centres it perfectly. Webkit hit-tests the thumb area regardless. */
 .fader-input {
     -webkit-appearance: none;
     appearance: none;
@@ -439,8 +441,8 @@ html, body {
     outline: none;
     padding: 0;
     border: none;
-    /* Width = thumb width so the click area is correct */
-    width: var(--slider-thumb-w);
+    overflow: visible;
+    width: var(--slider-track-w);
 }
 
 /* Webkit: track — dynamic fill from bottom via --val-percent (Fader._updateFill).

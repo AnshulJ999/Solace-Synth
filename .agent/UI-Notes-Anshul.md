@@ -2,7 +2,7 @@
 
 These are UI notes/observations by Anshul. Based on comparison of Figma design and actual UI, and also personal preference.
 
-1) The slider on the faders is too big and not aligned. It seems offset to the right; it is not center-aligned. Needs to be a little smaller and center-aligned. True for all faders.
+1) The slider on the faders is too big and not aligned. It seems offset to the right; it is not center-aligned. Needs to be a little smaller and center-aligned. True for all faders. --- STILL NOT RESOLVED
 
 2) Waveform, Octave, Transpose, and Tuning, are all in one row, which is why they don't fit. It should be more like
 
@@ -22,4 +22,4 @@ This problem is for both Osc1 and Osc2.
 
 Also, we may opt to show the values as a tooltip when hovering over a fader.
 
-5) 
+5) All the stuff that was supposed to be a dropdown is a click to cycle instead. Everything under LFO and Voicing was supposed to be dropdowns naturally.

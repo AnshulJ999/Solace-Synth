@@ -156,7 +156,7 @@
     const mountAllComponents = () => {
 
         // --- Oscillator 1 ---
-        new WaveformSelector("osc1Waveform", OSC_WAVEFORMS, { defaultIndex: 0, showArrows: false })
+        new WaveformSelector("osc1Waveform", OSC_WAVEFORMS, { defaultIndex: 0, showArrows: true })
             .mount(mount("mount-osc1Waveform"));
 
         new ArrowSelector("osc1Octave", OCTAVE_OPTIONS, { label: "Octave", ariaLabel: "Oscillator 1 octave", defaultIndex: 3 })
@@ -178,7 +178,7 @@
         }).mount(mount("mount-oscMix"));
 
         // --- Oscillator 2 ---
-        new WaveformSelector("osc2Waveform", OSC_WAVEFORMS, { defaultIndex: 2, showArrows: false }) // default: Square
+        new WaveformSelector("osc2Waveform", OSC_WAVEFORMS, { defaultIndex: 2, showArrows: true }) // default: Square
             .mount(mount("mount-osc2Waveform"));
 
         new ArrowSelector("osc2Octave", OCTAVE_OPTIONS, { label: "Octave", ariaLabel: "Oscillator 2 octave", defaultIndex: 4 })

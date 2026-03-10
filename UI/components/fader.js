@@ -66,9 +66,9 @@ class Fader {
             sizeClass   = 'fader--standard',
             bottomLabel = null,
             extraClass  = null,
-            // showTicks: true = show ruler tick marks on track (default: true for big/standard, false for small)
+            // showTicks: true = show ruler tick strip to the right of track (all faders per Figma, Phase 7.4)
             // Set showTicks: false in config to suppress.
-            showTicks   = (sizeClass !== 'fader--small'),
+            showTicks   = true,
         } = this.config;
 
         const classes = ['fader', sizeClass, extraClass, showTicks ? 'fader--ticks' : null].filter(Boolean).join(' ');
@@ -94,8 +94,21 @@ class Fader {
         input.step       = String(step);
         input.value      = String(defaultValue);
         input.setAttribute('aria-label', label);
-        wrapper.appendChild(input);
         this._input = input;
+
+        // Track area: input + optional ruler, laid side-by-side (flex-row)
+        const trackArea = document.createElement('div');
+        trackArea.className = 'fader-track-area';
+        trackArea.appendChild(input);
+
+        // Tick ruler — narrow strip RIGHT of the track (Figma spec, Phase 7.4)
+        if (showTicks) {
+            const ruler = document.createElement('div');
+            ruler.className = 'fader-ticks-ruler';
+            trackArea.appendChild(ruler);
+        }
+
+        wrapper.appendChild(trackArea);
 
         // Value readout
         const displayEl = document.createElement('span');

@@ -78,10 +78,10 @@
 
     /* Slider */
     --slider-track-w:    8px;
-    --slider-thumb-w:    20px;
-    --slider-thumb-h:    24px;
-    --slider-thumb-r:    8px;
-    --slider-thumb-border: 4px;
+    --slider-thumb-w:    16px;
+    --slider-thumb-h:    20px;
+    --slider-thumb-r:    6px;
+    --slider-thumb-border: 3px;
 }
 
 /* ============================================================================
@@ -317,6 +317,41 @@ html, body {
 .sub-section--filter-cfg { flex: 3; }
 
 /* ============================================================================
+ * Oscillator section — 2-column layout (Phase 7.4)
+ * Left col:  waveform icon + octave selector + transpose selector (stacked)
+ * Right col: tuning fader (fills available height)
+ * ============================================================================ */
+.osc-grid {
+    display: flex;
+    flex-direction: row;
+    gap: var(--space-md);
+    flex: 1;
+    min-height: 0;
+}
+
+.osc-left-col {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    flex-shrink: 0;
+    min-width: 0;
+}
+
+/* Waveform icon constrained in the osc left column */
+.osc-left-col .waveform-icon {
+    width: clamp(40px, 4.5vw, 72px);
+}
+
+.osc-right-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    min-width: 0;
+}
+
+/* ============================================================================
  * Section Heading
  * ============================================================================ */
 .section-heading {
@@ -408,11 +443,12 @@ html, body {
     width: var(--slider-thumb-w);
 }
 
-/* Webkit: track — dynamic fill from bottom using --val-percent set by Fader component.
-   to top = toward max-value end (top of track). Default 0% = no fill (all track grey). */
+/* Webkit: track — dynamic fill from bottom via --val-percent (Fader._updateFill).
+   margin:0 auto centers the 8px track within the 16px input click area. */
 .fader-input::-webkit-slider-runnable-track {
     width: var(--slider-track-w);
     border-radius: 999px;
+    margin: 0 auto;
     background: linear-gradient(
         to top,
         var(--color-fill-track) var(--val-percent, 0%),
@@ -691,47 +727,31 @@ html, body {
 }
 
 /* ============================================================================
- * Fader tick marks — optional ruler graduations along the track
+ * Fader track area + tick ruler (Phase 7.4)
  *
- * Off by default. Add class 'fader--ticks' to any .fader element to enable.
- * Tick marks are at 10% intervals along the track height.
- * The fill gradient is replicated so the ticks layer on top of it.
- *
- * Usage (JS):  faderEl.classList.add('fader--ticks');
- * Usage (CSS): .my-section .fader { } + add class via settings toggle (Phase 7.5)
+ * .fader-track-area wraps the input and the ruler side-by-side.
+ * .fader-ticks-ruler is a narrow strip to the RIGHT of the fader track
+ * showing notch marks at 10% intervals (Figma spec: tight, 2-4px marks).
+ * Height auto-stretches to match the input via align-items:stretch.
  * ============================================================================ */
-.fader--ticks .fader-input::-webkit-slider-runnable-track {
-    background:
-        /* Layer 1 (top): subtle 0.75px tick marks at every 10% of track height */
-        repeating-linear-gradient(
-            to top,
-            transparent 0%,
-            transparent calc(10% - 0.75px),
-            rgba(0, 0, 0, 0.18) calc(10% - 0.75px),
-            rgba(0, 0, 0, 0.18) 10%
-        ),
-        /* Layer 2 (bottom): dynamic fill from bottom */
-        linear-gradient(
-            to top,
-            var(--color-fill-track) var(--val-percent, 0%),
-            var(--color-slider-track) var(--val-percent, 0%)
-        );
+.fader-track-area {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 3px;
 }
 
-.fader--ticks .fader-input::-moz-range-track {
-    background:
-        repeating-linear-gradient(
-            to top,
-            transparent 0%,
-            transparent calc(10% - 0.75px),
-            rgba(0, 0, 0, 0.18) calc(10% - 0.75px),
-            rgba(0, 0, 0, 0.18) 10%
-        ),
-        linear-gradient(
-            to top,
-            var(--color-fill-track) var(--val-percent, 0%),
-            var(--color-slider-track) var(--val-percent, 0%)
-        );
+.fader-ticks-ruler {
+    width: 4px;
+    flex-shrink: 0;
+    background: repeating-linear-gradient(
+        to bottom,
+        transparent 0%,
+        transparent calc(10% - 0.75px),
+        rgba(0, 0, 0, 0.22) calc(10% - 0.75px),
+        rgba(0, 0, 0, 0.22) 10%
+    );
+    border-radius: 1px;
 }
 
 /* ============================================================================

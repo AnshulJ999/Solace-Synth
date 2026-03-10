@@ -44,8 +44,8 @@ All icons in `UI/assets/icons/` are hand-coded geometric SVGs. None are exported
 | `logo.svg` | Placeholder SS monogram — not the real Figma logo |
 | `waveform-sine-icon.svg` | Hand-coded orange curve — close but not Figma export |
 | `waveform-square-icon.svg` | Hand-coded — close |
-| `waveform-sawtooth-icon.svg` | Placeholder — **Nabeel must provide** |
-| `waveform-triangle-icon.svg` | Placeholder — **Nabeel must provide** |
+| `waveform-sawtooth-icon.svg` | Hand-coded — exists ✅ (may need visual polish compared to Figma) |
+| `waveform-triangle-icon.svg` | Hand-coded — exists ✅ (may need visual polish compared to Figma) |
 | `waveform-sh-icon.svg` | LFO S&H placeholder |
 | Chevrons, menu, arrows | Simple geometric shapes — acceptable for now |
 

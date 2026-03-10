@@ -1,8 +1,8 @@
 # Solace Synth — Project Memory
 
 **Created:** 2026-03-08
-**Last Updated:** 2026-03-11 (Phase 7.4 in progress — track fill CSS done, tick marks class added)
-**Status:** Active — Phase 6 (DSP) COMPLETE. Phase 7.1-7.3 COMPLETE. Phase 7.4 in progress (fill + ticks CSS done; logo/icons/LFO targets pending Nabeel).
+**Last Updated:** 2026-03-11 (Phase 7.4 — osc 2-col layout, fader centering, tick rulers, waveform arrows)
+**Status:** Active — Phase 6 (DSP) COMPLETE. Phase 7.1-7.3 COMPLETE. Phase 7.4 in progress: osc grid, fader fill+ruler, waveform arrows done. Pending: logo, LFO targets, vertical labels.
 
 ---
 

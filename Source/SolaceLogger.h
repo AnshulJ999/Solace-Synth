@@ -2,6 +2,8 @@
 
 #include <juce_core/juce_core.h>
 
+#if SOLACE_LOGGING_ENABLED || JUCE_DEBUG
+
 // ============================================================================
 // Solace Synth - Multi-Level File Logger
 //
@@ -153,3 +155,5 @@ namespace SolaceLog
             logger->write (LogLevel::Error, msg);
     }
 }
+
+#endif // SOLACE_LOGGING_ENABLED || JUCE_DEBUG

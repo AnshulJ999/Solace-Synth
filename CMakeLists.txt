@@ -90,6 +90,9 @@ target_compile_definitions("${PROJECT_NAME}"
     JUCE_USE_CURL=0             # No need for CURL
     JUCE_VST3_CAN_REPLACE_VST2=0
 
+    # Logging enabled (default to ON in Debug, OFF in Release)
+    $<$<CONFIG:Debug>:SOLACE_LOGGING_ENABLED=1>
+
     # Build info available to code
     CMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE}"
     VERSION="${PROJECT_VERSION}"

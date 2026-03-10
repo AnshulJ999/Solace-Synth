@@ -3,7 +3,11 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_audio_utils/juce_audio_utils.h>
 #include <juce_dsp/juce_dsp.h>
+
+#if SOLACE_LOGGING_ENABLED || JUCE_DEBUG
 #include "SolaceLogger.h"
+#endif
+
 #include "DSP/SolaceVoice.h"
 #include "DSP/SolaceSound.h"
 
@@ -79,7 +83,9 @@ private:
     juce::Synthesiser synth;
 
     // File-based logger — output goes to %TEMP%/SolaceSynth/ (trace.log, debug.log, info.log)
+#if SOLACE_LOGGING_ENABLED || JUCE_DEBUG
     std::unique_ptr<SolaceLogger> solaceLogger;
+#endif
 
     // Creates the parameter layout (called once in constructor)
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();

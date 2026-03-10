@@ -12,11 +12,13 @@ SolaceSynthProcessor::SolaceSynthProcessor()
 {
     // Set up multi-level file logging
     // Log files: %TEMP%/SolaceSynth/ (trace.log, debug.log, info.log)
+#if SOLACE_LOGGING_ENABLED || JUCE_DEBUG
     solaceLogger = std::make_unique<SolaceLogger>();
     juce::Logger::setCurrentLogger (solaceLogger.get());
 
     SolaceLog::info ("=== Solace Synth started ===");
     SolaceLog::info ("Log directory: " + solaceLogger->getLogDirectory());
+#endif
 
     // --- Phase 5: Polyphonic Synthesiser Setup ---
     // Add voices. Each SolaceVoice can play one note at a time.
@@ -30,13 +32,17 @@ SolaceSynthProcessor::SolaceSynthProcessor()
     // so any note on any channel will trigger a SolaceVoice.
     synth.addSound (new SolaceSound());
 
+#if SOLACE_LOGGING_ENABLED || JUCE_DEBUG
     SolaceLog::info ("Synthesiser ready: " + juce::String (numVoices) + " voices, SolaceSound");
+#endif
 }
 
 SolaceSynthProcessor::~SolaceSynthProcessor()
 {
+#if SOLACE_LOGGING_ENABLED || JUCE_DEBUG
     SolaceLog::info ("=== Solace Synth shutting down ===");
     juce::Logger::setCurrentLogger (nullptr);
+#endif
 }
 
 // ============================================================================
@@ -129,8 +135,10 @@ void SolaceSynthProcessor::prepareToPlay (double sampleRate, int samplesPerBlock
     // This converts MIDI note frequencies to the correct angleDelta per sample.
     synth.setCurrentPlaybackSampleRate (sampleRate);
 
+#if SOLACE_LOGGING_ENABLED || JUCE_DEBUG
     SolaceLog::info ("prepareToPlay: sampleRate=" + juce::String (sampleRate)
         + " samplesPerBlock=" + juce::String (samplesPerBlock));
+#endif
 
     juce::ignoreUnused (samplesPerBlock);
 }

@@ -230,22 +230,28 @@ void SolaceSynthEditor::handleSetParameter (
         if (param != nullptr)
         {
             auto normalized = param->convertTo0to1 (value);
+#if SOLACE_LOGGING_ENABLED || JUCE_DEBUG
             SolaceLog::trace ("setParameter: " + paramId
                 + " rawValue=" + juce::String (value, 4)
                 + " normalized=" + juce::String (normalized, 4));
+#endif
 
             param->setValueNotifyingHost (normalized);
             completion (juce::var (true));
         }
         else
         {
+#if SOLACE_LOGGING_ENABLED || JUCE_DEBUG
             SolaceLog::error ("setParameter: unknown param '" + paramId + "'");
+#endif
             completion (juce::var (false));
         }
     }
     else
     {
+#if SOLACE_LOGGING_ENABLED || JUCE_DEBUG
         SolaceLog::error ("setParameter: wrong arg count (" + juce::String (args.size()) + ")");
+#endif
         completion (juce::var (false));
     }
 }
@@ -255,7 +261,9 @@ void SolaceSynthEditor::handleUiReady (
     const juce::Array<juce::var>& /*args*/,
     juce::WebBrowserComponent::NativeFunctionCompletion completion)
 {
+#if SOLACE_LOGGING_ENABLED || JUCE_DEBUG
     SolaceLog::info ("UI ready signal received from JS");
+#endif
     webViewReady = true;
 
     // Hide fallback, show WebView
@@ -264,7 +272,9 @@ void SolaceSynthEditor::handleUiReady (
     // Send the current state of all parameters to JS
     sendAllParametersToJS();
 
+#if SOLACE_LOGGING_ENABLED || JUCE_DEBUG
     SolaceLog::info ("UI ready complete - all parameters synced to JS");
+#endif
     completion (juce::var (true));
 }
 
@@ -273,10 +283,14 @@ void SolaceSynthEditor::handleLog (
     const juce::Array<juce::var>& args,
     juce::WebBrowserComponent::NativeFunctionCompletion completion)
 {
+#if SOLACE_LOGGING_ENABLED || JUCE_DEBUG
     if (! args.isEmpty())
     {
         SolaceLog::debug ("[JS] " + args[0].toString());
     }
+#else
+    juce::ignoreUnused (args);
+#endif
 
     completion (juce::var (true));
 }
@@ -291,8 +305,10 @@ void SolaceSynthEditor::sendParameterToJS (const juce::String& paramId, float va
     if (webView == nullptr || ! webViewReady)
         return;
 
+#if SOLACE_LOGGING_ENABLED || JUCE_DEBUG
     SolaceLog::trace ("C++->JS parameterChanged: " + paramId
         + " value=" + juce::String (value, 4));
+#endif
 
     auto* obj = new juce::DynamicObject();
     obj->setProperty ("paramId", paramId);
@@ -351,8 +367,10 @@ void SolaceSynthEditor::parameterChanged (const juce::String& parameterID, float
     {
         if (auto* self = safeThis.getComponent())
         {
+#if SOLACE_LOGGING_ENABLED || JUCE_DEBUG
             SolaceLog::trace ("APVTS parameterChanged: " + parameterID
                 + " newValue=" + juce::String (newValue, 4));
+#endif
             self->sendParameterToJS (parameterID, newValue);
         }
     });

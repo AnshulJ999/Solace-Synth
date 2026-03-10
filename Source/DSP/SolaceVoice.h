@@ -245,7 +245,8 @@ public:
     {
         ampEnvelope.prepare    (spec.sampleRate);
         filterEnvelope.prepare (spec.sampleRate);
-        filter.prepare (spec);  // SolaceFilter overrides numChannels to 1 internally
+        filterL.prepare (spec);  // One per channel for true per-channel stereo filtering
+        filterR.prepare (spec);
         // LFO has no sample-rate-dependent state -- setRate() handles this per block.
     }
 
@@ -314,11 +315,16 @@ public:
         voiceGain = kBaseVoiceGain / std::sqrt (static_cast<float> (activeUnisonCount));
 
         // --- Filter (Phase 6.3) ---
-        filter.reset();
-        filter.setMode      (static_cast<int> (params.filterType->load()));
-        filter.setResonance (params.filterResonance->load());
+        // Both filter instances reset and initialised identically at note-on.
+        // They diverge per sample only because preFiltL and preFiltR carry
+        // different detuned oscillator mixes based on each unison voice's pan position.
+        const int filterMode = static_cast<int> (params.filterType->load());
+        const float filterRes = params.filterResonance->load();
         baseCutoffHz = params.filterCutoff->load();
-        filter.setCutoff (baseCutoffHz);
+        filterL.reset();        filterR.reset();
+        filterL.setMode (filterMode);   filterR.setMode (filterMode);
+        filterL.setResonance (filterRes); filterR.setResonance (filterRes);
+        filterL.setCutoff (baseCutoffHz); filterR.setCutoff (baseCutoffHz);
 
         // --- Filter Envelope (Phase 6.4) ---
         filterEnvelope.reset();
@@ -367,7 +373,8 @@ public:
             // immediately reused without transient pops or stale envelope values.
             ampEnvelope.reset();
             filterEnvelope.reset();
-            filter.reset();
+            filterL.reset();
+            filterR.reset();
             clearCurrentNote();
         }
     }
@@ -378,8 +385,8 @@ public:
     // Signal flow (Phase 6.6+, per sample):
     //   lfoValue  = lfo.getNextSample() * lfoAmount      (per sample)
     //   osc1+osc2 blended by oscMix, with LFO pitch multiplier per block
-    //   blendedOsc -> filter (cutoff = filterEnv + LFO; resonance = base + LFO)
-    //     -> * kVoiceGain * velocity * ampEnv * (amp LFO) -> output
+    //   blendedOsc -> filterL/R (cutoff = filterEnv + LFO; resonance = base + LFO)
+    //     -> * voiceGain * velocity * ampEnv * (amp LFO) -> output
     //
     // Per-block reads (before sample loop):
     //   baseCutoffHz, baseResonance, envDepth, oscMix
@@ -443,42 +450,45 @@ public:
         const bool lfoToAmpLevel     = (lfoTarget1 == 6 || lfoTarget2 == 6 || lfoTarget3 == 6);
         const bool lfoToFilterRes    = (lfoTarget1 == 7 || lfoTarget2 == 7 || lfoTarget3 == 7);
 
-        // LFO pitch: apply multiplier to ALL active unison voices' oscillators.
-        if (lfoToOsc1Pitch)
+        // LFO pitch: compute multiplier once (both osc targets share same lfoValue).
+        // getCurrentValue() does NOT advance the phase, so the single pow() is correct.
+        if (lfoToOsc1Pitch || lfoToOsc2Pitch)
         {
             const double semi = static_cast<double> (lfo.getCurrentValue() * lfoAmount * kLFOPitchSemi);
             const double mult = std::pow (2.0, semi / 12.0);
             for (int u = 0; u < activeUnisonCount; ++u)
-                unisonVoices[u].osc1.setLFOPitchMultiplier (mult);
+            {
+                if (lfoToOsc1Pitch) unisonVoices[u].osc1.setLFOPitchMultiplier (mult);
+                else                unisonVoices[u].osc1.setLFOPitchMultiplier (1.0);
+                if (lfoToOsc2Pitch) unisonVoices[u].osc2.setLFOPitchMultiplier (mult);
+                else                unisonVoices[u].osc2.setLFOPitchMultiplier (1.0);
+            }
         }
         else
         {
             for (int u = 0; u < activeUnisonCount; ++u)
+            {
                 unisonVoices[u].osc1.setLFOPitchMultiplier (1.0);
+                unisonVoices[u].osc2.setLFOPitchMultiplier (1.0);
+            }
         }
 
-        if (lfoToOsc2Pitch)
-        {
-            const double semi = static_cast<double> (lfo.getCurrentValue() * lfoAmount * kLFOPitchSemi);
-            const double mult = std::pow (2.0, semi / 12.0);
-            for (int u = 0; u < activeUnisonCount; ++u)
-                unisonVoices[u].osc2.setLFOPitchMultiplier (mult);
-        }
-        else
-        {
-            for (int u = 0; u < activeUnisonCount; ++u)
-                unisonVoices[u].osc2.setLFOPitchMultiplier (1.0);
-        }
+        // Hoist channel count -- never changes mid-block.
+        const int numChannels = outputBuffer.getNumChannels();
 
         while (--numSamples >= 0)
         {
             const float lfoSample = lfo.getNextSample() * lfoAmount;
 
-            // --- Unison oscillator sum (Phase 6.7) ---
-            // All N unison voices advance every sample regardless of mix.
-            // Sum to mono first (standard architecture: JP-8000, Serum, Vital).
-            // Stereo spread is applied AFTER the filter stage, not per-oscillator.
-            float monoSum = 0.0f;
+            // --- Per-unison oscillator accumulation ---
+            // Each unison voice advances its own detuned osc pair and contributes
+            // its sample to L and R *separately* using its individual pan gains.
+            // This produces genuinely different pre-filter content per channel,
+            // which is what creates real stereo width after filtering.
+            // (contrast with the broken previous approach which summed to mono first
+            // and then re-applied pan gains, yielding identical L and R channels)
+            float preFiltL = 0.0f;
+            float preFiltR = 0.0f;
             for (int u = 0; u < activeUnisonCount; ++u)
             {
                 float uOsc1s = unisonVoices[u].osc1.getNextSample();
@@ -488,22 +498,28 @@ public:
                 if (lfoToOsc1Level) uOsc1s *= juce::jlimit (0.0f, 2.0f, 1.0f + lfoSample);
                 if (lfoToOsc2Level) uOsc2s *= juce::jlimit (0.0f, 2.0f, 1.0f + lfoSample);
 
-                monoSum += uOsc1s * (1.0f - mix) + uOsc2s * mix;
+                const float uMixed = uOsc1s * (1.0f - mix) + uOsc2s * mix;
+
+                preFiltL += uMixed * unisonVoices[u].panL;
+                preFiltR += uMixed * unisonVoices[u].panR;
             }
 
-            // Filter envelope + LFO cutoff modulation.
-            const float filterEnvVal  = filterEnvelope.getNextSample();
-            float modulatedCutoff     = baseCutoffHz + filterEnvVal * envDepth * kModRange;
-            if (lfoToFilterCutoff)    modulatedCutoff += lfoSample * kLFOCutoffRange;
-            filter.setCutoff (modulatedCutoff);
+            // Filter envelope + LFO cutoff/resonance modulation.
+            // Both filters always receive identical cutoff and resonance.
+            // They diverge sonically only because their inputs (preFiltL vs preFiltR)
+            // carry different detuned oscillator blends.
+            const float filterEnvVal = filterEnvelope.getNextSample();
+            float modulatedCutoff    = baseCutoffHz + filterEnvVal * envDepth * kModRange;
+            if (lfoToFilterCutoff)   modulatedCutoff += lfoSample * kLFOCutoffRange;
 
-            // Filter resonance modulation.
             const float modulatedRes = juce::jlimit (0.0f, 1.0f,
                 baseResonance + (lfoToFilterRes ? lfoSample * kLFOResRange : 0.0f));
-            filter.setResonance (modulatedRes);
 
-            // Filter: mono sum through shared filter (standard unison architecture).
-            const float filteredMono = filter.processSample (monoSum);
+            filterL.setCutoff    (modulatedCutoff); filterR.setCutoff    (modulatedCutoff);
+            filterL.setResonance (modulatedRes);    filterR.setResonance (modulatedRes);
+
+            const float filteredL = filterL.processSample (preFiltL);
+            const float filteredR = filterR.processSample (preFiltR);
 
             // Amp envelope + LFO amp modulation.
             const float ampEnvVal = ampEnvelope.getNextSample();
@@ -511,26 +527,14 @@ public:
                 ? juce::jlimit (0.0f, 2.0f, 1.0f + lfoSample)
                 : 1.0f;
 
-            // Final scalar: includes equal-power unison normalisation (voiceGain).
-            const float scalar = filteredMono * voiceGain * velocityScale * ampEnvVal * ampMod;
+            // Final gain: voiceGain provides equal-power unison normalisation.
+            // At N=1 spread=0: preFiltL == preFiltR == osc * sqrt(0.5),
+            // so filteredL == filteredR, and the output is centred mono --
+            // backwards-compatible with Phase 6.6.
+            const float gainScalar = voiceGain * velocityScale * ampEnvVal * ampMod;
+            const float sampleL    = filteredL * gainScalar;
+            const float sampleR    = filteredR * gainScalar;
 
-            // Stereo output: fan the mono filtered signal to L and R using pan gains.
-            // At unisonCount=1 and spread=0, panL=panR=sqrt(0.5)~=0.707 for each voice,
-            // sum of panL across 1 voice = 0.707 * scalar. This is slightly quieter (-3dB)
-            // than the pre-unison mono output. To preserve pre-6.7 loudness exactly,
-            // kBaseVoiceGain is adjusted to 0.15 * sqrt(2) = 0.212 so that
-            // 0.212 / sqrt(1) * 0.707 = 0.15, matching the old kVoiceGain=0.15 path.
-            float sampleL = 0.0f;
-            float sampleR = 0.0f;
-            for (int u = 0; u < activeUnisonCount; ++u)
-            {
-                sampleL += scalar * unisonVoices[u].panL;
-                sampleR += scalar * unisonVoices[u].panR;
-            }
-
-            // Write to output buffer: channel 0 = L, channel 1 = R.
-            // Guard against mono host (numChannels==1).
-            const int numChannels = outputBuffer.getNumChannels();
             if (numChannels >= 1) outputBuffer.addSample (0, startSample, sampleL);
             if (numChannels >= 2) outputBuffer.addSample (1, startSample, sampleR);
 
@@ -558,10 +562,20 @@ private:
     SolaceADSR ampEnvelope;
 
     // --- Phase 6.3: Filter ---
-    // Single mono instance following standard unison architecture (JP-8000, Serum, Vital):
-    // all unison oscillators sum to mono, then this shared filter processes the sum.
-    // Stereo spread is applied AFTER the filter via per-unison-voice pan gains.
-    SolaceFilter filter;
+    // Two instances (filterL, filterR) process the left and right pre-filter signals
+    // independently. This is what makes stereo spread real: each channel receives a
+    // different mix of detuned oscillators (per-voice panL/panR weighting applied
+    // before summing into preFiltL / preFiltR), so filterL and filterR see genuinely
+    // different inputs and produce genuinely different outputs.
+    //
+    // At N=1 (unisonCount=1), panL == panR == sqrt(0.5), so preFiltL == preFiltR and
+    // both filters receive identical inputs -- output is centred mono, fully backward-
+    // compatible with Phase 6.6.
+    //
+    // Both filters are always set to the same mode, cutoff, and resonance; they differ
+    // only in their input signal content.
+    SolaceFilter filterL;
+    SolaceFilter filterR;
     float baseCutoffHz = 20000.0f;
 
     // --- Phase 6.4: Filter Envelope ---
@@ -600,12 +614,17 @@ private:
     // Incorporates equal-power unison normalisation: kBaseVoiceGain / sqrt(unisonCount).
     // At unisonCount=1, voiceGain = kBaseVoiceGain / sqrt(1) = kBaseVoiceGain.
     //
-    // kBaseVoiceGain is scaled by sqrt(2) vs the old kVoiceGain=0.15 to compensate
-    // for the -3dB headroom loss introduced by constant-power panning at N=1:
-    //   panL = panR = sqrt(0.5) = 0.707 at pan=0.
-    //   0.15 * sqrt(2) * 0.707 = 0.15 -- matches old mono output level exactly.
+    // Why kBaseVoiceGain = 0.15 (not 0.15 * sqrt(2) as before):
+    // With dual-filter stereo, at N=1 spread=0:
+    //   panL = panR = sqrt(0.5) = 0.707
+    //   preFiltL = osc * 0.707, preFiltR = osc * 0.707
+    //   filteredL = filter(osc * 0.707), filteredR = filter(osc * 0.707)
+    //   sampleL = filteredL * kBaseVoiceGain = filter(osc) * 0.707 * kBaseVoiceGain
     //
-    // TODO (Phase 6.7+): adjust if overall loudness feels too hot at high voice counts.
+    // To match the old kVoiceGain=0.15 mono output:
+    //   0.707 * kBaseVoiceGain = 0.15 -> kBaseVoiceGain = 0.15 / 0.707 = 0.2121 = 0.15 * sqrt(2)
+    //
+    // kBaseVoiceGain unchanged from before at 0.15 * sqrt(2). Math still holds.
     static constexpr float kBaseVoiceGain = 0.15f * 1.4142135f;  // 0.15 * sqrt(2)
     float voiceGain = kBaseVoiceGain;  // updated at startNote()
 };

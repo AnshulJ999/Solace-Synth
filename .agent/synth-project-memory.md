@@ -1,8 +1,8 @@
 # Solace Synth — Project Memory
 
 **Created:** 2026-03-08
-**Last Updated:** 2026-03-11 (Phase 6.7 Unison -- code complete. UnisonVoice[8] array, constant-power pan, equal-power level normalisation, stereo output. Awaiting build + listening test.)
-**Status:** Active -- Phases 0-5 complete + Phases 6.1-6.7 code complete. Next: build + test 6.7, then Phase 6.8 (Voicing Parameters).
+**Last Updated:** 2026-03-11 (Phase 6.7 stereo spread fixed: replaced broken post-filter pan-fan approach with dual filterL/filterR + pre-filter per-unison accumulation. Claude Code + Codex caught the math bug. All 4 findings fixed. Awaiting build + test.)
+**Status:** Active -- Phases 0-5 done + 6.1-6.7 code complete. Next: build/test 6.7, then 6.8 (Voicing Parameters).
 
 For UI: Up till phase 7.2 was done. UI prototype works, but needs lots of polishing and tweaks and further refinement.
 
@@ -586,7 +586,25 @@ Do NOT implement features suggested solely by Claude Code/Codex reviews without 
     - (1) LFO phase alignment: all voices started at `currentAngle=0.0` → simultaneous chord had no phase diversity. Fixed: constructor seeds `currentAngle` via `getSystemRandom().nextDouble() * 2π`.
     - (2) S&H initial silence: `sAndHValue=0.0f` default → up to 1 full LFO cycle of silent modulation on first S&H use. Fixed: constructor seeds `sAndHValue` via `getSystemRandom().nextFloat() * 2 - 1`.
     - (3) `juce::Random` seed=1 default: all instances produced identical S&H sequences. Fixed: constructor calls `random.setSeed(getSystemRandom().nextInt64())` for true per-voice independence.
-- [ ] Phase 6.7: Unison (with level normalization)
+- [x] **Phase 6.7: Unison** — code complete (2026-03-11), awaiting build + listening test
+  - `Source/DSP/SolaceVoice.h` — `SolaceVoiceParams` extended with 3 new atomics (`unisonCount/Detune/Spread`). 3 new `jassert` checks in constructor. Private `osc1` + `osc2` members replaced by `UnisonVoice unisonVoices[8]` array + `kMaxUnison=8` constant. `UnisonVoice` is a nested struct with `SolaceOscillator osc1, osc2, float panL, panR`. `activeUnisonCount` (int) is snapshotted at note-on. `voiceGain` (float) replaces old `static constexpr kVoiceGain`, computed dynamically at note-on. Old single `SolaceFilter filter` replaced by `SolaceFilter filterL, filterR` (dual instances for true stereo).
+  - `startNote()` — reads `unisonCount` (clamp 1-8) and `unisonDetune` atomics at note-on (snapshotted; not safe to resize mid-note). For each active unison voice: computes `detuneOffset = ((u / (N-1)) - 0.5) * detuneCents` (symmetric, N=1 → 0 cents). Sets waveform, tuning, and frequency for both osc1 and osc2 in every unison slot. Computes `voiceGain = kBaseVoiceGain / sqrt(activeUnisonCount)` for equal-power normalisation. Both `filterL` and `filterR` reset and initialised identically.
+  - `renderNextBlock()` — per-block: reads `unisonSpread`, recomputes `panL/panR` for each slot via constant-power pan law: `pan_i = ((u / (N-1)) * 2 - 1) * spread`, `panL = sqrt(0.5 * (1 - pan))`, `panR = sqrt(0.5 * (1 + pan))`. Per-sample: each unison voice advances its own detuned osc pair, accumulates into `preFiltL` and `preFiltR` separately (using `panL/panR` weighting). `filterL.processSample(preFiltL)` and `filterR.processSample(preFiltR)` independently. Then amp env + gain scalar applied to both channels. L and R written to output buffer separately.
+  - `PluginProcessor.cpp` — 3 new APVTS params: `unisonCount` (int 1-8, def 1), `unisonDetune` (float 0-100 cents, step 0.1, def 0.0), `unisonSpread` (float 0-1, step 0.01, def 0.5). 3 `voiceParams` atomics populated before voice creation loop. `prepareToPlay` log string updated: `unison(3)`.
+  - **`prepare()`** — now calls `filterL.prepare(spec)` + `filterR.prepare(spec)` instead of single `filter.prepare()`.
+  - **`stopNote()` hard-cut** — resets both `filterL.reset()` and `filterR.reset()`.
+  - **Architecture decision — dual filter vs mono filter:**
+    - True stereo spread requires genuinely different content in L and R channels. This requires panning oscillator signals **before** the filter input, giving filterL and filterR different pre-filter signals.
+    - Pre-filter accumulation: `preFiltL += uMixed * panL`, `preFiltR += uMixed * panR`. This means each channel's filter input is a different blend of detuned oscillators — filterL and filterR produce genuinely different outputs.
+    - At N=1 spread=0: `panL = panR = sqrt(0.5)`, so `preFiltL = preFiltR`, and both filter outputs are identical — centred mono, backward-compatible with Phase 6.6.
+  - **`kBaseVoiceGain = 0.15 * sqrt(2) = 0.2121`:** At N=1 spread=0, `preFiltL = osc * sqrt(0.5) = osc * 0.707`. After filter and gain: `sampleL = filter(osc) * 0.707 * kBaseVoiceGain = filter(osc) * 0.15`. Matches pre-6.7 `kVoiceGain=0.15` mono output exactly.
+  - **Post-review fixes (2026-03-11, caught by Claude Code + Codex):**
+    - **(BUG - MEDIUM)** Stereo spread was non-functional: original code computed one `scalar = filteredMono * voiceGain * ...` then summed `scalar * panL[u]` across all voices. Because scalar was identical per voice, `sampleL = scalar * Σ(panL)` and `sampleR = scalar * Σ(panR)`. Symmetric spread means `Σ(panL) == Σ(panR)` always → dual-mono output regardless of spread knob. **Fixed** by moving pan application before the filter (dual preFiltL/preFiltR + filterL/filterR as described above).
+    - **(LOW)** `outputBuffer.getNumChannels()` was called inside the `while` loop (every sample). Hoisted above the loop.
+    - **(LOW)** Double `pow()` call: when both `lfoToOsc1Pitch` and `lfoToOsc2Pitch` were true, `getCurrentValue()` and `pow()` were called twice with identical inputs. Merged into single `if (lfoToOsc1Pitch || lfoToOsc2Pitch)` block with one `pow()`.
+    - **(LOW)** Signal flow comment referenced old `kVoiceGain` (deleted). Updated to `voiceGain`.
+  - **unisonSpread is live per-block** (affects panL/panR in pre-filter accumulation). unisonCount and unisonDetune snapshotted at note-on (resizing active oscillator array mid-note is not audio-thread safe; user hears change on next note).
+  - **Default unisonCount=1:** Confirmed by user. Figma shows 3, but plan says 1. Default 1 chosen for backward compatibility and no loudness surprise on first launch.
 - [ ] Phase 6.8: Voicing params (voice count, velocity mod targets)
 - [ ] Phase 7: Full Figma UI implementation
 - [ ] GitHub Actions CI + pluginval

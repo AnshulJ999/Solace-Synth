@@ -8,6 +8,7 @@
 //
 // Generates one of four waveforms via phase accumulation. One instance lives
 // inside each SolaceVoice (Osc1). Phase 6.5 adds a second instance (Osc2).
+// Phase 6.6 adds LFO pitch modulation via setLFOPitchMultiplier().
 //
 // Waveform index mapping (matches APVTS "osc1Waveform" / "osc2Waveform"):
 //   0 = Sine      — std::sin(angle)
@@ -113,6 +114,25 @@ public:
     }
 
     // ========================================================================
+    // setLFOPitchMultiplier -- apply LFO vibrato as a frequency multiplier.
+    //
+    // Called once per render block (not per sample) before the sample loop.
+    // The multiplier is applied inside getNextSample() by scaling angleDelta.
+    //
+    //   multiplier = 2^(lfoSemitones / 12)  (equal-temperament pitch shift)
+    //   multiplier = 1.0                     (no LFO effect -- default)
+    //
+    // This is cheaper than recalling setFrequency() per block because it avoids
+    // the pow() and division; the oscillator already has the base angleDelta set.
+    // The compiler will see the 1.0 case in the hot loop and may elide the
+    // multiply when the target is not a pitch target.
+    // ========================================================================
+    void setLFOPitchMultiplier (double multiplier) noexcept
+    {
+        lfoMultiplier = multiplier;
+    }
+
+    // ========================================================================
     // getNextSample — advance the oscillator and return the current sample.
     //
     // Returns a value in [-1.0, +1.0] for all waveforms.
@@ -126,8 +146,8 @@ public:
         // Compute sample for the current phase.
         float sample = computeSample (currentAngle);
 
-        // Advance phase accumulator.
-        currentAngle += angleDelta;
+        // Advance phase accumulator. Apply LFO pitch multiplier (default 1.0 = no effect).
+        currentAngle += angleDelta * lfoMultiplier;
 
         // Wrap to [0, 2π]. Using a while loop rather than fmod (fmod is more
         // expensive on the audio thread). A single subtraction is insufficient
@@ -201,4 +221,9 @@ private:
     // Frequency multiplier from tuning controls (octave + semitones + cents).
     // Default 1.0 = no offset. Recomputed by setTuningOffset() at each note-on.
     double tuningMultiplier = 1.0;
+
+    // LFO pitch multiplier = 2^(lfoSemitones/12). Default 1.0 = no modulation.
+    // Set once per render block by setLFOPitchMultiplier() when a pitch LFO
+    // target is active; reset to 1.0 when the target is None.
+    double lfoMultiplier = 1.0;
 };

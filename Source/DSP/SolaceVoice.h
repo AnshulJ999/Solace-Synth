@@ -7,6 +7,7 @@
 #include "SolaceADSR.h"
 #include "SolaceOscillator.h"
 #include "SolaceFilter.h"
+#include "SolaceLFO.h"
 
 // ============================================================================
 // SolaceVoiceParams — APVTS Parameter Pointers for SolaceVoice
@@ -71,6 +72,21 @@ struct SolaceVoiceParams
     const std::atomic<float>* osc2Transpose = nullptr;
     const std::atomic<float>* osc2Tuning    = nullptr;  // float, -100 to +100 cents
     const std::atomic<float>* oscMix        = nullptr;  // float, 0.0–1.0
+
+    // --- Phase 6.6: LFO ---
+    // lfoWaveform: int stored as float (0=Sine, 1=Triangle, 2=Saw, 3=Square, 4=S&H).
+    // lfoRate:     float, 0.01–50 Hz.
+    // lfoAmount:   float, 0.0–1.0. Scales the LFO output before it is applied.
+    //              Default 0.0 means the LFO has no effect until the user turns it up.
+    // lfoTarget1/2/3: int stored as float (0=None, 1=FilterCutoff, 2=Osc1Pitch,
+    //              3=Osc2Pitch, 4=Osc1Level, 5=Osc2Level, 6=AmpLevel, 7=FilterRes).
+    // All six params are read per render-block for live knob response.
+    const std::atomic<float>* lfoWaveform = nullptr;
+    const std::atomic<float>* lfoRate     = nullptr;
+    const std::atomic<float>* lfoAmount   = nullptr;
+    const std::atomic<float>* lfoTarget1  = nullptr;
+    const std::atomic<float>* lfoTarget2  = nullptr;
+    const std::atomic<float>* lfoTarget3  = nullptr;
 };
 
 // ============================================================================
@@ -110,17 +126,31 @@ struct SolaceVoiceParams
 //     oscSample = osc1.getNextSample() * (1.0f - oscMix) + osc2.getNextSample() * oscMix
 //   The blended signal feeds into the filter unchanged — signal chain is additive.
 //
-// Signal flow (per sample, Phase 6.5+):
-//   blendedOsc = osc1 * (1 - oscMix) + osc2 * oscMix          ← crossfader
-//     → filter.setCutoff(baseCutoffHz + filterEnv * depth * 10000)  ← per sample
-//     → filter.processSample(blendedOsc)                            ← filtered
-//       → * kVoiceGain * velocityScale * ampEnvelope.getNextSample()
-//         → output buffer
+// Phase 6.6 -- LFO:
+//   SolaceLFO adds one free-running LFO per voice. Free-running means the LFO
+//   is never reset at note-on, giving each chord voice a progressively different
+//   phase for organic shimmer. lfoAmount (0-1) scales the LFO output; up to 3
+//   target slots (lfoTarget1/2/3) independently route the LFO to:
+//     1=FilterCutoff, 2=Osc1Pitch, 3=Osc2Pitch, 4=Osc1Level,
+//     5=Osc2Level, 6=AmpLevel, 7=FilterResonance.
+//
+// Signal flow (per sample, Phase 6.6+):
+//   lfoValue = lfo.getNextSample() * lfoAmount      ← per sample, all targets
+//   [Osc pitch targets: LFO multiplier set per block, applied in getNextSample()]
+//   osc1.getNextSample() → osc1s (with pitch LFO baked in if target)
+//   osc2.getNextSample() → osc2s (with pitch LFO baked in if target)
+//   [Osc level targets: scale osc1s/osc2s by (1 + lfoValue)]
+//   blendedOsc = osc1s * (1-mix) + osc2s * mix
+//   filter.setCutoff(baseCutoffHz + filterEnv + [LFO if target 1])
+//   filter.setResonance(baseRes + [LFO if target 7])
+//   filter.processSample(blendedOsc)
+//   * kVoiceGain * velocity * ampEnvVal * [LFO if target 6]
+//     → output buffer
 //
 // Architecture rules (audio thread):
 //   - No allocations, no locks, no logging, no I/O.
-//   - addSample() (not setSample()) — voices mix into a shared buffer.
-//   - startSample offset MUST be respected — note-on can arrive mid-block.
+//   - addSample() (not setSample()) -- voices mix into a shared buffer.
+//   - startSample offset MUST be respected -- note-on can arrive mid-block.
 // ============================================================================
 
 class SolaceVoice : public juce::SynthesiserVoice
@@ -163,6 +193,14 @@ public:
         jassert (params.osc2Transpose != nullptr);
         jassert (params.osc2Tuning    != nullptr);
         jassert (params.oscMix        != nullptr);
+
+        // Phase 6.6
+        jassert (params.lfoWaveform != nullptr);
+        jassert (params.lfoRate     != nullptr);
+        jassert (params.lfoAmount   != nullptr);
+        jassert (params.lfoTarget1  != nullptr);
+        jassert (params.lfoTarget2  != nullptr);
+        jassert (params.lfoTarget3  != nullptr);
     }
 
     // ========================================================================
@@ -309,26 +347,25 @@ public:
     }
 
     // ========================================================================
-    // renderNextBlock — fill the output buffer for this voice.
+    // renderNextBlock -- fill the output buffer for this voice.
     //
-    // Signal flow (Phase 6.5+, per sample):
-    //   blendedOsc = osc1 * (1-mix) + osc2 * mix         ← crossfader (per block)
-    //   blendedOsc → filter (cutoff modulated by filterEnv per sample)
-    //     → * kVoiceGain * velocityScale * ampEnv → output
+    // Signal flow (Phase 6.6+, per sample):
+    //   lfoValue  = lfo.getNextSample() * lfoAmount      (per sample)
+    //   osc1+osc2 blended by oscMix, with LFO pitch multiplier per block
+    //   blendedOsc -> filter (cutoff = filterEnv + LFO; resonance = base + LFO)
+    //     -> * kVoiceGain * velocity * ampEnv * (amp LFO) -> output
     //
-    // Filter runs BEFORE amp envelope — correct subtractive order:
-    //   filter self-resonance decays naturally during amp release phase.
+    // Per-block reads (before sample loop):
+    //   baseCutoffHz, baseResonance, envDepth, oscMix
+    //   lfoShape, lfoRate, lfoAmount, lfoTarget1/2/3
+    //   osc pitch multipliers (from LFO, using getCurrentValue -- no phase advance)
     //
-    // Per-block (before the sample loop):
-    //   - baseCutoffHz, filterResonance, envDepth, oscMix read from APVTS atomics
+    // Per-sample reads (inside loop):
+    //   osc1 + osc2 samples, filterEnvelope, filter.setCutoff/setResonance/process,
+    //   ampEnvelope, lfoSample for filter/amp/level targets
     //
-    // Per-sample (inside the loop):
-    //   - osc1 + osc2 both advance always (phase-continuous crossfader sweep)
-    //   - filterEnvelope.getNextSample() → modulated cutoff → filter.setCutoff()
-    //   - ampEnvelope.getNextSample()    → final amplitude scale
-    //
-    // CRITICAL: addSample() not setSample() — voices mix into shared buffer.
-    // CRITICAL: startSample offset respected — note may begin mid-block.
+    // CRITICAL: addSample() not setSample() -- voices mix into shared buffer.
+    // CRITICAL: startSample offset respected -- note may begin mid-block.
     // CRITICAL: No allocations, no locks, no logging on this thread.
     // ========================================================================
     void renderNextBlock (juce::AudioSampleBuffer& outputBuffer,
@@ -339,62 +376,125 @@ public:
             return;
 
         // --- Per-block parameter refresh ---
-        // Read live APVTS values once per block (not per sample) to give
-        // immediate knob response without atomic load overhead per sample.
-        //
-        // filterType excluded — mode changes mid-note cause a transient click
-        // (state-vector discontinuity). Stays at note-on snapshot for V1.
+        // All atomics read once per block — immediate knob response without
+        // per-sample atomic overhead. filterType excluded (mode change mid-note
+        // causes a state-vector transient; stays at note-on snapshot in V1).
         baseCutoffHz = params.filterCutoff->load();
-        filter.setResonance (params.filterResonance->load());
+        const float baseResonance = params.filterResonance->load();
+        const float envDepth      = params.filterEnvDepth->load();
+        const float mix           = juce::jlimit (0.0f, 1.0f, params.oscMix->load());
 
-        // filterEnvDepth: continuous float the user may sweep mid-note.
-        const float envDepth = params.filterEnvDepth->load();
+        // Filter modulation range constants (V1 fixed values -- could be params in V2).
+        constexpr float kModRange       = 10000.0f;  // max Hz swing from filter envelope
+        constexpr float kLFOCutoffRange = 10000.0f;  // max Hz swing from LFO (same scale)
+        constexpr float kLFOResRange    = 0.5f;      // LFO can swing +-0.5 resonance at full amount
+        constexpr float kLFOPitchSemi   = 2.0f;      // LFO can shift +-2 semitones at full amount
 
-        // oscMix: read per-block so moving the crossfader while holding a note
-        // is immediately audible. Clamped to [0, 1] for safety.
-        const float mix = juce::jlimit (0.0f, 1.0f, params.oscMix->load());
+        // --- LFO per-block refresh ---
+        // Shape and rate updated every block for live knob response.
+        // Phase is NOT reset -- the LFO is free-running from voice allocation.
+        lfo.setShape  (static_cast<int> (params.lfoWaveform->load()));
+        lfo.setRate   (params.lfoRate->load(), getSampleRate());
+        const float lfoAmount  = juce::jlimit (0.0f, 1.0f, params.lfoAmount->load());
+        const int   lfoTarget1 = static_cast<int> (params.lfoTarget1->load());
+        const int   lfoTarget2 = static_cast<int> (params.lfoTarget2->load());
+        const int   lfoTarget3 = static_cast<int> (params.lfoTarget3->load());
 
-        // modRange: maximum Hz the filter envelope can add or subtract.
-        // 10000 Hz gives dramatic sweeps while keeping headroom on both edges.
-        // V1 constant — could become an APVTS param in V2 if needed.
-        constexpr float kModRange = 10000.0f;
+        // Pre-compute bool flags: which target types are active across all 3 slots.
+        // Computed before the loop so the inner loop branches are on loop-invariant
+        // values -- the compiler can hoist or eliminate them.
+        const bool lfoToFilterCutoff = (lfoTarget1 == 1 || lfoTarget2 == 1 || lfoTarget3 == 1);
+        const bool lfoToOsc1Pitch    = (lfoTarget1 == 2 || lfoTarget2 == 2 || lfoTarget3 == 2);
+        const bool lfoToOsc2Pitch    = (lfoTarget1 == 3 || lfoTarget2 == 3 || lfoTarget3 == 3);
+        const bool lfoToOsc1Level    = (lfoTarget1 == 4 || lfoTarget2 == 4 || lfoTarget3 == 4);
+        const bool lfoToOsc2Level    = (lfoTarget1 == 5 || lfoTarget2 == 5 || lfoTarget3 == 5);
+        const bool lfoToAmpLevel     = (lfoTarget1 == 6 || lfoTarget2 == 6 || lfoTarget3 == 6);
+        const bool lfoToFilterRes    = (lfoTarget1 == 7 || lfoTarget2 == 7 || lfoTarget3 == 7);
+
+        // Pitch targets: compute multiplier once per block using getCurrentValue()
+        // (reads current LFO value without advancing phase, so the per-sample
+        // getNextSample() loop remains the sole source of LFO advancement).
+        // Block-rate vibrato granularity (~10 ms at 512 samples/48kHz) is
+        // imperceptible for typical vibrato rates of 1-8 Hz.
+        if (lfoToOsc1Pitch)
+        {
+            const double semi = static_cast<double> (lfo.getCurrentValue() * lfoAmount * kLFOPitchSemi);
+            osc1.setLFOPitchMultiplier (std::pow (2.0, semi / 12.0));
+        }
+        else
+        {
+            osc1.setLFOPitchMultiplier (1.0);
+        }
+
+        if (lfoToOsc2Pitch)
+        {
+            const double semi = static_cast<double> (lfo.getCurrentValue() * lfoAmount * kLFOPitchSemi);
+            osc2.setLFOPitchMultiplier (std::pow (2.0, semi / 12.0));
+        }
+        else
+        {
+            osc2.setLFOPitchMultiplier (1.0);
+        }
 
         while (--numSamples >= 0)
         {
-            // 1. Oscillators: blend Osc1 and Osc2 via oscMix crossfader.
-            //    mix=0 → Osc1 only; mix=1 → Osc2 only; mix=0.5 → equal blend.
-            //    Both oscillators always advance their phase accumulators each
-            //    sample (getNextSample() is called regardless of mix value) so
-            //    neither oscillator drifts out of phase if mix is swept back.
-            const float osc1Sample  = osc1.getNextSample();
-            const float osc2Sample  = osc2.getNextSample();
-            const float oscSample   = osc1Sample * (1.0f - mix) + osc2Sample * mix;
+            // LFO: advance once per sample. lfoSample is in [-lfoAmount, +lfoAmount].
+            // All non-pitch targets consume this value in this same iteration.
+            const float lfoSample = lfo.getNextSample() * lfoAmount;
 
-            // 2. Filter envelope modulation — per sample for smooth sweep.
-            //    filterEnvelope returns 0.0 → 1.0. envDepth (-1 to +1) controls
-            //    direction. SolaceFilter::setCutoff() clamps to [20, 20000] Hz.
-            const float filterEnvVal    = filterEnvelope.getNextSample();
-            const float modulatedCutoff = baseCutoffHz + filterEnvVal * envDepth * kModRange;
-            filter.setCutoff (modulatedCutoff);
+            // 1. Oscillators: get samples (LFO pitch multiplier applied inside
+            //    getNextSample() via stored lfoMultiplier; set per block above).
+            float osc1s = osc1.getNextSample();
+            float osc2s = osc2.getNextSample();
 
-            // 3. Filter: shape the spectrum (blended osc → filter → amp)
+            // 2. Osc level modulation (targets 4 and 5).
+            //    Scale: (1 + lfoSample) ranges 0 to 2 at full amount.
+            //    Clamped to [0, 2] to avoid negative amplitude (prevents phase inversion).
+            if (lfoToOsc1Level) osc1s *= juce::jlimit (0.0f, 2.0f, 1.0f + lfoSample);
+            if (lfoToOsc2Level) osc2s *= juce::jlimit (0.0f, 2.0f, 1.0f + lfoSample);
+
+            // 3. Mix oscillators via crossfader.
+            const float oscSample = osc1s * (1.0f - mix) + osc2s * mix;
+
+            // 4. Filter envelope + LFO cutoff modulation (target 1).
+            const float filterEnvVal  = filterEnvelope.getNextSample();
+            float modulatedCutoff     = baseCutoffHz + filterEnvVal * envDepth * kModRange;
+            if (lfoToFilterCutoff)    modulatedCutoff += lfoSample * kLFOCutoffRange;
+            filter.setCutoff (modulatedCutoff);  // clamps internally to [20, 20000]
+
+            // 5. Filter resonance modulation (target 7).
+            //    Per sample so the LFO sweep is smooth.
+            const float modulatedRes = juce::jlimit (0.0f, 1.0f,
+                baseResonance + (lfoToFilterRes ? lfoSample * kLFOResRange : 0.0f));
+            filter.setResonance (modulatedRes);
+
+            // 6. Filter: shape the spectrum.
             const float filteredSample = filter.processSample (oscSample);
 
-            // 4. Amp envelope + velocity + gain
-            const float ampEnvVal     = ampEnvelope.getNextSample();
+            // 7. Amp envelope.
+            const float ampEnvVal = ampEnvelope.getNextSample();
+
+            // 8. Amp level modulation (target 6).
+            //    Same (1 + lfoSample) scale as osc level -- clamped to [0, 2].
+            const float ampMod = lfoToAmpLevel
+                ? juce::jlimit (0.0f, 2.0f, 1.0f + lfoSample)
+                : 1.0f;
+
+            // 9. Final sample: filter -> gain -> velocity -> amp env -> amp LFO.
             const float currentSample = filteredSample
                                         * kVoiceGain
                                         * velocityScale
-                                        * ampEnvVal;
+                                        * ampEnvVal
+                                        * ampMod;
 
-            // 5. Mix into all output channels (mono voice → stereo buffer)
+            // 10. Mix into all output channels (mono voice -> stereo buffer).
             for (int ch = outputBuffer.getNumChannels(); --ch >= 0;)
                 outputBuffer.addSample (ch, startSample, currentSample);
 
             ++startSample;
 
-            // 6. Voice done check — AFTER getNextSample() so the ADSR's
-            //    final idle transition is captured correctly in the output.
+            // 11. Voice done check -- AFTER getNextSample() so the ADSR's
+            //     final idle transition is captured correctly in the output.
             if (! ampEnvelope.isActive())
             {
                 clearCurrentNote();
@@ -434,7 +534,13 @@ private:
     // The per-block load from APVTS atomics gives live crossfader response.
     SolaceOscillator osc2;
 
-    // Velocity scaling — set at note-on, multiplied per sample in renderNextBlock.
+    // --- Phase 6.6: LFO ---
+    // The LFO is free-running -- phase is NOT reset at note-on.
+    // Each voice in a chord accumulates a different phase naturally, producing
+    // organic per-voice shimmer on pads and filter sweeps.
+    SolaceLFO lfo;
+
+    // Velocity scaling -- set at note-on, multiplied per sample in renderNextBlock.
     float velocityScale = 0.0f;
 
     // Per-voice output gain. Limits peak output of a single voice to prevent

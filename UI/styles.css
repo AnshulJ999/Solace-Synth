@@ -382,16 +382,11 @@ html, body {
        overflow:hidden here would silently clip items that just barely overflow. */
 }
 
-/* Oscillator controls need tighter gap: waveform + 2 selectors + fader
-   need to fit in a narrower column than amp-env or master. */
-.controls-row--osc {
-    gap: var(--space-sm);
-}
+/* Oscillator controls — dead class, osc sections now use .osc-grid.
+   Kept for reference; safe to delete in a future cleanup. */
+/* .controls-row--osc { gap: var(--space-sm); } */
 
-/* Waveform icon is smaller in the tighter osc column */
-.controls-row--osc .waveform-icon {
-    width: clamp(40px, 4.5vw, 72px);
-}
+/* In the new osc-left-col layout, icon width is set via .osc-left-col .waveform-icon */
 
 /* Centered variant — for Osc Mix single-fader layout */
 .controls-row--center {
@@ -731,21 +726,27 @@ html, body {
 /* ============================================================================
  * Fader track area + tick ruler (Phase 7.4)
  *
- * .fader-track-area wraps the input and the ruler side-by-side.
- * .fader-ticks-ruler is a narrow strip to the RIGHT of the fader track
- * showing notch marks at 10% intervals (Figma spec: tight, 2-4px marks).
- * Height auto-stretches to match the input via align-items:stretch.
+ * fader-track-area is a thin relative-positioned wrapper around the input.
+ * width:fit-content means it stays the size of the input (8px), so
+ * align-items:center on .fader centres the input + thumb correctly.
+ *
+ * fader-ticks-ruler is absolutely positioned to the RIGHT of the input.
+ * It does NOT participate in the flex layout, so it cannot displace the
+ * thumb from the track centre. Height is top:0/bottom:0 = stretches to
+ * match the input via the containing block.
  * ============================================================================ */
 .fader-track-area {
-    display: flex;
-    flex-direction: row;
-    align-items: stretch;
-    gap: 3px;
+    position: relative;
+    overflow: visible;
+    width: fit-content;
 }
 
 .fader-ticks-ruler {
+    position: absolute;
+    left: calc(100% + 3px);  /* 3px gap right of the 8px track = 11px from left */
+    top: 0;
+    bottom: 0;
     width: 4px;
-    flex-shrink: 0;
     background: repeating-linear-gradient(
         to bottom,
         transparent 0%,

@@ -264,7 +264,7 @@
     // Initialize
     // =========================================================================
     const init = async () => {
-        logInfo("=== Solace Synth UI — Phase 7.3 ===");
+        logInfo("=== Solace Synth UI — Phase 7.4 ===");
 
         try {
             const bridgeOk = SolaceBridge.init();

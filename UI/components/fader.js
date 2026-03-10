@@ -71,7 +71,7 @@ class Fader {
             showTicks   = true,
         } = this.config;
 
-        const classes = ['fader', sizeClass, extraClass, showTicks ? 'fader--ticks' : null].filter(Boolean).join(' ');
+        const classes = ['fader', sizeClass, extraClass].filter(Boolean).join(' ');
 
         const wrapper = document.createElement('div');
         wrapper.className = classes;

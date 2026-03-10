@@ -1,8 +1,8 @@
 # Solace Synth — Project Memory
 
 **Created:** 2026-03-08
-**Last Updated:** 2026-03-11 (Phase 6.7 stereo spread fixed: replaced broken post-filter pan-fan approach with dual filterL/filterR + pre-filter per-unison accumulation. Claude Code + Codex caught the math bug. All 4 findings fixed. Awaiting build + test.)
-**Status:** Active -- Phases 0-5 done + 6.1-6.7 code complete. Next: build/test 6.7, then 6.8 (Voicing Parameters).
+**Last Updated:** 2026-03-11 (Phase 6.8 Voicing Parameters code complete. HIGH bug found: SolaceSynthesiser::noteOn() is a no-op -- both branches call identical base noteOn(), voiceCount polyphony cap has zero effect. Fix: use findVoiceToSteal()+stopVoice() before base noteOn() when at limit. Velocity modulation correct. Awaiting fix + build + test.)
+**Status:** Active -- Phases 0-5 done + 6.1-6.8 code complete (6.8 has HIGH bug pending fix). Next: fix voiceCount noteOn(), build + test 6.6-6.8, then 6.9 (Master Distortion).
 
 For UI: Up till phase 7.2 was done. UI prototype works, but needs lots of polishing and tweaks and further refinement.
 
@@ -480,8 +480,8 @@ An AI-first "vibe-coding" framework for building JUCE plugins. Provides structur
   - [ ] 6.4 Filter Envelope
   - [ ] 6.5 Second Oscillator + Osc Mix
   - [x] 6.6 LFO (3 targets, per-voice free-running) — code complete, pending build + listening test
-  - [ ] 6.7 Unison
-  - [ ] 6.8 Voicing params
+  - [x] 6.7 Unison — code complete (dual-filter stereo, pending build + listening test)
+  - [~] 6.8 Voicing params — code complete but HIGH bug: voiceCount polyphony cap is non-functional (noteOn() override is a no-op). Velocity mod is correct. Fix required before testing.
   - [ ] 6.9 Master Distortion
 - [ ] GitHub Actions CI + pluginval (automated testing)
 
@@ -628,6 +628,8 @@ Do NOT implement features suggested solely by Claude Code/Codex reviews without 
     - `voiceCount` (int 1-16, def 16), `velocityRange` (float 0-1, step 0.01, def 1.0), `velocityModTarget1` (int 0-4, def 2=AmpAttack), `velocityModTarget2` (int 0-4, def 0=None).
   - **Velocity mod target enum:** 0=None, 1=AmpLevel, 2=AmpAttack, 3=FilterCutoff, 4=FilterResonance.
   - **Default `velocityModTarget1=2` (AmpAttack):** Matches Figma. Gives expressiveness without changing loudness dynamics (users who want loudness control set target to AmpLevel).
+  - **⚠️ HIGH BUG found by Claude Code (2026-03-11):** `SolaceSynthesiser::noteOn()` is a complete no-op. Both branches (`if (activeCount >= voiceLimit)` and the else path) call `juce::Synthesiser::noteOn()` identically. The polyphony cap has zero effect. JUCE only invokes `findVoiceToSteal()` when ALL 16 voices are occupied -- with `voiceLimit=4` and 4 notes playing, voices 5-16 are still free and JUCE uses them without stealing. **Fix:** When `activeCount >= voiceLimit`, call `stopVoice(findVoiceToSteal(nullptr, ch, note), 0.0f, false)` BEFORE calling the base `noteOn()`. Both `findVoiceToSteal()` and `stopVoice()` are `protected` on `juce::Synthesiser`, callable from the subclass, safe to call from within `noteOn()` (lock already held). Remove the early `return` so the single base `noteOn()` call at the bottom handles both paths.
+  - **LOW:** `voiceCount` pointer stored in `SolaceVoiceParams` with a `jassert` but never read by any voice. It is read directly via `apvts.getRawParameterValue("voiceCount")` in `processBlock()`. The jassert implies a requirement that doesn't exist functionally. Either remove from `SolaceVoiceParams` or drop the jassert.
 - [ ] Phase 7: Full Figma UI implementation
 - [ ] GitHub Actions CI + pluginval
 

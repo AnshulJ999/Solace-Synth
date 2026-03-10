@@ -1,8 +1,10 @@
 # Solace Synth — Project Memory
 
 **Created:** 2026-03-08
-**Last Updated:** 2026-03-10 (Phase 6.5 code review complete — one Phase 6.3 bug found; Phases 6.1–6.5 code done, pending build + listening test)
-**Status:** Active — Phases 0-5 complete + Phases 6.1–6.5 code complete. Next: build verification + listening test for 6.5, fix filter.reset() bug, then Phase 6.6 (LFO).
+**Last Updated:** 2026-03-10 (Phase 6.6 LFO — code complete. SolaceLFO.h + SolaceOscillator.h + SolaceVoice.h done by Antigravity; PluginProcessor.cpp completed by Claude. Awaiting build + listening test.)
+**Status:** Active — Phases 0-5 complete + Phases 6.1–6.6 code complete. Next: build + listening test for 6.6, then Phase 6.7 (Unison).
+
+For UI: Up till phase 7.2 was done. UI prototype works, but needs lots of polishing and tweaks and further refinement.
 
 ---
 
@@ -476,7 +478,7 @@ An AI-first "vibe-coding" framework for building JUCE plugins. Provides structur
   - [ ] 6.3 Filter (LadderFilter LP24)
   - [ ] 6.4 Filter Envelope
   - [ ] 6.5 Second Oscillator + Osc Mix
-  - [ ] 6.6 LFO (3 targets, per-voice free-running)
+  - [x] 6.6 LFO (3 targets, per-voice free-running) — code complete, pending build + listening test
   - [ ] 6.7 Unison
   - [ ] 6.8 Voicing params
   - [ ] 6.9 Master Distortion
@@ -572,7 +574,13 @@ Do NOT implement features suggested solely by Claude Code/Codex reviews without 
   - **Build: successful (2026-03-10). Listening test: passed (2026-03-10). COMPLETE ✅**
 
 
-- [ ] Phase 6.6: LFO (3 targets, per-voice free-running)
+- [x] **Phase 6.6: LFO** — code complete (2026-03-10), awaiting build + listening test
+  - `Source/DSP/SolaceLFO.h` — NEW. Free-running per-voice LFO. 5 waveforms (Sine/Triangle/Saw/Square/S&H via `Shape` enum 0-4). Per-instance `juce::Random` for S&H (each voice gets independent random sequence). `getCurrentValue()` reads LFO without phase advance (for per-block pitch target setup). `getNextSample()` advances phase + detects cycle boundary for S&H latch. `reset()` exists but must NOT be called in `startNote()` — LFO is free-running by design.
+  - `Source/DSP/SolaceOscillator.h` — added `setLFOPitchMultiplier(double)` method and `double lfoMultiplier = 1.0` member. `getNextSample()` now uses `angleDelta * lfoMultiplier` (was `angleDelta`). Default 1.0 = no modulation. Cheaper than re-calling `setFrequency()` per block.
+  - `Source/DSP/SolaceVoice.h` — `SolaceVoiceParams` extended with 6 new atomics (`lfoWaveform/Rate/Amount/Target1/2/3`). `SolaceLFO lfo` private member added. Constructor: 6 new `jassert` checks. `renderNextBlock()`: per-block sets shape/rate/amount/targets, pre-computes 7 `bool` target flags (compiler-hoistable), sets pitch multipliers via `getCurrentValue()` before sample loop; per-sample advances LFO, applies level mod (jlimit 0-2), cutoff mod (+-10000 Hz), resonance mod (+-0.5), amp mod (jlimit 0-2).
+  - `PluginProcessor.cpp` — 6 new APVTS params: `lfoWaveform` (int 0-4, def 0=Sine), `lfoRate` (float 0.01-50Hz, skew 0.3, def 1.0), `lfoAmount` (float 0-1, def 0.0=no effect), `lfoTarget1` (int 0-7, def 1=FilterCutoff), `lfoTarget2` (int 0-7, def 0=None), `lfoTarget3` (int 0-7, def 0=None). 6 `voiceParams` atomics populated before voice creation loop.
+  - LFO target enum (in SolaceVoiceParams comment): 0=None, 1=FilterCutoff, 2=Osc1Pitch, 3=Osc2Pitch, 4=Osc1Level, 5=Osc2Level, 6=AmpLevel, 7=FilterRes.
+  - Key design: `lfoAmount=0.0` default means zero LFO effect on launch — user opts in. `lfoTarget1=1` (FilterCutoff) is the most natural default first target.
 - [ ] Phase 6.7: Unison (with level normalization)
 - [ ] Phase 6.8: Voicing params (voice count, velocity mod targets)
 - [ ] Phase 7: Full Figma UI implementation

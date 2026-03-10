@@ -54,6 +54,14 @@ SolaceSynthProcessor::SolaceSynthProcessor()
     voiceParams.osc2Tuning    = apvts.getRawParameterValue ("osc2Tuning");
     voiceParams.oscMix        = apvts.getRawParameterValue ("oscMix");
 
+    // --- Phase 6.6: LFO ---
+    voiceParams.lfoWaveform = apvts.getRawParameterValue ("lfoWaveform");
+    voiceParams.lfoRate     = apvts.getRawParameterValue ("lfoRate");
+    voiceParams.lfoAmount   = apvts.getRawParameterValue ("lfoAmount");
+    voiceParams.lfoTarget1  = apvts.getRawParameterValue ("lfoTarget1");
+    voiceParams.lfoTarget2  = apvts.getRawParameterValue ("lfoTarget2");
+    voiceParams.lfoTarget3  = apvts.getRawParameterValue ("lfoTarget3");
+
     // Create 16 voices. We always create the maximum number up front — JUCE's
     // Synthesiser does not support safe voice addition/removal at runtime.
     // A polyphony cap (Phase 6.8) will be implemented inside startNote() later.
@@ -237,6 +245,45 @@ juce::AudioProcessorValueTreeState::ParameterLayout SolaceSynthProcessor::create
         juce::NormalisableRange<float> (0.0f, 1.0f, 0.01f),
         0.5f));
 
+    // --- Phase 6.6: LFO ---
+    // lfoWaveform: int, 0=Sine, 1=Triangle, 2=Sawtooth, 3=Square, 4=S&H. Default 0=Sine.
+    // lfoRate uses the same skew factor (0.3) as filterCutoff -- the musically useful
+    // range (0.1-10 Hz) would be cramped at the bottom of a linear slider without it.
+    // lfoAmount default 0.0 means LFO has zero effect on launch; user opts in.
+    // lfoTarget1 default 1=FilterCutoff -- the most common/expected first LFO target.
+    // lfoTarget2/3 default 0=None -- additional slots inactive until user assigns.
+    params.push_back (std::make_unique<juce::AudioParameterInt> (
+        juce::ParameterID { "lfoWaveform", 1 },
+        "LFO Waveform",
+        0, 4, 0));  // default: 0 = Sine
+
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (
+        juce::ParameterID { "lfoRate", 1 },
+        "LFO Rate",
+        juce::NormalisableRange<float> (0.01f, 50.0f, 0.01f, 0.3f),
+        1.0f));  // default: 1 Hz
+
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (
+        juce::ParameterID { "lfoAmount", 1 },
+        "LFO Amount",
+        juce::NormalisableRange<float> (0.0f, 1.0f, 0.01f),
+        0.0f));  // default: 0 = no effect on launch
+
+    params.push_back (std::make_unique<juce::AudioParameterInt> (
+        juce::ParameterID { "lfoTarget1", 1 },
+        "LFO Target 1",
+        0, 7, 1));  // default: 1 = FilterCutoff
+
+    params.push_back (std::make_unique<juce::AudioParameterInt> (
+        juce::ParameterID { "lfoTarget2", 1 },
+        "LFO Target 2",
+        0, 7, 0));  // default: 0 = None
+
+    params.push_back (std::make_unique<juce::AudioParameterInt> (
+        juce::ParameterID { "lfoTarget3", 1 },
+        "LFO Target 3",
+        0, 7, 0));  // default: 0 = None
+
     return { params.begin(), params.end() };
 }
 
@@ -343,7 +390,7 @@ void SolaceSynthProcessor::prepareToPlay (double sampleRate, int samplesPerBlock
     SolaceLog::info ("prepareToPlay: sampleRate=" + juce::String (sampleRate)
         + " samplesPerBlock=" + juce::String (samplesPerBlock)
         + " voices=" + juce::String (synth.getNumVoices())
-        + " params: amp(4) osc1(4) filter(3) filterEnv(5) osc2+mix(5)");
+        + " params: amp(4) osc1(4) filter(3) filterEnv(5) osc2+mix(5) lfo(6)");
 }
 
 void SolaceSynthProcessor::releaseResources()

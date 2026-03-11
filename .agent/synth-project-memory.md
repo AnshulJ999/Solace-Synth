@@ -2,7 +2,10 @@
 
 **Created:** 2026-03-08
 **Last Updated:** 2026-03-11 (Phase 7.4/packaging) | 2026-03-12 (Phase 6.8b: vel mod 3 slots + 8 targets) | 2026-03-12 (Distortion volume-jump bug fixed: k=drive*10 instead of 1+drive*9)
-**Status:** Active -- All DSP phases 6.1-6.9 + 6.8b COMPLETE + distortion bug fixed. **Remaining V1 items: pitch bend, mod wheel, 3rd vel-target slot in UI.** Build not re-verified after latest fixes -- run before next session. Phase 7 UI mostly done (7.1-7.4).
+**Status:** Active -- All DSP phases 6.1-6.9 + 6.8b COMPLETE + distortion bug fixed. **Remaining V1 items: pitch bend, mod wheel, 3rd vel-target slot in UI.** Phase 7 UI mostly done (7.1-7.4).
+
+
+BUILD WAS VERIFIED.
 
 ---
 

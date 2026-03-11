@@ -1,15 +1,19 @@
 # Solace Synth — Project Memory
 
 **Created:** 2026-03-08
-**Last Updated:** 2026-03-11 (Phase 7.4/packaging) | 2026-03-12 (Phase 6.8b: vel mod 3 slots + 8 targets) | 2026-03-12 (Distortion volume-jump bug fixed: k=drive*10 instead of 1+drive*9)
-**Status:** Active -- All DSP phases 6.1-6.9 + 6.8b COMPLETE + distortion bug fixed. **Remaining V1 items: pitch bend, mod wheel, 3rd vel-target slot in UI.** Phase 7 UI mostly done (7.1-7.4).
+**Last Updated:** 2026-03-12 (Phase 7.5: dropdown popup + fader UX + 3rd vel-mod slot) | 2026-03-12 pitch bend + mod wheel DSP
+**Status:** Active — All DSP phases 6.1-6.9 + 6.8b COMPLETE. Pitch bend ±2 semi + mod wheel → LFO DONE. Phase 7 UI 7.1-7.5 COMPLETE. **Remaining V1: LFO target enum reconciliation (pending Nabeel), pitch bend/mod wheel UI controls (V1.1+), SVG icon exports (whenever Nabeel provides).**
 
 
-BUILD WAS VERIFIED.
+BUILD WAS VERIFIED as of 2026-03-11
 
 ---
 
-**Pending item:** LFO target list in `main.js` does NOT match Vision Document (Nabeel's answer 5). Current code has `FilterCutoff, Osc1Pitch...` but Vision Doc requires a different 8-item list including Distortion, Master Volume, Osc Mix, etc. Must be reconciled before DSP LFO wiring. See `.agent/plans/Phase-7-UI-Master-Plan.md`.
+**Pending item (unchanged):** LFO target list in `main.js` does NOT match Vision Document (Nabeel's answer 5). Velocity mod target list IS now correct (8 targets, Phase 6.8b aligned). LFO keep on hold — see `.agent/plans/Phase-7-UI-Master-Plan.md`.
+
+**SVG icons:** RESOLVED — placeholder SVG icons are fine for now. Will update when/if Nabeel exports final assets from Figma. Not a blocker.
+
+**Ctrl+drag fine fader control:** PENDING — deferred from Phase 7.5. Marked for a later pass.
 
 **UI plan:** `.agent/plans/Phase-7-UI-Master-Plan.md` — this is the authoritative merged plan. `.agent/plans/Standalone-Packaging-Plan.md` covers the portable standalone handoff path. Old files (`Phase 7 — UI Roadmap.md`, `Phase-7.4-Pixel-Perfect-Audit.md`) are kept as references only.
 

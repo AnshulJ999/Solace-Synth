@@ -9,6 +9,8 @@
 // Generates one of four waveforms via phase accumulation. One instance lives
 // inside each SolaceVoice (Osc1). Phase 6.5 adds a second instance (Osc2).
 // Phase 6.6 adds LFO pitch modulation via setLFOPitchMultiplier().
+// Phase 6.8b adds velocity pitch via setVelPitchMultiplier().
+// Phase 7 (DSP) adds MIDI pitch bend via setPitchBendMultiplier().
 //
 // Waveform index mapping (matches APVTS "osc1Waveform" / "osc2Waveform"):
 //   0 = Sine      — std::sin(angle)
@@ -150,6 +152,25 @@ public:
     }
 
     // ========================================================================
+    // setPitchBendMultiplier -- apply MIDI pitch wheel as a frequency multiplier.
+    //
+    // Called from SolaceVoice::pitchWheelMoved() whenever the MIDI pitch wheel
+    // changes position while the voice is active, and also at note-on to apply
+    // any bend that was already active when the note started.
+    //
+    //   multiplier = 2^(semitones / 12)  (equal-temperament pitch shift)
+    //   semitones  = (wheelValue / 8192.0) * bendRange
+    //   multiplier = 1.0                  (wheel at centre -- default)
+    //
+    // Applied multiplicatively with lfoMultiplier and velPitchMultiplier in
+    // getNextSample(): all three pitch sources are fully independent.
+    // ========================================================================
+    void setPitchBendMultiplier (double multiplier) noexcept
+    {
+        pitchBendMultiplier = multiplier;
+    }
+
+    // ========================================================================
     // getNextSample — advance the oscillator and return the current sample.
     //
     // Returns a value in [-1.0, +1.0] for all waveforms.
@@ -163,11 +184,12 @@ public:
         // Compute sample for the current phase.
         float sample = computeSample (currentAngle);
 
-        // Advance phase accumulator. Apply both pitch multipliers:
-        //   lfoMultiplier     = LFO vibrato (set per block, default 1.0)
-        //   velPitchMultiplier = velocity-to-pitch (set at note-on, default 1.0)
-        // Multiplied together: combined pitch ratio = lfoMult * velPitchMult.
-        currentAngle += angleDelta * lfoMultiplier * velPitchMultiplier;
+        // Advance phase accumulator. Apply all three pitch multipliers:
+        //   lfoMultiplier       = LFO vibrato (set per block, default 1.0)
+        //   velPitchMultiplier  = velocity-to-pitch (set at note-on, default 1.0)
+        //   pitchBendMultiplier = MIDI pitch wheel (updated on wheel events, default 1.0)
+        // All three compose multiplicatively: combined pitch ratio = product of all three.
+        currentAngle += angleDelta * lfoMultiplier * velPitchMultiplier * pitchBendMultiplier;
 
         // Wrap to [0, 2π]. Using a while loop rather than fmod (fmod is more
         // expensive on the audio thread). A single subtraction is insufficient
@@ -249,6 +271,12 @@ private:
 
     // Velocity pitch multiplier = 2^(velCents/1200). Default 1.0 = no modulation.
     // Set once at note-on by setVelPitchMultiplier(). Constant for the life of the note.
-    // Combined with lfoMultiplier multiplicatively in getNextSample().
+    // Combined with lfoMultiplier and pitchBendMultiplier multiplicatively in getNextSample().
     double velPitchMultiplier = 1.0;
+
+    // MIDI pitch bend multiplier = 2^(bendSemitones/12). Default 1.0 = wheel at centre.
+    // Updated by setPitchBendMultiplier() on each pitchWheelMoved() callback and also
+    // applied at note-on to capture any bend that was already active.
+    // Combined with lfoMultiplier and velPitchMultiplier multiplicatively.
+    double pitchBendMultiplier = 1.0;
 };

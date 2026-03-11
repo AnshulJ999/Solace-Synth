@@ -146,8 +146,82 @@ class Fader {
             this._suppressSync = false;
         });
 
+        // --- Double-click input → reset to defaultValue ---
+        input.addEventListener ('dblclick', (e) => {
+            e.preventDefault();
+            if (this._suppressSync) return;
+            const v = defaultValue;
+            this._suppressSync = true;
+            input.value = String (v);
+            if (this._display) this._display.textContent = this._fmt (v);
+            this._updateFill (v);
+            this._suppressSync = false;
+            SolaceBridge.setParameter (this.paramId, v);
+        });
+
+        // --- Click value text → inline text editor ---
+        //
+        // Clicking the readout span converts it to a text <input>.
+        // Enter/blur commits the value (clamped to [min, max]).
+        // Escape cancels and restores the previous display.
+        // A `committed` flag prevents double-firing when Enter triggers blur.
+        displayEl.addEventListener ('click', () => {
+            if (displayEl.dataset.editing === 'true') return;
+            displayEl.dataset.editing = 'true';
+
+            const currentVal = parseFloat (this._input ? this._input.value : String (defaultValue));
+
+            const textInput = document.createElement ('input');
+            textInput.type      = 'text';
+            textInput.className = 'fader-value-edit';
+            textInput.value     = this._fmt (currentVal);
+
+            // Swap span content for the text input
+            displayEl.textContent = '';
+            displayEl.appendChild (textInput);
+            textInput.focus();
+            textInput.select();
+
+            let committed = false;
+
+            const commit = () => {
+                if (committed) return;
+                committed = true;
+                displayEl.dataset.editing = 'false';
+
+                const raw     = parseFloat (textInput.value);
+                const { min, max } = this.config;
+
+                if (!isNaN (raw)) {
+                    const clamped = Math.min (max, Math.max (min, raw));
+                    if (this._input) this._input.value = String (clamped);
+                    this._updateFill (clamped);
+                    displayEl.textContent = this._fmt (clamped);
+                    SolaceBridge.setParameter (this.paramId, clamped);
+                } else {
+                    // Non-numeric input: revert to current slider value
+                    const revert = parseFloat (this._input ? this._input.value : String (defaultValue));
+                    displayEl.textContent = this._fmt (revert);
+                }
+            };
+
+            const cancel = () => {
+                if (committed) return;
+                committed = true;
+                displayEl.dataset.editing = 'false';
+                const revert = parseFloat (this._input ? this._input.value : String (defaultValue));
+                displayEl.textContent = this._fmt (revert);
+            };
+
+            textInput.addEventListener ('keydown', (e) => {
+                if (e.key === 'Enter')  { e.preventDefault(); commit(); }
+                if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+            });
+            textInput.addEventListener ('blur', commit);
+        });
+
         // Initialise fill from defaultValue
-        this._updateFill(defaultValue);
+        this._updateFill (defaultValue);
 
         return this;
     }

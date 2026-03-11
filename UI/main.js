@@ -118,8 +118,10 @@
     const VOICE_COUNT_OPTIONS= Array.from({ length: 16 }, (_, i) => ({ value: i + 1, label: String(i + 1) }));
     const UNISON_OPTIONS     = Array.from({ length: 8  }, (_, i) => ({ value: i + 1, label: String(i + 1) }));
 
-    // ⚠️ PENDING: These enums do not match Vision Document answer 5.
+    // ⚠️ PENDING: LFO target enum does not match Vision Document answer 5.
     //    Leaving unchanged until Anshul/Nabeel confirm the final target list.
+    //    DSP enum: 0=None,1=FilterCutoff,2=Osc1Pitch,3=Osc2Pitch,
+    //              4=Osc1Level,5=Osc2Level,6=AmpLevel,7=FilterResonance
     const LFO_TARGET_OPTIONS = [
         { value: 0, label: "None"              },
         { value: 1, label: "Filter - Cutoff"   },
@@ -127,16 +129,22 @@
         { value: 3, label: "Osc 2 - Pitch"     },
         { value: 4, label: "Osc 1 - Level"     },
         { value: 5, label: "Osc 2 - Level"     },
-        { value: 6, label: "Amp - Level"        },
+        { value: 6, label: "Amp - Level"       },
         { value: 7, label: "Filter - Resonance"},
     ];
 
+    // Velocity mod target enum — fully implemented in DSP (Phase 6.8 / 6.8b).
+    //   0=None, 1=AmpLevel, 2=AmpAttack, 3=FilterCutoff, 4=FilterResonance,
+    //   5=Distortion, 6=Osc1Pitch, 7=OscMix
     const VEL_MOD_TARGET_OPTIONS = [
         { value: 0, label: "None"              },
-        { value: 1, label: "Amp - Level"        },
-        { value: 2, label: "Amp - Attack"       },
+        { value: 1, label: "Amp - Level"       },
+        { value: 2, label: "Amp - Attack"      },
         { value: 3, label: "Filter - Cutoff"   },
         { value: 4, label: "Filter - Resonance"},
+        { value: 5, label: "Distortion"        },
+        { value: 6, label: "Osc Pitch"     },
+        { value: 7, label: "Osc Mix"           },
     ];
 
     // =========================================================================
@@ -249,10 +257,12 @@
         new Fader("velocityRange", { label: "Velocity", min: 0, max: 1, step: 0.01, defaultValue: 1, sizeClass: "fader--big" })
             .mount(mount("mount-velocityRange"));
 
-        new Dropdown("velocityModTarget1", VEL_MOD_TARGET_OPTIONS, { ariaLabel: "Velocity Mod Target 1", defaultIndex: 2 }) // Amp Attack
+        new Dropdown("velocityModTarget1", VEL_MOD_TARGET_OPTIONS, { ariaLabel: "Velocity Mod Target 1", defaultIndex: 1 }) // Amp Level (Nabeel confirmed default, Phase 6.8b)
             .mount(mount("mount-velocityModTarget1"));
         new Dropdown("velocityModTarget2", VEL_MOD_TARGET_OPTIONS, { ariaLabel: "Velocity Mod Target 2", defaultIndex: 0 }) // None
             .mount(mount("mount-velocityModTarget2"));
+        new Dropdown("velocityModTarget3", VEL_MOD_TARGET_OPTIONS, { ariaLabel: "Velocity Mod Target 3", defaultIndex: 0 }) // None
+            .mount(mount("mount-velocityModTarget3"));
 
         // unisonDetune + unisonSpread: deliberately NOT mounted — no UI controls in V1 (engine-only by design).
         // C++ APVTS params exist; bridge silently skips them on syncAllParameters (no registered listeners = no-op). This is correct.

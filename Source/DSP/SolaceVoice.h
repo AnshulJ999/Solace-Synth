@@ -109,6 +109,16 @@ struct SolaceVoiceParams
     const std::atomic<float>* velocityModTarget2 = nullptr;
     const std::atomic<float>* velocityModTarget3 = nullptr;  // Phase 6.8b
     const std::atomic<float>* voiceCount         = nullptr;
+
+    // --- Phase 7 DSP: Pitch Wheel + Mod Wheel ---
+    // Owned by SolaceSynthesiser (atomic members). Pointer held here so voices
+    // can read the current wheel position at note-on and per-block without
+    // going through the APVTS (wheel state is not an APVTS parameter).
+    //
+    // pitchWheelValue: 0-16383, centred at 8192. Updated via handleMidiEvent.
+    // modWheelValue:   0-127.   Updated via handleMidiEvent for CC#1.
+    const std::atomic<int>* pitchWheelValue = nullptr;
+    const std::atomic<int>* modWheelValue   = nullptr;
 };
 
 // ============================================================================
@@ -272,6 +282,10 @@ public:
         // from APVTS in SolaceSynthesiser::processBlock(). The pointer must still
         // be non-null (hence the jassert) but SolaceVoice never dereferences it.
         jassert (params.voiceCount != nullptr);
+
+        // Phase 7 DSP: pitch bend + mod wheel
+        jassert (params.pitchWheelValue != nullptr);
+        jassert (params.modWheelValue   != nullptr);
     }
 
     // ========================================================================
@@ -499,6 +513,13 @@ public:
         // LFO (Phase 6.6): no reset here -- free-running by design.
         // Pan gains (Phase 6.7): initialised in renderNextBlock() per-block from
         // unisonSpread, so live spread knob changes are audible while holding notes.
+
+        // --- Pitch Bend at note-on (Phase 7 DSP) ---
+        // Apply the current pitch wheel position immediately so a note started
+        // while the wheel is bent plays at the correct pitch from the first sample.
+        // pitchWheelMoved() won't be called for this voice until the NEXT wheel
+        // message arrives, so we prime the multiplier here.
+        _applyPitchBend (params.pitchWheelValue->load (std::memory_order_relaxed));
     }
 
     // ========================================================================
@@ -591,7 +612,12 @@ public:
         // --- LFO per-block refresh ---
         lfo.setShape  (static_cast<int> (params.lfoWaveform->load()));
         lfo.setRate   (params.lfoRate->load(), getSampleRate());
-        const float lfoAmount  = juce::jlimit (0.0f, 1.0f, params.lfoAmount->load());
+        const float lfoAmountKnob = juce::jlimit (0.0f, 1.0f, params.lfoAmount->load());
+        // Mod wheel (CC#1, 0–127) adds to the knob value, clamped to [0, 1].
+        // This gives classic "mod wheel = vibrato depth" behaviour: at lfoAmount=0
+        // the mod wheel still works; at lfoAmount=1 it has no headroom to add.
+        const float modWheelNorm = static_cast<float> (params.modWheelValue->load (std::memory_order_relaxed)) / 127.0f;
+        const float lfoAmount    = juce::jlimit (0.0f, 1.0f, lfoAmountKnob + modWheelNorm);
         const int   lfoTarget1 = static_cast<int> (params.lfoTarget1->load());
         const int   lfoTarget2 = static_cast<int> (params.lfoTarget2->load());
         const int   lfoTarget3 = static_cast<int> (params.lfoTarget3->load());
@@ -726,11 +752,38 @@ public:
     }
 
     // ========================================================================
-    // Pitch wheel / controller — required overrides, not yet implemented.
-    // Phase 6.8+ / V2: pitch wheel will modulate osc1 frequency.
+    // pitchWheelMoved -- called by JUCE Synthesiser on MIDI pitch wheel events.
+    //
+    // Converts the 14-bit wheel position (0-16383, centred at 8192) to a
+    // frequency multiplier using a ±2 semitone range (standard MIDI default).
+    // Applied multiplicatively via setPitchBendMultiplier() on all active unison
+    // oscillators. The bend stays applied until the wheel returns to centre;
+    // no state reset on note-off (consistent with real hardware behaviour).
+    //
+    // Bend range: ±2 semitones (kPitchBendRange). Industry standard default.
+    //   V2: make this a user-configurable APVTS parameter.
     // ========================================================================
-    void pitchWheelMoved (int /*newValue*/)                    override {}
-    void controllerMoved (int /*controller*/, int /*value*/)   override {}
+    void pitchWheelMoved (int newValue) override
+    {
+        _applyPitchBend (newValue);
+    }
+
+    // ========================================================================
+    // controllerMoved -- called by JUCE Synthesiser on MIDI CC events.
+    //
+    // CC#1 is the mod wheel (standard MIDI). We store the value on the
+    // synthesiser-level atomic (via SolaceVoiceParams pointer) and apply it
+    // per-block in renderNextBlock() to the LFO amount.
+    //
+    // All other CC messages are ignored at the voice level in V1.
+    // ========================================================================
+    void controllerMoved (int controller, int /*value*/) override
+    {
+        // The actual mod wheel value is already captured into the synthesiser-level
+        // atomic by SolaceSynthesiser::handleMidiEvent() before this call arrives.
+        // Nothing more to do here -- renderNextBlock() reads it each block.
+        (void) controller;
+    }
 
 private:
     const SolaceVoiceParams params;
@@ -809,6 +862,36 @@ private:
     //   0.707 * kBaseVoiceGain = 0.15 -> kBaseVoiceGain = 0.15 / 0.707 = 0.2121 = 0.15 * sqrt(2)
     //
     // kBaseVoiceGain unchanged from before at 0.15 * sqrt(2). Math still holds.
+    // ========================================================================
+    // _applyPitchBend -- convert MIDI pitch wheel value to frequency multiplier
+    // and apply to all active unison oscillators.
+    //
+    // Called from pitchWheelMoved() (real-time, while note is playing) and
+    // from startNote() (primes the multiplier at note onset).
+    //
+    // wheelValue: 0-16383 (JUCE standard), centred at 8192.
+    //   0     = maximum downward bend (-kPitchBendRange semitones)
+    //   8192  = centre (no bend),  multiplier = 1.0
+    //   16383 = maximum upward bend (+kPitchBendRange semitones)
+    // ========================================================================
+    void _applyPitchBend (int wheelValue) noexcept
+    {
+        // Normalise to [-1.0, +1.0]. JUCE uses 0-16383 with centre at 8192.
+        const double normalised = (static_cast<double> (wheelValue) - 8192.0) / 8192.0;
+        const double semitones  = normalised * static_cast<double> (kPitchBendRange);
+        const double multiplier = std::pow (2.0, semitones / 12.0);
+
+        for (int u = 0; u < activeUnisonCount; ++u)
+        {
+            unisonVoices[u].osc1.setPitchBendMultiplier (multiplier);
+            unisonVoices[u].osc2.setPitchBendMultiplier (multiplier);
+        }
+    }
+
+    // Pitch bend range in semitones (\u00b12 semitones = MIDI default).
+    // V2: expose as user-configurable APVTS parameter.
+    static constexpr int kPitchBendRange = 2;
+
     static constexpr float kBaseVoiceGain = 0.15f * 1.4142135f;  // 0.15 * sqrt(2)
     float voiceGain = kBaseVoiceGain;  // updated at startNote()
 };

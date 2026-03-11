@@ -40,7 +40,45 @@ public:
         voiceLimit = juce::jlimit (1, 16, limit);
     }
 
+    // ========================================================================
+    // Pitch wheel and mod wheel state.
+    //
+    // pitchWheelValue: 0-16383 (14-bit), centred at 8192. Updated from MIDI.
+    // modWheelValue:   0-127 (7-bit). Updated from MIDI CC#1.
+    //
+    // These are read by SolaceVoice: pitchWheelValue at note-on (to apply
+    // any bend already held) and per-block for continuous update.
+    // modWheelValue is read per-block to modulate LFO amount.
+    //
+    // Thread safety: written on the audio thread (handleMidiEvent, called
+    // inside renderNextBlock). Read on the audio thread only (SolaceVoice).
+    // std::atomic used defensively for cache coherence across CPU cores.
+    // ========================================================================
+    std::atomic<int> pitchWheelValue { 8192 };  // centred (no bend)
+    std::atomic<int> modWheelValue   { 0 };     // fully down (no mod)
+
 protected:
+    // ========================================================================
+    // handleMidiEvent -- intercept MIDI events to capture pitch/mod wheel state
+    // before forwarding to the base Synthesiser.
+    //
+    // JUCE's Synthesiser::renderNextBlock routes MIDI events through
+    // handleMidiEvent() in timestamp order. Overriding here lets us store the
+    // current wheel positions so SolaceVoice can apply them at note-on (for
+    // notes that start after the wheel event within the same block).
+    // ========================================================================
+    void handleMidiEvent (const juce::MidiMessage& m) override
+    {
+        if (m.isPitchWheel())
+            pitchWheelValue.store (m.getPitchWheelValue(), std::memory_order_relaxed);
+
+        if (m.isController() && m.getControllerNumber() == 1)
+            modWheelValue.store (m.getControllerValue(), std::memory_order_relaxed);
+
+        // Always forward to base class — it handles note-on, note-off, etc.
+        juce::Synthesiser::handleMidiEvent (m);
+    }
+
     // ========================================================================
     // findFreeVoice — restricts the free-voice search to [0, voiceLimit).
     //

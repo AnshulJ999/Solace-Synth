@@ -1,14 +1,14 @@
 # Solace Synth — Project Memory
 
 **Created:** 2026-03-08
-**Last Updated:** 2026-03-11 (Phase 7.4 — osc 2-col layout, fader centering, tick rulers, waveform arrows)
-**Status:** Active — Phase 6 (DSP) COMPLETE. Phase 7.1-7.3 COMPLETE. Phase 7.4 in progress: osc grid, fader fill+ruler, waveform arrows done. Pending: logo, LFO targets, vertical labels.
+**Last Updated:** 2026-03-11 (Phase 7.4/packaging — osc 2-col layout, fader centering fixed, tick rulers, waveform arrows, embedded UI for portable standalone)
+**Status:** Active — Phase 6 (DSP) COMPLETE. Phase 7.1-7.4 functionally complete for demo. Standalone packaging updated: Release builds embed the full UI via JUCE BinaryData; Debug keeps dev-path fallback for fast iteration. Pending: clean-machine verification, logo, LFO targets, vertical labels, real dropdown popup.
 
 ---
 
 **Pending item:** LFO target list in `main.js` does NOT match Vision Document (Nabeel's answer 5). Current code has `FilterCutoff, Osc1Pitch...` but Vision Doc requires a different 8-item list including Distortion, Master Volume, Osc Mix, etc. Must be reconciled before DSP LFO wiring. See `.agent/plans/Phase-7-UI-Master-Plan.md`.
 
-**UI plan:** `.agent/plans/Phase-7-UI-Master-Plan.md` — this is the authoritative merged plan. Old files (`Phase 7 — UI Roadmap.md`, `Phase-7.4-Pixel-Perfect-Audit.md`) are kept as references only.
+**UI plan:** `.agent/plans/Phase-7-UI-Master-Plan.md` — this is the authoritative merged plan. `.agent/plans/Standalone-Packaging-Plan.md` covers the portable standalone handoff path. Old files (`Phase 7 — UI Roadmap.md`, `Phase-7.4-Pixel-Perfect-Audit.md`) are kept as references only.
 
 ---
 
@@ -30,7 +30,7 @@ A free, open-source polyphonic soft synthesizer. Being built by Anshul (backend/
 - GitHub repo: **`AnshulJ999/Solace-Synth`** (created, owned by Anshul)
 - Local path: `G:\GitHub\Solace-Synth`
 - Project memory: `.agent/synth-project-memory.md` (hardlinked to `G:\GitHub\Personal-Stuff\Synth-Project\synth-project-memory.md`)
-- Repo status: **Phases 0-5 complete** — working polyphonic sine synth with WebView UI, bridge, MIDI keyboard
+- Repo status: **Phases 0-6 complete, Phase 7 demo UI working** — working polyphonic synth with WebView UI, bridge, MIDI keyboard, and portable embedded-UI standalone build
 - The "SS" monogram logo from the original mockup works well with Solace Synth initials
 
 ---
@@ -750,10 +750,15 @@ git push origin --tags
 Tags allow instant rollback to any verified state without hunting for commit hashes.
 
 ### Nabeel's Hot-Reload Workflow
-Nabeel does **not** need to build the project. UI files are served from disk at runtime:
+For **Debug/dev builds**, UI files can still be served from disk at runtime:
 1. Edit files in `UI/` → Save
 2. Close + reopen the plugin window (or refresh WebView)
 3. Changes visible immediately — no C++ compile needed
+
+For **Release/distribution builds**, the UI is embedded via JUCE BinaryData:
+1. Edit files in `UI/`
+2. Rebuild the project
+3. New standalone / plugin artifacts contain the updated embedded UI
 
 ### If Nabeel breaks his branch
 ```bash
@@ -808,4 +813,3 @@ Since `dev-nabeel` only contains `UI/` changes, this is always safe — no audio
 - [JUCE pricing/licensing](https://juce.com/get-juce/)
 
 ---
-

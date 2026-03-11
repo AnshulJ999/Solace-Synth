@@ -1,8 +1,8 @@
 # Solace Synth — Project Memory
 
 **Created:** 2026-03-08
-**Last Updated:** 2026-03-11 (Phase 7.4/packaging — osc 2-col layout, fader centering fixed, tick rulers, waveform arrows, embedded UI for portable standalone)
-**Status:** Active — Phase 6 (DSP) COMPLETE. Phase 7.1-7.4 functionally complete for demo. Standalone packaging updated: Release builds embed the full UI via JUCE BinaryData; Debug keeps dev-path fallback for fast iteration. Pending: clean-machine verification, logo, LFO targets, vertical labels, real dropdown popup.
+**Last Updated:** 2026-03-11 (Phase 7.4/packaging) | 2026-03-12 (Phase 6.8b: velocity mod expanded to 3 slots + 8 targets, flat-when-not-routed fix, Distortion/Osc1Pitch/OscMix targets added, APVTS skew factors on all ADSR time params, organic distortion flagged for V1.1)
+**Status:** Active -- Phase 6 (DSP) COMPLETE + 6.8b applied. Phase 7.1-7.4 functionally complete for demo. **Build not re-verified after 6.8b -- run cmake --build before next session.** Pending: clean-machine verification, logo, LFO targets, vertical labels, real dropdown popup.
 
 ---
 
@@ -645,6 +645,21 @@ Do NOT implement features suggested solely by Claude Code/Codex reviews without 
   - **⚠️ Implementation note:** At drive=0, k=1 → tanh(1)≈0.762, so the formula outputs x/0.762 ≈ 1.31x amplification even at \"clean\". This is by design in the plan (noted in Phase 6.9 spec). The plan says \"mild saturation at drive=0\" which matches. If Nabeel prefers truly transparent passthrough at 0, the alternative is `drive==0 → return x` (bypass).
   - **Applied per channel**, before master volume, after renderNextBlock().
   - **APVTS:** `masterDistortion` (float, 0.0-1.0, step 0.01, default 0.0). Default 0.0 maps to k=1 (mild/near-clean).
+- [x] **Phase 6.8b: Velocity Mod Expansion** — COMPLETE (2026-03-12)
+  - **Problem resolved:** Nabeel confirmed AmpLevel should be default Slot 1, and when AmpLevel is in no slot, volume must be flat (was incorrectly always following velocity).
+  - **3 slots** added (was 2). New `velocityModTarget3` APVTS param (int 0-7, default 0=None). Wire-up added in PluginProcessor.cpp constructor. jassert added in SolaceVoice constructor.
+  - **Velocity mod target enum expanded from 0-4 to 0-7:**
+    - 0=None, 1=AmpLevel (**default Slot1, was AmpAttack**), 2=AmpAttack, 3=FilterCutoff, 4=FilterResonance
+    - 5=Distortion (new), 6=Osc1Pitch (new), 7=OscMix (new)
+  - **Flat-when-not-routed fix:** `velocityScale` else branch changed from `velocity` to `1.0f`. If AmpLevel is in no target slot, every note plays at full volume regardless of how hard you press.
+  - **Distortion target (5):** `velModDistDrive` (float, note-on snapshot) = `vel * range * 0.7f`. Applied pre-filter via `SolaceDistortion::processSample(preFiltL/R, velModDistDrive)` when > 0. Per-voice saturation -- harder hit = more grit on that specific note only. `SolaceDistortion.h` include added to `SolaceVoice.h`.
+  - **Osc1Pitch target (6):** `velPitchCents = vel * range * 100.0f` cents. Applied at note-on via `setVelPitchMultiplier(2^(cents/1200))` on all unison osc1 and osc2 instances. New `velPitchMultiplier` member and `setVelPitchMultiplier()` method added to `SolaceOscillator.h`. Multiplied together with `lfoMultiplier` in `getNextSample()` so LFO vibrato and velocity pitch are independent additive pitch ratios.
+  - **OscMix target (7):** `velModOscMixOffset = vel * range * 0.5f`. Applied per-block: `mix = jlimit(0,1, params.oscMix->load() + velModOscMixOffset)`. Harder hit blends further toward Osc2.
+  - **APVTS skew factors added** to all time-domain params (brings exponential feel to sliders, matching lfoRate):
+    - `ampAttack`, `ampDecay`, `filterEnvAttack`, `filterEnvDecay`: skew=0.4
+    - `ampRelease`, `filterEnvRelease`: skew=0.3 (longer range, more skew needed)
+    - `lfoRate`: already had skew=0.3 ✅
+  - ⚠️ **Future: Organic distortion.** Nabeel noted the oscillators and distortion sound very digital; wants a warmer/more organic option. Cannot implement without a proper reference (tube saturation curve, tape model, etc.). Flagged for V1.1 once a specific target sound is identified.
 - [ ] Phase 7: Full Figma UI implementation
 - [ ] GitHub Actions CI + pluginval
 

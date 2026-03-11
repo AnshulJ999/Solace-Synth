@@ -133,6 +133,23 @@ public:
     }
 
     // ========================================================================
+    // setVelPitchMultiplier -- apply velocity-to-pitch as a frequency multiplier.
+    //
+    // Called once at note-on (not per block) -- velocity is constant for the
+    // lifetime of the note. Applied multiplicatively with lfoMultiplier so the
+    // two pitch sources (LFO vibrato + velocity pitch) are independent.
+    //
+    //   multiplier = 2^(velPitchCents / 1200)   (hard hit = sharp)
+    //   multiplier = 1.0                          (no vel-pitch target -- default)
+    //
+    // Reset to 1.0 in startNote() when Osc1Pitch is not a velocity target.
+    // ========================================================================
+    void setVelPitchMultiplier (double multiplier) noexcept
+    {
+        velPitchMultiplier = multiplier;
+    }
+
+    // ========================================================================
     // getNextSample — advance the oscillator and return the current sample.
     //
     // Returns a value in [-1.0, +1.0] for all waveforms.
@@ -146,8 +163,11 @@ public:
         // Compute sample for the current phase.
         float sample = computeSample (currentAngle);
 
-        // Advance phase accumulator. Apply LFO pitch multiplier (default 1.0 = no effect).
-        currentAngle += angleDelta * lfoMultiplier;
+        // Advance phase accumulator. Apply both pitch multipliers:
+        //   lfoMultiplier     = LFO vibrato (set per block, default 1.0)
+        //   velPitchMultiplier = velocity-to-pitch (set at note-on, default 1.0)
+        // Multiplied together: combined pitch ratio = lfoMult * velPitchMult.
+        currentAngle += angleDelta * lfoMultiplier * velPitchMultiplier;
 
         // Wrap to [0, 2π]. Using a while loop rather than fmod (fmod is more
         // expensive on the audio thread). A single subtraction is insufficient
@@ -226,4 +246,9 @@ private:
     // Set once per render block by setLFOPitchMultiplier() when a pitch LFO
     // target is active; reset to 1.0 when the target is None.
     double lfoMultiplier = 1.0;
+
+    // Velocity pitch multiplier = 2^(velCents/1200). Default 1.0 = no modulation.
+    // Set once at note-on by setVelPitchMultiplier(). Constant for the life of the note.
+    // Combined with lfoMultiplier multiplicatively in getNextSample().
+    double velPitchMultiplier = 1.0;
 };

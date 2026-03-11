@@ -67,10 +67,11 @@ SolaceSynthProcessor::SolaceSynthProcessor()
     voiceParams.unisonDetune = apvts.getRawParameterValue ("unisonDetune");
     voiceParams.unisonSpread = apvts.getRawParameterValue ("unisonSpread");
 
-    // --- Phase 6.8: Voicing Parameters ---
+    // --- Phase 6.8 / 6.8b: Voicing Parameters ---
     voiceParams.velocityRange      = apvts.getRawParameterValue ("velocityRange");
     voiceParams.velocityModTarget1 = apvts.getRawParameterValue ("velocityModTarget1");
     voiceParams.velocityModTarget2 = apvts.getRawParameterValue ("velocityModTarget2");
+    voiceParams.velocityModTarget3 = apvts.getRawParameterValue ("velocityModTarget3");
     voiceParams.voiceCount         = apvts.getRawParameterValue ("voiceCount");
 
     // Create 16 voices. All 16 are always allocated -- SolaceSynthesiser::noteOn()
@@ -119,13 +120,13 @@ juce::AudioProcessorValueTreeState::ParameterLayout SolaceSynthProcessor::create
     params.push_back (std::make_unique<juce::AudioParameterFloat> (
         juce::ParameterID { "ampAttack", 1 },
         "Amp Attack",
-        juce::NormalisableRange<float> (0.001f, 5.0f, 0.001f),
+        juce::NormalisableRange<float> (0.001f, 5.0f, 0.001f, 0.4f),  // skew: finer at short values
         0.01f));
 
     params.push_back (std::make_unique<juce::AudioParameterFloat> (
         juce::ParameterID { "ampDecay", 1 },
         "Amp Decay",
-        juce::NormalisableRange<float> (0.001f, 5.0f, 0.001f),
+        juce::NormalisableRange<float> (0.001f, 5.0f, 0.001f, 0.4f),  // skew: finer at short values
         0.1f));
 
     params.push_back (std::make_unique<juce::AudioParameterFloat> (
@@ -137,7 +138,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout SolaceSynthProcessor::create
     params.push_back (std::make_unique<juce::AudioParameterFloat> (
         juce::ParameterID { "ampRelease", 1 },
         "Amp Release",
-        juce::NormalisableRange<float> (0.001f, 10.0f, 0.001f),
+        juce::NormalisableRange<float> (0.001f, 10.0f, 0.001f, 0.3f),  // skew: more range at short values
         0.3f));
 
     // --- Phase 6.2: Oscillator 1 Waveform ---
@@ -203,13 +204,13 @@ juce::AudioProcessorValueTreeState::ParameterLayout SolaceSynthProcessor::create
     params.push_back (std::make_unique<juce::AudioParameterFloat> (
         juce::ParameterID { "filterEnvAttack", 1 },
         "Filter Env Attack",
-        juce::NormalisableRange<float> (0.001f, 5.0f, 0.001f),
+        juce::NormalisableRange<float> (0.001f, 5.0f, 0.001f, 0.4f),  // skew: finer at short values
         0.01f));
 
     params.push_back (std::make_unique<juce::AudioParameterFloat> (
         juce::ParameterID { "filterEnvDecay", 1 },
         "Filter Env Decay",
-        juce::NormalisableRange<float> (0.001f, 5.0f, 0.001f),
+        juce::NormalisableRange<float> (0.001f, 5.0f, 0.001f, 0.4f),  // skew: finer at short values
         0.3f));
 
     params.push_back (std::make_unique<juce::AudioParameterFloat> (
@@ -221,7 +222,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout SolaceSynthProcessor::create
     params.push_back (std::make_unique<juce::AudioParameterFloat> (
         juce::ParameterID { "filterEnvRelease", 1 },
         "Filter Env Release",
-        juce::NormalisableRange<float> (0.001f, 10.0f, 0.001f),
+        juce::NormalisableRange<float> (0.001f, 10.0f, 0.001f, 0.3f),  // skew: more range at short values
         0.3f));
 
     // --- Phase 6.5: Oscillator 2 + Osc Mix ---
@@ -320,37 +321,39 @@ juce::AudioProcessorValueTreeState::ParameterLayout SolaceSynthProcessor::create
         juce::NormalisableRange<float> (0.0f, 1.0f, 0.01f),
         0.5f));  // default: 0.5 = moderate stereo width
 
-    // --- Phase 6.8: Voicing Parameters ---
-    // voiceCount: int 1-16. Default 16 = full polyphony. The polyphony cap is
-    //   enforced per-block in processBlock() via SolaceSynthesiser::setVoiceLimit().
-    //   When the cap is reached and a new note arrives, JUCE steals the oldest voice
-    //   (standard hardware synth behaviour) rather than dropping the new note.
-    // velocityRange: float 0.0-1.0. Bridge between velocity and the mod targets.
-    //   0.0 = no dynamics (all notes at full level / full attack).
-    //   1.0 = full sensitivity (level/attack scales with velocity).
-    // velocityModTarget1/2: int 0-4.
-    //   0=None, 1=AmpLevel, 2=AmpAttack, 3=FilterCutoff, 4=FilterResonance.
-    //   Two routing slots; both can be active simultaneously.
+    // --- Phase 6.8 / 6.8b: Voicing Parameters ---
+    // voiceCount: int 1-16.
+    // velocityRange: float 0.0-1.0. Sensitivity bridge between velocity and targets.
+    // velocityModTarget1/2/3: int 0-7. Three routing slots.
+    //   0=None, 1=AmpLevel, 2=AmpAttack, 3=FilterCutoff, 4=FilterResonance,
+    //   5=Distortion, 6=Osc1Pitch, 7=OscMix.
+    //   Default: target1=1 (AmpLevel), target2/3=0 (None).
+    //   Semantic: if AmpLevel is in no slot, velocityScale=1.0 (flat dynamics).
     params.push_back (std::make_unique<juce::AudioParameterInt> (
         juce::ParameterID { "voiceCount", 1 },
         "Voice Count",
-        1, 16, 16));  // default: 16 = full polyphony
+        1, 16, 16));
 
     params.push_back (std::make_unique<juce::AudioParameterFloat> (
         juce::ParameterID { "velocityRange", 1 },
         "Velocity Range",
         juce::NormalisableRange<float> (0.0f, 1.0f, 0.01f),
-        1.0f));  // default: 1.0 = full velocity sensitivity
+        1.0f));
 
     params.push_back (std::make_unique<juce::AudioParameterInt> (
         juce::ParameterID { "velocityModTarget1", 1 },
         "Velocity Mod Target 1",
-        0, 4, 2));  // default: 2 = AmpAttack (Figma default)
+        0, 7, 1));  // default: 1 = AmpLevel
 
     params.push_back (std::make_unique<juce::AudioParameterInt> (
         juce::ParameterID { "velocityModTarget2", 1 },
         "Velocity Mod Target 2",
-        0, 4, 0));  // default: 0 = None
+        0, 7, 0));  // default: 0 = None
+
+    params.push_back (std::make_unique<juce::AudioParameterInt> (
+        juce::ParameterID { "velocityModTarget3", 1 },
+        "Velocity Mod Target 3",
+        0, 7, 0));  // default: 0 = None
 
     // --- Phase 6.9: Master Distortion ---
     // Applied globally to the stereo mix after all voices have rendered.
@@ -470,7 +473,7 @@ void SolaceSynthProcessor::prepareToPlay (double sampleRate, int samplesPerBlock
     SolaceLog::info ("prepareToPlay: sampleRate=" + juce::String (sampleRate)
         + " samplesPerBlock=" + juce::String (samplesPerBlock)
         + " voices=" + juce::String (synth.getNumVoices())
-        + " params: amp(4) osc1(4) filter(3) filterEnv(5) osc2+mix(5) lfo(6) unison(3) voicing(4) distortion(1)");
+        + " params: amp(4) osc1(4) filter(3) filterEnv(5) osc2+mix(5) lfo(6) unison(3) voicing(5) distortion(1)");
 }
 
 void SolaceSynthProcessor::releaseResources()

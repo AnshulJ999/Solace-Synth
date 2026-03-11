@@ -8,6 +8,7 @@
 #include "SolaceOscillator.h"
 #include "SolaceFilter.h"
 #include "SolaceLFO.h"
+#include "SolaceDistortion.h"  // Phase 6.8b: per-voice velocity-to-distortion target
 
 // ============================================================================
 // SolaceVoiceParams — APVTS Parameter Pointers for SolaceVoice
@@ -91,20 +92,22 @@ struct SolaceVoiceParams
     const std::atomic<float>* unisonDetune = nullptr;  // float, 0-100 cents
     const std::atomic<float>* unisonSpread = nullptr;  // float, 0.0-1.0
 
-    // --- Phase 6.8: Voicing Parameters ---
+    // --- Phase 6.8 / 6.8b: Voicing Parameters ---
     // velocityRange: float, 0.0-1.0. How strongly velocity modulates the targets.
     //   0.0 = flat (all notes same level/attack). 1.0 = full velocity sensitivity.
     //   Read at note-on and applied immediately per target.
-    // velocityModTarget1/2: int 0-4. Two velocity-to-parameter routing slots.
-    //   0=None, 1=AmpLevel, 2=AmpAttack, 3=FilterCutoff, 4=FilterResonance.
-    //   These are additive modulations on top of the knob values (same pattern
-    //   as LFO targets in Phase 6.6).
+    // velocityModTarget1/2/3: int 0-7. Three velocity-to-parameter routing slots.
+    //   0=None, 1=AmpLevel, 2=AmpAttack, 3=FilterCutoff, 4=FilterResonance,
+    //   5=Distortion, 6=Osc1Pitch, 7=OscMix.
+    //   Additive modulations on top of the knob values, same pattern as LFO targets.
+    //   If AmpLevel is in no slot, velocityScale is 1.0 (flat -- every note same volume).
     // voiceCount: int 1-16 stored as float. Read only by SolaceSynthesiser in
     //   PluginProcessor.h -- NOT read inside SolaceVoice. Kept here for
     //   symmetry and to keep all APVTS pointers in one struct.
     const std::atomic<float>* velocityRange      = nullptr;
     const std::atomic<float>* velocityModTarget1 = nullptr;
     const std::atomic<float>* velocityModTarget2 = nullptr;
+    const std::atomic<float>* velocityModTarget3 = nullptr;  // Phase 6.8b
     const std::atomic<float>* voiceCount         = nullptr;
 };
 
@@ -264,7 +267,8 @@ public:
         jassert (params.velocityRange      != nullptr);
         jassert (params.velocityModTarget1 != nullptr);
         jassert (params.velocityModTarget2 != nullptr);
-        // params.voiceCount is NOT required by SolaceVoice — it is read directly
+        jassert (params.velocityModTarget3 != nullptr);  // Phase 6.8b: third slot
+        // params.voiceCount is NOT required by SolaceVoice -- it is read directly
         // from APVTS in SolaceSynthesiser::processBlock(). The pointer must still
         // be non-null (hence the jassert) but SolaceVoice never dereferences it.
         jassert (params.voiceCount != nullptr);
@@ -397,21 +401,41 @@ public:
         // the velocity offset before the filter env in renderNextBlock(). We store
         // them as velocity-derived offsets in velModCutoffHz and velModRes so they
         // are only computed once at note-on and referenced each block.
+        // --- Velocity modulation (Phase 6.8 / 6.8b) ---
+        // velocityModTarget enum:
+        //   0=None, 1=AmpLevel, 2=AmpAttack, 3=FilterCutoff, 4=FilterResonance,
+        //   5=Distortion, 6=Osc1Pitch, 7=OscMix.
+        //
+        // IMPORTANT: if AmpLevel (1) is in no slot, velocityScale = 1.0 (flat).
+        // Every note plays at full volume. Set target to AmpLevel to re-enable dynamics.
+        //
+        // Distortion  (5): harder hit -> more per-voice saturation pre-filter.
+        //                  Applied via SolaceDistortion::processSample() on preFiltL/R.
+        // Osc1Pitch   (6): harder hit -> pitch rises up to kVelPitchCents cents sharp.
+        //                  Applied at note-on via adjusted setTuningOffset call.
+        // OscMix      (7): harder hit -> mix blends further toward Osc2.
+        //                  Applied per-block: velModOscMixOffset added to APVTS oscMix.
         const float velRange = juce::jlimit (0.0f, 1.0f, params.velocityRange->load());
         const int   velTgt1  = static_cast<int> (params.velocityModTarget1->load());
         const int   velTgt2  = static_cast<int> (params.velocityModTarget2->load());
+        const int   velTgt3  = static_cast<int> (params.velocityModTarget3->load());
 
-        // Velocity-to-amplitude-level (target 1):
-        //   Range=0 → all notes at full level. Range=1 → level = velocity.
-        const bool velToAmpLevel   = (velTgt1 == 1 || velTgt2 == 1);
-        const bool velToAmpAttack  = (velTgt1 == 2 || velTgt2 == 2);
-        const bool velToFilterCut  = (velTgt1 == 3 || velTgt2 == 3);
-        const bool velToFilterRes  = (velTgt1 == 4 || velTgt2 == 4);
+        const bool velToAmpLevel   = (velTgt1 == 1 || velTgt2 == 1 || velTgt3 == 1);
+        const bool velToAmpAttack  = (velTgt1 == 2 || velTgt2 == 2 || velTgt3 == 2);
+        const bool velToFilterCut  = (velTgt1 == 3 || velTgt2 == 3 || velTgt3 == 3);
+        const bool velToFilterRes  = (velTgt1 == 4 || velTgt2 == 4 || velTgt3 == 4);
+        const bool velToDist       = (velTgt1 == 5 || velTgt2 == 5 || velTgt3 == 5);
+        const bool velToOscPitch   = (velTgt1 == 6 || velTgt2 == 6 || velTgt3 == 6);
+        const bool velToOscMix     = (velTgt1 == 7 || velTgt2 == 7 || velTgt3 == 7);
 
+        // AmpLevel: lerp(1.0, velocity, velRange). Range=0 -> all notes full level.
+        //           Range=1 -> level scales linearly with velocity.
+        //           If NOT in any slot: flat (1.0f) -- velocity does not affect volume.
         velocityScale = velToAmpLevel
-            ? juce::jmap (velRange, 0.0f, 1.0f, 1.0f, velocity)  // lerp(1.0, velocity, velRange)
-            : velocity;
+            ? juce::jmap (velRange, 0.0f, 1.0f, 1.0f, velocity)  // lerp(1.0, vel, range)
+            : 1.0f;  // flat -- no amplitude dynamics when AmpLevel is not routed
 
+        // AmpAttack: hard hit = shorter attack (punch). baseAttack floor = 0.1x.
         const float baseAttack = params.ampAttack->load();
         const float modAttack  = velToAmpAttack
             ? baseAttack * juce::jmap (velocity * velRange, 0.0f, 1.0f, 1.0f, 0.1f)
@@ -425,13 +449,53 @@ public:
         );
         ampEnvelope.trigger();
 
-        // Velocity → filter modulation (stored for use in renderNextBlock()).
-        // Cutoff: hard note opens filter more (+kVelCutoffRange Hz at vel=1, range=1).
-        // Res:    hard note adds resonance boost (+kVelResRange at vel=1, range=1).
+        // FilterCutoff / FilterResonance: stored as note-on offsets, applied per-sample.
         constexpr float kVelCutoffRange = 5000.0f;
         constexpr float kVelResRange    = 0.5f;
         velModCutoffHz = velToFilterCut ? velocity * velRange * kVelCutoffRange : 0.0f;
         velModRes      = velToFilterRes ? velocity * velRange * kVelResRange    : 0.0f;
+
+        // Distortion (target 5): harder hit = more per-voice saturation pre-filter.
+        // kVelDistRange=0.7: at max velocity+range, per-voice drive = 0.7.
+        // Applied via SolaceDistortion::processSample() on preFiltL/R each sample.
+        constexpr float kVelDistRange = 0.7f;
+        velModDistDrive = velToDist ? velocity * velRange * kVelDistRange : 0.0f;
+
+        // Osc1Pitch (target 6): harder hit = pitch shifts sharp by up to 100 cents.
+        // Applied now at note-on by adding the cents offset to the tuning call.
+        // Both osc1 and osc2 in all unison slots are adjusted identically so the
+        // interval between them (and the detune spread) is preserved exactly.
+        constexpr float kVelPitchCents = 100.0f;
+        const float velPitchCents = velToOscPitch ? velocity * velRange * kVelPitchCents : 0.0f;
+
+        if (velToOscPitch && velPitchCents != 0.0f)
+        {
+            // Re-apply tuning with the velocity pitch offset baked in.
+            // We can't read osc1Cents etc. here (already used above in the unison loop),
+            // so we store the pitch multiplier and apply it via setLFOPitchMultiplier.
+            // At note-on this is called once, and LFO clears it to 1.0 each block
+            // only if LFO is targeting pitch -- since vel pitch is constant (not oscillating)
+            // we use a separate stored multiplier for it.
+            const double velPitchMult = std::pow (2.0, static_cast<double>(velPitchCents) / 1200.0);
+            for (int u = 0; u < activeUnisonCount; ++u)
+            {
+                unisonVoices[u].osc1.setVelPitchMultiplier (velPitchMult);
+                unisonVoices[u].osc2.setVelPitchMultiplier (velPitchMult);
+            }
+        }
+        else
+        {
+            for (int u = 0; u < activeUnisonCount; ++u)
+            {
+                unisonVoices[u].osc1.setVelPitchMultiplier (1.0);
+                unisonVoices[u].osc2.setVelPitchMultiplier (1.0);
+            }
+        }
+
+        // OscMix (target 7): harder hit = more Osc2. Stored as offset applied per-block.
+        // velModOscMixOffset is clamped with base oscMix in renderNextBlock().
+        constexpr float kVelOscMixRange = 0.5f;
+        velModOscMixOffset = velToOscMix ? velocity * velRange * kVelOscMixRange : 0.0f;
 
         // LFO (Phase 6.6): no reset here -- free-running by design.
         // Pan gains (Phase 6.7): initialised in renderNextBlock() per-block from
@@ -499,7 +563,11 @@ public:
         baseCutoffHz = params.filterCutoff->load();
         const float baseResonance = params.filterResonance->load();
         const float envDepth      = params.filterEnvDepth->load();
-        const float mix           = juce::jlimit (0.0f, 1.0f, params.oscMix->load());
+        // OscMix: base APVTS value + velocity mod offset (target 7).
+        // velModOscMixOffset is 0.0 when target 7 is not assigned, so this is
+        // effectively just params.oscMix->load() when the target is inactive.
+        const float mix = juce::jlimit (0.0f, 1.0f,
+            params.oscMix->load() + velModOscMixOffset);
 
         // Filter and LFO modulation range constants.
         constexpr float kModRange       = 10000.0f;
@@ -608,6 +676,15 @@ public:
             filterL.setCutoff    (modulatedCutoff); filterR.setCutoff    (modulatedCutoff);
             filterL.setResonance (modulatedRes);    filterR.setResonance (modulatedRes);
 
+            // Per-voice distortion (Phase 6.8b, target 5): velocity -> drive.
+            // Applied pre-filter on both channels. velModDistDrive=0.0 when target
+            // is inactive, in which case processSample() is bypassed entirely.
+            if (velModDistDrive > 0.0f)
+            {
+                preFiltL = SolaceDistortion::processSample (preFiltL, velModDistDrive);
+                preFiltR = SolaceDistortion::processSample (preFiltR, velModDistDrive);
+            }
+
             const float filteredL = filterL.processSample (preFiltL);
             const float filteredR = filterR.processSample (preFiltR);
 
@@ -713,8 +790,10 @@ private:
 
     // Phase 6.8 velocity-to-filter offsets. Computed once at note-on and applied
     // every sample in renderNextBlock() alongside the filter envelope and LFO.
-    float velModCutoffHz = 0.0f;  // additive Hz offset from velocity -> filter cutoff
-    float velModRes      = 0.0f;  // additive [0-1] offset from velocity -> resonance
+    float velModCutoffHz    = 0.0f;  // Hz offset: velocity -> filter cutoff (target 3)
+    float velModRes         = 0.0f;  // [0-1] offset: velocity -> resonance (target 4)
+    float velModDistDrive   = 0.0f;  // [0-1] drive: velocity -> per-voice distortion (target 5)
+    float velModOscMixOffset = 0.0f; // [0-1] offset: velocity -> osc mix toward Osc2 (target 7)
 
     // Per-voice output gain, updated at note-on.
     // Incorporates equal-power unison normalisation: kBaseVoiceGain / sqrt(unisonCount).

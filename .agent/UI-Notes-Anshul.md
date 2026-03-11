@@ -26,4 +26,16 @@ Also, we may opt to show the values as a tooltip when hovering over a fader.
 
 6) The sizing and placement of the faders is awkward and not perfect. Needs refinement. Some faders need to be bigger. 
 
-7) 
+7) We need precise control over values of faders. Right now it's a bit finicky. Ideas: 
+
+A modifier key like Ctrl + Dragging the fader should allow precise control over values. Slower value adjustment basically. 
+
+Being able to double-click the value and becomes a text box where we can just type the actual value. 
+
+Keyboard arrow keys to control value when the fader was touched/focused. This might be complex so have to discuss.
+
+8) There is no way to go back to the 'Default' value of a setting. Need a gesture for that. Perhaps double-clicking on a fader thumb puts it back to default.
+
+For example, It would be nice if we can just double-click on OscMix and get back to 50-50 mix of both Oscillators
+
+There's other such small UI UX things that professional plugins have and we need to think about and add.

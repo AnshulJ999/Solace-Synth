@@ -472,8 +472,16 @@ graph TD
 
 - [ ] Noise waveform (V2 — requires per-voice PRNG state design)
 - [ ] PolyBLEP anti-aliased waveforms (replaces naïve math in `SolaceOscillator`)
-- [ ] Portamento / glide (polyphonic glide is non-trivial — firmly V2)
+- [ ] Portamento / glide (polyphonic glide is non-trivial -- firmly V2)
 - [ ] Preset system (save/load APVTS state as XML/JSON)
 - [ ] Global effects chain (reverb, delay, chorus)
-- [ ] Pitch wheel / mod wheel support (`pitchWheelMoved` override)
 - [ ] Voice count: full dynamic voice add/remove (requires Synthesiser refactor)
+- [ ] **Organic distortion (V1.1):** Nabeel noted the tanh soft-clip sounds digital. Needs a specific reference sound (tube saturation model, tape, asymmetric clipper). Cannot guess curve. Flagged 2026-03-12.
+- [ ] **Vel→Distortion caching (V1.1):** `SolaceDistortion::processSample` computes `k` and `tanhK` every sample even though `velModDistDrive` is constant per note. Precomputing at note-on and storing as `SolaceVoice` members halves `tanhf` calls. Only matters at high polyphony with Distortion target active.
+- [ ] **MIDI CC assign / CC learn (V2):** Right-click a control, assign a MIDI CC number. Complex -- CC map table, processBlock CC scanning, UI context menu, state persistence. ~3-5 days. Not V1. Nabeel flagged this.
+
+## Required for V1 Release (not yet implemented as of 2026-03-12)
+
+- [ ] **Pitch bend** (`pitchWheelMoved` override): JUCE sends 0-16383, center=8192. Standard range ±2 semitones. Apply as a frequency multiplier to all oscillators in `renderNextBlock`. Stub already in `SolaceVoice.h`.
+- [ ] **Mod wheel** (`controllerMoved` CC1 override): Standard mapping → LFO amount. `params.lfoAmount` APVTS param already exists. Stub already in `SolaceVoice.h`.
+- [ ] **3rd velocity target slot in UI:** `velocityModTarget3` DSP param wired. UI dropdown not yet added to `index.html` / `main.js`. Target label array must be 8 entries (0-7); index 6 label must be "Osc Pitch" (not "Osc 1 Pitch").

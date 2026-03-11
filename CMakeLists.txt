@@ -81,6 +81,51 @@ file(GLOB_RECURSE SourceFiles
 target_sources("${PROJECT_NAME}" PRIVATE ${SourceFiles})
 
 # ============================================================================
+# Embedded UI assets
+# ============================================================================
+# Release/distribution builds must not depend on the repo checkout path.
+# We embed all UI assets into a JUCE binary-data target, while keeping an
+# optional dev-only disk fallback for faster local iteration.
+file(GLOB_RECURSE UIAssetFiles
+    CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/*.html"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/*.css"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/*.js"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/*.svg"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/*.png"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/*.jpg"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/*.jpeg"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/*.woff"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/*.woff2"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/*.ttf"
+)
+
+# JUCE BinaryData stores original filenames, not relative paths. Guard against
+# duplicate basenames so resource lookup by filename remains deterministic.
+set(UIAssetBasenames)
+foreach(ui_file IN LISTS UIAssetFiles)
+    get_filename_component(ui_basename "${ui_file}" NAME)
+    list(APPEND UIAssetBasenames "${ui_basename}")
+endforeach()
+
+set(UIAssetBasenamesDeduped "${UIAssetBasenames}")
+list(REMOVE_DUPLICATES UIAssetBasenamesDeduped)
+list(LENGTH UIAssetBasenames ui_asset_count)
+list(LENGTH UIAssetBasenamesDeduped ui_asset_deduped_count)
+
+if(NOT ui_asset_count EQUAL ui_asset_deduped_count)
+    message(FATAL_ERROR
+        "UI asset basenames must be unique when embedding BinaryData. "
+        "Found duplicate filenames under UI/.")
+endif()
+
+juce_add_binary_data(SolaceUIAssets
+    NAMESPACE SolaceUIBinaryData
+    HEADER_NAME SolaceUIBinaryData.h
+    SOURCES ${UIAssetFiles}
+)
+
+# ============================================================================
 # Preprocessor definitions
 # ============================================================================
 target_compile_definitions("${PROJECT_NAME}"
@@ -100,6 +145,12 @@ target_compile_definitions("${PROJECT_NAME}"
     SOLACE_DEV_UI_PATH="${CMAKE_SOURCE_DIR}/UI"
 )
 
+target_compile_definitions("${PROJECT_NAME}"
+    PRIVATE
+    $<$<CONFIG:Debug>:SOLACE_ENABLE_DEV_UI_FALLBACK=1>
+    $<$<NOT:$<CONFIG:Debug>>:SOLACE_ENABLE_DEV_UI_FALLBACK=0>
+)
+
 # ============================================================================
 # Include directories — so Source/ files can find each other
 # ============================================================================
@@ -110,6 +161,7 @@ target_include_directories("${PROJECT_NAME}" PRIVATE "${CMAKE_CURRENT_SOURCE_DIR
 # ============================================================================
 target_link_libraries("${PROJECT_NAME}"
     PRIVATE
+    SolaceUIAssets
     juce_audio_utils         # Includes audio_basics, audio_devices, audio_formats, audio_processors
     juce_dsp                 # DSP classes (oscillators, filters, etc.)
     juce_gui_basics          # Core GUI

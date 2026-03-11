@@ -1,5 +1,74 @@
 #include "PluginEditor.h"
+#include <SolaceUIBinaryData.h>
 #include <juce_core/juce_core.h>
+
+namespace
+{
+juce::String normaliseResourcePath (juce::String path)
+{
+    if (path == "/" || path.isEmpty())
+        path = "/index.html";
+
+    if (path.startsWith ("/"))
+        path = path.substring (1);
+
+    return juce::URL::removeEscapeChars (path);
+}
+
+juce::String getMimeTypeForPath (const juce::String& path)
+{
+    auto ext = juce::File (path).getFileExtension().toLowerCase();
+
+    if      (ext == ".html")                    return "text/html";
+    else if (ext == ".css")                     return "text/css";
+    else if (ext == ".js")                      return "application/javascript";
+    else if (ext == ".json")                    return "application/json";
+    else if (ext == ".png")                     return "image/png";
+    else if (ext == ".jpg" || ext == ".jpeg")   return "image/jpeg";
+    else if (ext == ".svg")                     return "image/svg+xml";
+    else if (ext == ".woff")                    return "font/woff";
+    else if (ext == ".woff2")                   return "font/woff2";
+    else if (ext == ".ttf")                     return "font/ttf";
+
+    return "application/octet-stream";
+}
+
+std::optional<juce::WebBrowserComponent::Resource> makeResourceFromMemory (
+    const void* data,
+    size_t size,
+    const juce::String& mimeType)
+{
+    if (data == nullptr || size == 0)
+        return std::nullopt;
+
+    std::vector<std::byte> bytes (size);
+    std::memcpy (bytes.data(), data, size);
+
+    return juce::WebBrowserComponent::Resource { std::move (bytes), mimeType };
+}
+
+std::optional<juce::WebBrowserComponent::Resource> loadEmbeddedResource (const juce::String& requestedPath)
+{
+    const auto fileName = juce::File (requestedPath).getFileName();
+
+    for (int i = 0; i < SolaceUIBinaryData::namedResourceListSize; ++i)
+    {
+        const auto originalFileName = juce::String (SolaceUIBinaryData::originalFilenames[i]);
+
+        if (! originalFileName.equalsIgnoreCase (fileName))
+            continue;
+
+        int dataSize = 0;
+        const auto* data = SolaceUIBinaryData::getNamedResource (SolaceUIBinaryData::namedResourceList[i], dataSize);
+
+        return makeResourceFromMemory (data,
+                                       static_cast<size_t> (dataSize),
+                                       getMimeTypeForPath (fileName));
+    }
+
+    return std::nullopt;
+}
+} // namespace
 
 // ============================================================================
 // Constructor
@@ -155,34 +224,26 @@ juce::WebBrowserComponent::Options SolaceSynthEditor::createWebViewOptions()
 std::optional<juce::WebBrowserComponent::Resource>
 SolaceSynthEditor::resourceRequested (const juce::String& path)
 {
-    // Use the compile-time dev path (defined in CMakeLists.txt)
-    // This is an absolute path like "G:/GitHub/Solace-Synth/UI"
+    const auto requestedPath = normaliseResourcePath (path);
+
+   #if SOLACE_ENABLE_DEV_UI_FALLBACK
+    // Debug/dev builds can still load directly from disk for fast UI iteration.
     juce::File uiDir (SOLACE_DEV_UI_PATH);
 
-    if (! uiDir.isDirectory())
+    if (uiDir.isDirectory())
     {
-        DBG ("Solace Synth: UI/ directory not found at: " + uiDir.getFullPathName());
-        return std::nullopt;
+        auto file = uiDir.getChildFile (requestedPath);
+
+        if (file.isAChildOf (uiDir) && file.existsAsFile())
+            return loadFileAsResource (file);
     }
+   #endif
 
-    // Map the request path to a file
-    juce::String filePath = path;
-    if (filePath == "/" || filePath.isEmpty())
-        filePath = "/index.html";
+    if (auto embedded = loadEmbeddedResource (requestedPath))
+        return embedded;
 
-    // Remove leading slash
-    if (filePath.startsWith ("/"))
-        filePath = filePath.substring (1);
-
-    auto file = uiDir.getChildFile (filePath);
-
-    if (! file.isAChildOf (uiDir) || ! file.existsAsFile())
-    {
-        DBG ("Solace Synth: Resource not found or outside UI dir: " + filePath);
-        return std::nullopt;
-    }
-
-    return loadFileAsResource (file);
+    DBG ("Solace Synth: Embedded resource not found: " + requestedPath);
+    return std::nullopt;
 }
 
 // ============================================================================
@@ -191,21 +252,6 @@ SolaceSynthEditor::resourceRequested (const juce::String& path)
 std::optional<juce::WebBrowserComponent::Resource>
 SolaceSynthEditor::loadFileAsResource (const juce::File& file)
 {
-    // Determine MIME type from extension
-    auto ext = file.getFileExtension().toLowerCase();
-    juce::String mimeType = "application/octet-stream";
-
-    if      (ext == ".html")                    mimeType = "text/html";
-    else if (ext == ".css")                     mimeType = "text/css";
-    else if (ext == ".js")                      mimeType = "application/javascript";
-    else if (ext == ".json")                    mimeType = "application/json";
-    else if (ext == ".png")                     mimeType = "image/png";
-    else if (ext == ".jpg" || ext == ".jpeg")   mimeType = "image/jpeg";
-    else if (ext == ".svg")                     mimeType = "image/svg+xml";
-    else if (ext == ".woff")                    mimeType = "font/woff";
-    else if (ext == ".woff2")                   mimeType = "font/woff2";
-    else if (ext == ".ttf")                     mimeType = "font/ttf";
-
     // Read file contents
     juce::MemoryBlock mb;
     if (! file.loadFileAsData (mb))
@@ -214,11 +260,9 @@ SolaceSynthEditor::loadFileAsResource (const juce::File& file)
         return std::nullopt;
     }
 
-    // Convert to std::vector<std::byte>
-    std::vector<std::byte> data (mb.getSize());
-    std::memcpy (data.data(), mb.getData(), mb.getSize());
-
-    return juce::WebBrowserComponent::Resource { std::move (data), mimeType };
+    return makeResourceFromMemory (mb.getData(),
+                                   mb.getSize(),
+                                   getMimeTypeForPath (file.getFullPathName()));
 }
 
 // ============================================================================

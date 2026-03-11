@@ -48,12 +48,12 @@ public:
     static float processSample (float x, float drive) noexcept
     {
         const float k    = 1.0f + drive * 9.0f;
-        const float tanhK = std::tanhf (k);
+        const float tanhK = std::tanh (k);
 
         // Guard: if tanhK is near zero (should never happen for k≥1), pass through.
         if (tanhK < 1e-6f)
             return x;
 
-        return std::tanhf (k * x) / tanhK;
+        return std::tanh (k * x) / tanhK;
     }
 };

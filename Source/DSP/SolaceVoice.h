@@ -303,7 +303,7 @@ public:
     // startNote — called by the Synthesiser on each MIDI note-on.
     //
     // All note-start setup happens here (not per-sample). Expensive operations
-    // (pow(), atomic loads, filter mode changes) are all done once at note-on.
+    // (exp2(), atomic loads, filter mode changes) are all done once at note-on.
     // ========================================================================
     void startNote (int midiNoteNumber,
                     float velocity,
@@ -538,11 +538,11 @@ public:
         const bool lfoToFilterRes    = (lfoTarget1 == 7 || lfoTarget2 == 7 || lfoTarget3 == 7);
 
         // LFO pitch: compute multiplier once (both osc targets share same lfoValue).
-        // getCurrentValue() does NOT advance the phase, so the single pow() is correct.
+        // getCurrentValue() does NOT advance the phase, so the single exp2() is correct.
         if (lfoToOsc1Pitch || lfoToOsc2Pitch)
         {
             const double semi = static_cast<double> (lfo.getCurrentValue() * lfoAmount * kLFOPitchSemi);
-            const double mult = std::pow (2.0, semi / 12.0);
+            const double mult = std::exp2 (semi / 12.0);
             for (int u = 0; u < activeUnisonCount; ++u)
             {
                 if (lfoToOsc1Pitch) unisonVoices[u].osc1.setLFOPitchMultiplier (mult);

@@ -35,7 +35,7 @@
 
     /* Slider */
     --color-slider-track:        #CCCCCC;
-    --color-fill-track:          #999999;    /* Fader fill: darker grey from bottom up to thumb (Phase 7.4) */
+    --color-fill-track:          #777777;    /* Fader fill: dark grey from bottom up to thumb (darkened Phase 7.5) */
     --color-slider-thumb-bg:     #FFFFFF;
     --color-slider-thumb-stroke: #FF9E2F;
 
@@ -313,7 +313,7 @@ html, body {
 .sub-section--osc1      { flex: 3; }
 .sub-section--osc-mix   { flex: 1.2; min-width: 80px; }
 .sub-section--osc2      { flex: 3; }
-.sub-section--filter    { flex: 1.2; min-width: 80px; }
+.sub-section--filter    { flex: 1.5; min-width: 120px; }  /* Widened: holds 2 Big faders side by side */
 .sub-section--filter-cfg { flex: 3; }
 
 /* ============================================================================
@@ -452,6 +452,8 @@ html, body {
         var(--color-fill-track) var(--val-percent, 0%),
         var(--color-slider-track) var(--val-percent, 0%)
     );
+    /* Subtle 2px inset border gives the track pill visual definition against the white card bg */
+    box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.10);
 }
 
 /* Webkit: thumb */
@@ -684,11 +686,31 @@ html, body {
 .lfo-left-col {
     display: flex;
     flex-direction: column;
-    gap: var(--card-gap);
+    gap: clamp(6px, 1.0vh, 12px);  /* Tightened from card-gap — waveform + 3 dropdowns must fit */
     flex-shrink: 0;
     min-width: clamp(110px, 13vw, 180px);
     max-width: clamp(110px, 13vw, 180px);
 }
+
+/* ============================================================================
+ * LFO + Voicing cards: tighter internal spacing so 3rd dropdown target isn't
+ * clipped at the card bottom. These overrides are scoped to the two affected
+ * cards only — all other cards are untouched.
+ * ============================================================================ */
+
+/* Tighter gap between label and individual dropdown rows */
+.card--lfo .dropdown-group,
+.card--voicing .dropdown-group {
+    gap: 2px;
+}
+
+/* Reduce vertical padding on dropdown triggers in these two cards */
+.card--lfo .dropdown,
+.card--voicing .dropdown {
+    padding-top: 2px;
+    padding-bottom: 2px;
+}
+
 
 .lfo-faders {
     display: flex;
@@ -713,7 +735,7 @@ html, body {
 .voicing-selectors {
     display: flex;
     flex-direction: column;
-    gap: clamp(10px, 1.8vh, 18px);
+    gap: clamp(6px, 1.0vh, 12px);  /* Tightened from 1.8vh — 3 vel-mod target dropdowns must fit */
     flex: 1;
     min-width: 0;
 }
@@ -757,8 +779,12 @@ html, body {
 .fader-ticks-ruler {
     position: absolute;
     left: calc(100% + 3px);  /* 3px gap right of the 8px track = 11px from left */
-    top: 0;
-    bottom: 0;
+    /* Offset by half thumb height so tick marks align with the usable track range.
+       Chromium's range input reserves (thumb-height/2) of padding at both ends
+       so the thumb doesn't overshoot — the actual track starts and ends there.
+       Without this offset, the ruler extends into the dead zone at top/bottom. */
+    top:    calc(var(--slider-thumb-h) / 2);
+    bottom: calc(var(--slider-thumb-h) / 2);
     width: 4px;
     background: repeating-linear-gradient(
         to bottom,

@@ -470,12 +470,11 @@ public:
 
         if (velToOscPitch && velPitchCents != 0.0f)
         {
-            // Re-apply tuning with the velocity pitch offset baked in.
-            // We can't read osc1Cents etc. here (already used above in the unison loop),
-            // so we store the pitch multiplier and apply it via setLFOPitchMultiplier.
-            // At note-on this is called once, and LFO clears it to 1.0 each block
-            // only if LFO is targeting pitch -- since vel pitch is constant (not oscillating)
-            // we use a separate stored multiplier for it.
+            // Store the velocity pitch as a multiplier on each oscillator.
+            // setVelPitchMultiplier() is a separate member from setLFOPitchMultiplier(),
+            // so LFO vibrato and velocity pitch are fully independent -- applied
+            // multiplicatively in getNextSample(). This is set once at note-on and
+            // stays constant for the note's lifetime (velocity doesn't change mid-note).
             const double velPitchMult = std::pow (2.0, static_cast<double>(velPitchCents) / 1200.0);
             for (int u = 0; u < activeUnisonCount; ++u)
             {

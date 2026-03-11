@@ -41,21 +41,20 @@ public:
     }
 
     // ========================================================================
-    // Pitch wheel and mod wheel state.
+    // Mod wheel state.
     //
-    // pitchWheelValue: 0-16383 (14-bit), centred at 8192. Updated from MIDI.
-    // modWheelValue:   0-127 (7-bit). Updated from MIDI CC#1.
+    // modWheelValue: 0-127 (7-bit). Updated from MIDI CC#1 in handleMidiEvent.
+    // Read per-block by all voices to add to LFO amount (mod wheel = vibrato).
     //
-    // These are read by SolaceVoice: pitchWheelValue at note-on (to apply
-    // any bend already held) and per-block for continuous update.
-    // modWheelValue is read per-block to modulate LFO amount.
+    // Pitch wheel: NOT stored here. JUCE's Synthesiser base class already
+    // tracks lastPitchWheelValues[16] per MIDI channel and passes the correct
+    // per-channel value to startNote() as currentPitchWheelPosition, and calls
+    // pitchWheelMoved() on all active voices directly. No extra atomic needed.
     //
-    // Thread safety: written on the audio thread (handleMidiEvent, called
-    // inside renderNextBlock). Read on the audio thread only (SolaceVoice).
+    // Thread safety: written and read on the audio thread only.
     // std::atomic used defensively for cache coherence across CPU cores.
     // ========================================================================
-    std::atomic<int> pitchWheelValue { 8192 };  // centred (no bend)
-    std::atomic<int> modWheelValue   { 0 };     // fully down (no mod)
+    std::atomic<int> modWheelValue { 0 };     // fully down (no mod)
 
 protected:
     // ========================================================================
@@ -69,13 +68,13 @@ protected:
     // ========================================================================
     void handleMidiEvent (const juce::MidiMessage& m) override
     {
-        if (m.isPitchWheel())
-            pitchWheelValue.store (m.getPitchWheelValue(), std::memory_order_relaxed);
-
+        // Capture CC#1 (mod wheel) into our atomic so voices can read it per-block.
+        // Pitch wheel events are handled by the base class which calls pitchWheelMoved()
+        // on all active voices and maintains lastPitchWheelValues[channel] internally.
         if (m.isController() && m.getControllerNumber() == 1)
             modWheelValue.store (m.getControllerValue(), std::memory_order_relaxed);
 
-        // Always forward to base class — it handles note-on, note-off, etc.
+        // Always forward — base class handles note-on, note-off, pitch wheel, etc.
         juce::Synthesiser::handleMidiEvent (m);
     }
 

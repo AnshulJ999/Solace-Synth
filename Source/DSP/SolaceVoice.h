@@ -110,15 +110,17 @@ struct SolaceVoiceParams
     const std::atomic<float>* velocityModTarget3 = nullptr;  // Phase 6.8b
     const std::atomic<float>* voiceCount         = nullptr;
 
-    // --- Phase 7 DSP: Pitch Wheel + Mod Wheel ---
-    // Owned by SolaceSynthesiser (atomic members). Pointer held here so voices
-    // can read the current wheel position at note-on and per-block without
-    // going through the APVTS (wheel state is not an APVTS parameter).
+    // --- Phase 7 DSP: Mod Wheel ---
+    // Owned by SolaceSynthesiser (atomic member). Pointer held here so voices
+    // can read modWheelValue per-block to scale LFO amount.
     //
-    // pitchWheelValue: 0-16383, centred at 8192. Updated via handleMidiEvent.
-    // modWheelValue:   0-127.   Updated via handleMidiEvent for CC#1.
-    const std::atomic<int>* pitchWheelValue = nullptr;
-    const std::atomic<int>* modWheelValue   = nullptr;
+    // Note: pitch wheel position at note-on is passed directly as the
+    // currentPitchWheelPosition parameter in startNote() by JUCE's Synthesiser
+    // (it tracks lastPitchWheelValues[channel] internally). No need for a
+    // separate pointer here -- JUCE already handles it correctly per channel.
+    //
+    // modWheelValue: 0-127. Updated via handleMidiEvent for CC#1.
+    const std::atomic<int>* modWheelValue = nullptr;
 };
 
 // ============================================================================
@@ -283,9 +285,8 @@ public:
         // be non-null (hence the jassert) but SolaceVoice never dereferences it.
         jassert (params.voiceCount != nullptr);
 
-        // Phase 7 DSP: pitch bend + mod wheel
-        jassert (params.pitchWheelValue != nullptr);
-        jassert (params.modWheelValue   != nullptr);
+        // Phase 7 DSP: mod wheel (pitch wheel uses JUCE's built-in per-channel tracking)
+        jassert (params.modWheelValue != nullptr);
     }
 
     // ========================================================================
@@ -515,11 +516,10 @@ public:
         // unisonSpread, so live spread knob changes are audible while holding notes.
 
         // --- Pitch Bend at note-on (Phase 7 DSP) ---
-        // Apply the current pitch wheel position immediately so a note started
-        // while the wheel is bent plays at the correct pitch from the first sample.
-        // pitchWheelMoved() won't be called for this voice until the NEXT wheel
-        // message arrives, so we prime the multiplier here.
-        _applyPitchBend (params.pitchWheelValue->load (std::memory_order_relaxed));
+        // JUCE's Synthesiser tracks lastPitchWheelValues[midiChannel] and passes
+        // the correct per-channel value here as currentPitchWheelPosition.
+        // Using it directly is simpler and more correct than reading a global atomic.
+        _applyPitchBend (currentPitchWheelPosition);
     }
 
     // ========================================================================

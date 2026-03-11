@@ -74,12 +74,12 @@ SolaceSynthProcessor::SolaceSynthProcessor()
     voiceParams.velocityModTarget3 = apvts.getRawParameterValue ("velocityModTarget3");
     voiceParams.voiceCount         = apvts.getRawParameterValue ("voiceCount");
 
-    // --- Phase 7 DSP: Pitch Wheel + Mod Wheel ---
-    // These atomics live on the SolaceSynthesiser instance (not in APVTS).
-    // All 16 voices share the same atomic, so a single wheel event updates
-    // all voices simultaneously without any per-voice overhead.
-    voiceParams.pitchWheelValue = &synth.pitchWheelValue;
-    voiceParams.modWheelValue   = &synth.modWheelValue;
+    // --- Phase 7 DSP: Mod Wheel ---
+    // pitchWheelValue is NOT wired here: SolaceVoice reads it from JUCE's
+    // built-in currentPitchWheelPosition parameter in startNote() and from
+    // pitchWheelMoved() callbacks. No global atomic needed for pitch wheel.
+    // modWheelValue IS wired: voices read it per-block for LFO amount scaling.
+    voiceParams.modWheelValue = &synth.modWheelValue;
 
     // Create 16 voices. All 16 are always allocated -- SolaceSynthesiser::noteOn()
     // enforces the runtime voiceCount polyphony cap by reading the APVTS value each

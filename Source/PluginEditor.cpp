@@ -176,8 +176,8 @@ SolaceSynthEditor::SolaceSynthEditor (SolaceSynthProcessor& p)
         });
 
     // Set window size
-    setSize (900, 600);
-    SolaceLog::info ("Editor ctor: finished, window size set to 900x600");
+    setSize (1280, 720);
+    SolaceLog::info ("Editor ctor: finished, window size set to 1280x720 (720p)");
 }
 
 // ============================================================================

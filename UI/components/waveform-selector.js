@@ -41,6 +41,7 @@ class WaveformSelector {
         this.config        = config;
         this._currentIndex = config.defaultIndex ?? 0;
         this._iconEl       = null;
+        this._nameEl       = null;  // waveform name label below icon
         this._suppressSync = false;
     }
 
@@ -95,6 +96,15 @@ class WaveformSelector {
         }
 
         wrapper.appendChild(iconRow);
+
+        // Waveform name label (below icon row)
+        const nameEl = document.createElement('span');
+        nameEl.className   = 'waveform-name-label';
+        nameEl.id          = `${this.paramId}-waveform-name`;
+        nameEl.setAttribute('aria-hidden', 'true');  // decorative — icon already has aria-label
+        wrapper.appendChild(nameEl);
+        this._nameEl = nameEl;
+
         container.appendChild(wrapper);
 
         // Click on icon → advance forward (next)
@@ -162,6 +172,10 @@ class WaveformSelector {
         if (this._iconEl) {
             this._iconEl.src = wf.icon;
             this._iconEl.alt = wf.alt;
+            this._iconEl.setAttribute('aria-label', `${wf.label} waveform — click to cycle`);
+        }
+        if (this._nameEl) {
+            this._nameEl.textContent = wf.label;
         }
     }
 

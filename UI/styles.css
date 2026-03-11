@@ -610,6 +610,17 @@ html, body {
     display: block;
 }
 
+/* Small waveform name shown below the icon (e.g. "Sine", "Sawtooth") */
+.waveform-name-label {
+    display: block;
+    text-align: center;
+    font-family: var(--font-value);
+    font-size: var(--text-tag);
+    color: var(--color-text-mid);
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
 /* ============================================================================
  * Dropdown
  * ============================================================================ */
@@ -854,8 +865,8 @@ html, body {
     border-radius: var(--card-radius);
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.14);
     overflow: hidden;
-    min-width: 140px;
-    max-height: 240px;
+    min-width: 200px;
+    max-height: 360px;
     overflow-y: auto;
 }
 

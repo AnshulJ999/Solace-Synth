@@ -174,7 +174,11 @@ class Fader {
             const textInput = document.createElement ('input');
             textInput.type      = 'text';
             textInput.className = 'fader-value-edit';
-            textInput.value     = this._fmt (currentVal);
+            // Seed with the raw numeric value, NOT the formatted label.
+            // formatFn can produce strings like "20.00k" (filterCutoff) that
+            // parseFloat() silently truncates to 20 — a P1 correctness bug.
+            // The raw number is also more useful to the user when typing.
+            textInput.value     = parseFloat (this._input ? this._input.value : String (defaultValue)).toString();
 
             // Swap span content for the text input
             displayEl.textContent = '';

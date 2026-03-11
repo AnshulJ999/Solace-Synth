@@ -39,3 +39,7 @@ Keyboard arrow keys to control value when the fader was touched/focused. This mi
 For example, It would be nice if we can just double-click on OscMix and get back to 50-50 mix of both Oscillators
 
 There's other such small UI UX things that professional plugins have and we need to think about and add.
+
+9) The tick marks are not properly aligned to the faders. They look offset. Like they are starting below the fader. It's not vertically aligned. 
+
+Also the fader size is not good.

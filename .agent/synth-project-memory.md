@@ -1,8 +1,8 @@
 # Solace Synth — Project Memory
 
 **Created:** 2026-03-08
-**Last Updated:** 2026-03-12 (Phase 7.5: dropdown popup + fader UX + 3rd vel-mod slot) | 2026-03-12 pitch bend + mod wheel DSP
-**Status:** Active — All DSP phases 6.1-6.9 + 6.8b COMPLETE. Pitch bend ±2 semi + mod wheel → LFO DONE. Phase 7 UI 7.1-7.5 COMPLETE. **Remaining V1: LFO target enum reconciliation (pending Nabeel), pitch bend/mod wheel UI controls (V1.1+), SVG icon exports (whenever Nabeel provides).**
+**Last Updated:** 2026-03-12 (Phase 7.5: dropdown popup + fader UX + 3rd vel-mod slot) | 2026-03-12 pitch bend + mod wheel DSP | 2026-03-12 Phase 7.5 bugfixes (fader edit P1, pitchWheel simplification, 720p window, dropdown sizing, waveform labels)
+**Status:** Active — All DSP phases 6.1-6.9 + 6.8b + pitch bend/mod wheel COMPLETE. Phase 7 UI 7.1-7.5 COMPLETE. **Remaining V1: LFO target enum reconciliation (pending Nabeel), pitch bend/mod wheel UI controls (V1.1+), resizable window (needs CSS refactor), tooltip system (V1.1+).**
 
 
 BUILD WAS VERIFIED as of 2026-03-11

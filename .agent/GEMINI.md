@@ -8,6 +8,8 @@ For memory updates, prefer appends instead of rewrites. Old/stale memory context
 
 Remember, when updating memory, you have to add actual details of what you did. You don't just 'replace the status line at the top', that's lazy. We need details of what you actually did. And don't overwrite/rewrite any useful memories or valuable context.
 
+I seriously need to make this clearer: STOP UPDATING ONLY THE STATUS LINE. YOU ALWAYS UPDATE THE MEMORY's STATUS BUT NOT ANYTHING ELSE. EVERY UPDATE LOSES THE LAST CONTEXT. YOU MUST UPDATE STATUS LINE + THE ACTUAL MEMORY CONTEXT. 
+
 Coding practices: 
 
 - Never assume, hallucinate, or guess code. Don't write code you're not sure about or confident with.

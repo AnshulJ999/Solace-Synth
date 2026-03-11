@@ -668,6 +668,61 @@ Do NOT implement features suggested solely by Claude Code/Codex reviews without 
     - `lfoRate`: already had skew=0.3 ✅
   - ⚠️ **Future: Organic distortion.** Nabeel noted the oscillators and distortion sound very digital; wants a warmer/more organic option. Cannot implement without a proper reference (tube saturation curve, tape model, etc.). Flagged for V1.1 once a specific target sound is identified.
 - [ ] Phase 7: Full Figma UI implementation
+  - [x] **Phase 7.5: Dropdown Popup + Fader UX + DSP Pitch Bend + Mod Wheel** — COMPLETE (2026-03-12)
+
+    **UI — Dropdown (full rewrite, `UI/components/dropdown.js`):**
+    - Replaced click-to-cycle behaviour with a proper floating popup panel.
+    - Singleton `_sharedPanel` div appended to `<body>` once, shared across all Dropdown instances. Avoids z-index / overflow-clip issues from per-dropdown panels.
+    - Panel opens upward (preferred — all dropdowns sit in the bottom row). Falls back downward if not enough room above trigger.
+    - Outside-click dismiss: `pointerup` on `document` (bubble phase), deferred via `requestAnimationFrame` to avoid catching the same event that opened the panel.
+    - Options use `pointerup + stopPropagation` to prevent the dismiss handler firing on the same event.
+    - Escape key closes without changing selection. One popup open at a time — opening a second closes the first.
+    - Full ARIA: `role=button`, `aria-haspopup=listbox`, `aria-expanded`, `role=listbox`, `role=option`, `aria-selected`.
+    - CSS: `.dropdown-list` (min-width 200px, max-height 360px, overflow-y auto), `.dropdown-option`, `.dropdown-option--selected`, `.dropdown-option:hover`.
+
+    **UI — Vel Mod Target 3rd Slot:**
+    - `UI/index.html`: added `#mount-velocityModTarget3` div.
+    - `UI/main.js`: `VEL_MOD_TARGET_OPTIONS` expanded from 5 to 8 entries (0=None, 1=AmpLevel, 2=AmpAttack, 3=FilterCutoff, 4=FilterResonance, 5=Distortion, 6=OscPitch, 7=OscMix — matches DSP Phase 6.8b exactly). 3rd Dropdown mounted. `velocityModTarget1` defaultIndex corrected from 2 (AmpAttack) to 1 (AmpLevel) per Nabeel's Phase 6.8b decision.
+    - LFO target list remains PENDING (separate from vel mod — vel mod is now complete).
+
+    **UI — Fader Usability (`UI/components/fader.js`):**
+    - **Double-click to reset:** double-clicking the range input resets to `defaultValue` and sends to C++.
+    - **Click value to type:** clicking the `.fader-value` span spawns an inline `<input type=text>` pre-filled with the raw number. Enter commits + clamps to [min, max] + sends to C++. Escape cancels. Blur also commits (with `committed` flag to prevent double-fire on Enter→blur).
+    - **P1 bug fix (2026-03-12):** Inline editor was seeding with `this._fmt(currentVal)` (display label). For `filterCutoff`, this produces `"20.00k"` — `parseFloat("20.00k")` = 20, clamped to 20 Hz, corrupting the parameter silently. Fixed: seed with `parseFloat(this._input.value).toString()` (raw number like `"20000"`). Safe for all other faders.
+    - Ctrl+Drag for fine-tuning: **DEFERRED** — marked PENDING for later.
+    - CSS: `.fader-value-edit` inline text input styled to match fader value metrics.
+
+    **UI — Waveform Name Labels (`UI/components/waveform-selector.js`):**
+    - New `_nameEl` span added below the icon row showing the current waveform name ("Sine", "Sawtooth", etc.).
+    - Updated automatically in `_apply()` in sync with the icon change.
+    - CSS: `.waveform-name-label` — small, dimmed, centered, non-interactive (`aria-hidden`).
+
+    **UI — Window Size (`Source/PluginEditor.cpp`):**
+    - `setSize(900, 600)` → `setSize(1280, 720)` (720p). WebView gets 1280×640 (subtracting 80px MIDI keyboard strip).
+    - Resizable window: **deferred** — requires CSS responsive refactor. Plan separately.
+
+    **DSP — Pitch Bend (`Source/DSP/SolaceOscillator.h`, `SolaceVoice.h`):**
+    - `SolaceOscillator`: new `pitchBendMultiplier` member (default 1.0), `setPitchBendMultiplier(double)` method. Applied multiplicatively in `getNextSample()` alongside `lfoMultiplier` and `velPitchMultiplier`. All three pitch sources are fully independent.
+    - `SolaceVoice::startNote()`: `int /*currentPitchWheelPosition*/` → `int currentPitchWheelPosition`. Calls `_applyPitchBend(currentPitchWheelPosition)` at note-on end to prime the bend correctly. Uses JUCE's built-in per-channel wheel tracking (not a global atomic — JUCE already handles this correctly via `lastPitchWheelValues[channel]` and the parameter passed to `startNote()`).
+    - `SolaceVoice::pitchWheelMoved(int newValue)`: implemented — delegates to `_applyPitchBend(newValue)`.
+    - `_applyPitchBend(int wheelValue)` private helper: normalises 0-16383 to [-1, +1], multiplies by `kPitchBendRange=2` semitones, `pow(2, semitones/12)`, applies to all active unison osc1+osc2.
+    - Bend range: ±2 semitones (`kPitchBendRange = 2`). MIDI standard default. V2: make user-configurable APVTS param.
+
+    **DSP — Mod Wheel (`Source/PluginProcessor.h`, `SolaceVoice.h`, `PluginProcessor.cpp`):**
+    - `SolaceSynthesiser::modWheelValue` (std::atomic<int>, default 0): captures CC#1 in `handleMidiEvent()`.
+    - `SolaceVoiceParams::modWheelValue` pointer wired in `PluginProcessor.cpp` constructor.
+    - `SolaceVoice::renderNextBlock()`: reads `modWheelValue` per-block, normalises to [0,1], adds to `lfoAmountKnob`, clamped to [0,1]. Classic mod wheel = vibrato depth behaviour. Changes take effect next audio block (~2ms at typical buffer — imperceptible, intentional).
+    - `SolaceVoice::controllerMoved()`: implemented as a no-op — mod wheel value already captured by `handleMidiEvent()` before this is called. `(void) controller` suppresses warning.
+    - Global mod wheel (all channels share one atomic): acceptable V1 behaviour for a mono-timbral synth. Documented.
+
+    **Build fix (2026-03-12):** `int /*currentPitchWheelPosition*/` in `startNote()` signature was commented out. Removing the `/* */` fixed `error C2065: 'currentPitchWheelPosition': undeclared identifier`.
+
+    **Peer reviews processed (Claude Code + Codex, commit 8146cfe):**
+    - ✅ All DSP: thread model sound, ordering correct, ARIA complete, bounds checks in place.
+    - ✅ Fixed P1 fader edit bug (formatter seeding issue described above).
+    - ✅ Fixed P2 pitch wheel: switched from global atomic to JUCE parameter (simpler + more correct).
+    - ℹ️ Doc misnomer: `Osc1Pitch` in C++ comments should be `OscPitch` (both oscs shift). Low priority cleanup — does not affect runtime.
+
 - [ ] GitHub Actions CI + pluginval
 
 ---

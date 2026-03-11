@@ -327,7 +327,7 @@ public:
     void startNote (int midiNoteNumber,
                     float velocity,
                     juce::SynthesiserSound* /*sound*/,
-                    int /*currentPitchWheelPosition*/) override
+                    int currentPitchWheelPosition) override
     {
         const double baseHz = juce::MidiMessage::getMidiNoteInHertz (midiNoteNumber);
 

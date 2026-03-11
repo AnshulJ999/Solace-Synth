@@ -553,6 +553,7 @@ bool SolaceSynthProcessor::hasEditor() const
 
 juce::AudioProcessorEditor* SolaceSynthProcessor::createEditor()
 {
+    SolaceLog::info ("Processor: createEditor() called");
     return new SolaceSynthEditor (*this);
 }
 

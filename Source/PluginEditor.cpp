@@ -79,6 +79,8 @@ SolaceSynthEditor::SolaceSynthEditor (SolaceSynthProcessor& p)
       // and the layout orientation.
       midiKeyboard (p.getMidiKeyboardState(), juce::MidiKeyboardComponent::horizontalKeyboard)
 {
+    SolaceLog::info ("Editor ctor: entered");
+
     // --- Fallback label (shown while WebView loads or if it fails) ---
     fallbackLabel.setText ("Loading Solace Synth UI...",
                            juce::dontSendNotification);
@@ -88,19 +90,30 @@ SolaceSynthEditor::SolaceSynthEditor (SolaceSynthProcessor& p)
     addAndMakeVisible (fallbackLabel);
 
     // --- Create WebView with our bridge configuration ---
+    SolaceLog::debug ("Editor ctor: creating WebView options");
     auto options = createWebViewOptions();
+    SolaceLog::debug ("Editor ctor: WebView options created");
 
-    if (juce::WebBrowserComponent::areOptionsSupported (options))
+    const auto optionsSupported = juce::WebBrowserComponent::areOptionsSupported (options);
+    SolaceLog::info ("Editor ctor: WebView options supported = " + juce::String (optionsSupported ? "true" : "false"));
+
+    if (optionsSupported)
     {
+        SolaceLog::debug ("Editor ctor: constructing WebView component");
         webView = std::make_unique<juce::WebBrowserComponent> (options);
+        SolaceLog::debug ("Editor ctor: WebView component constructed");
         addAndMakeVisible (*webView);
+        SolaceLog::debug ("Editor ctor: WebView made visible");
 
         // Navigate to the resource provider root (serves our UI/index.html)
+        SolaceLog::info ("Editor ctor: navigating WebView to resource provider root");
         webView->goToURL (juce::WebBrowserComponent::getResourceProviderRoot());
+        SolaceLog::debug ("Editor ctor: goToURL returned");
     }
     else
     {
         // WebView not supported - show fallback
+        SolaceLog::error ("Editor ctor: WebView options not supported on this system");
         fallbackLabel.setText ("WebView is not available on this system.\n"
                                "Please install Microsoft Edge WebView2 Runtime.",
                                juce::dontSendNotification);
@@ -110,17 +123,23 @@ SolaceSynthEditor::SolaceSynthEditor (SolaceSynthProcessor& p)
     // This fires parameterChanged() when automation or presets change values
     auto& apvts = processorRef.getAPVTS();
     auto params = apvts.processor.getParameters();
+    int listenerCount = 0;
     for (auto* param : params)
     {
         if (auto* paramWithID = dynamic_cast<juce::AudioProcessorParameterWithID*> (param))
+        {
             apvts.addParameterListener (paramWithID->getParameterID(), this);
+            ++listenerCount;
+        }
     }
+    SolaceLog::debug ("Editor ctor: APVTS listeners registered = " + juce::String (listenerCount));
 
     // --- On-screen MIDI keyboard ---
     // Scroll to show octave 3-5 (middle range) by default
     midiKeyboard.setAvailableRange (36, 96);   // C2 to C6
     midiKeyboard.setScrollButtonsVisible (true);
     addAndMakeVisible (midiKeyboard);
+    SolaceLog::debug ("Editor ctor: MIDI keyboard created and visible");
     // Grab keyboard focus after a short delay so the user can play immediately.
     // We use a lambda timer so we don't block the constructor.
     //
@@ -138,6 +157,7 @@ SolaceSynthEditor::SolaceSynthEditor (SolaceSynthProcessor& p)
 
     // Set window size
     setSize (900, 600);
+    SolaceLog::info ("Editor ctor: finished, window size set to 900x600");
 }
 
 // ============================================================================
@@ -161,6 +181,7 @@ SolaceSynthEditor::~SolaceSynthEditor()
 juce::WebBrowserComponent::Options SolaceSynthEditor::createWebViewOptions()
 {
     using Options = juce::WebBrowserComponent::Options;
+    SolaceLog::debug ("createWebViewOptions: building options");
 
     return Options()
         .withBackend (Options::Backend::webview2)
@@ -225,6 +246,7 @@ std::optional<juce::WebBrowserComponent::Resource>
 SolaceSynthEditor::resourceRequested (const juce::String& path)
 {
     const auto requestedPath = normaliseResourcePath (path);
+    SolaceLog::debug ("resourceRequested: path='" + path + "' normalized='" + requestedPath + "'");
 
    #if SOLACE_ENABLE_DEV_UI_FALLBACK
     // Debug/dev builds can still load directly from disk for fast UI iteration.
@@ -235,13 +257,20 @@ SolaceSynthEditor::resourceRequested (const juce::String& path)
         auto file = uiDir.getChildFile (requestedPath);
 
         if (file.isAChildOf (uiDir) && file.existsAsFile())
+        {
+            SolaceLog::debug ("resourceRequested: serving from dev disk path '" + file.getFullPathName() + "'");
             return loadFileAsResource (file);
+        }
     }
    #endif
 
     if (auto embedded = loadEmbeddedResource (requestedPath))
+    {
+        SolaceLog::debug ("resourceRequested: serving embedded resource '" + requestedPath + "'");
         return embedded;
+    }
 
+    SolaceLog::error ("resourceRequested: embedded resource not found '" + requestedPath + "'");
     DBG ("Solace Synth: Embedded resource not found: " + requestedPath);
     return std::nullopt;
 }
@@ -252,14 +281,18 @@ SolaceSynthEditor::resourceRequested (const juce::String& path)
 std::optional<juce::WebBrowserComponent::Resource>
 SolaceSynthEditor::loadFileAsResource (const juce::File& file)
 {
+    SolaceLog::trace ("loadFileAsResource: reading '" + file.getFullPathName() + "'");
+
     // Read file contents
     juce::MemoryBlock mb;
     if (! file.loadFileAsData (mb))
     {
+        SolaceLog::error ("loadFileAsResource: failed to read '" + file.getFullPathName() + "'");
         DBG ("Solace Synth: Failed to read file: " + file.getFullPathName());
         return std::nullopt;
     }
 
+    SolaceLog::trace ("loadFileAsResource: read OK bytes=" + juce::String (static_cast<int> (mb.getSize())));
     return makeResourceFromMemory (mb.getData(),
                                    mb.getSize(),
                                    getMimeTypeForPath (file.getFullPathName()));

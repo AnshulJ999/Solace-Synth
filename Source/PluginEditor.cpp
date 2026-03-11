@@ -100,15 +100,35 @@ SolaceSynthEditor::SolaceSynthEditor (SolaceSynthProcessor& p)
     if (optionsSupported)
     {
         SolaceLog::debug ("Editor ctor: constructing WebView component");
-        webView = std::make_unique<juce::WebBrowserComponent> (options);
-        SolaceLog::debug ("Editor ctor: WebView component constructed");
-        addAndMakeVisible (*webView);
-        SolaceLog::debug ("Editor ctor: WebView made visible");
+        try
+        {
+            webView = std::make_unique<juce::WebBrowserComponent> (options);
+            SolaceLog::debug ("Editor ctor: WebView component constructed");
+            addAndMakeVisible (*webView);
+            SolaceLog::debug ("Editor ctor: WebView made visible");
 
-        // Navigate to the resource provider root (serves our UI/index.html)
-        SolaceLog::info ("Editor ctor: navigating WebView to resource provider root");
-        webView->goToURL (juce::WebBrowserComponent::getResourceProviderRoot());
-        SolaceLog::debug ("Editor ctor: goToURL returned");
+            // Navigate to the resource provider root (serves our UI/index.html)
+            SolaceLog::info ("Editor ctor: navigating WebView to resource provider root");
+            webView->goToURL (juce::WebBrowserComponent::getResourceProviderRoot());
+            SolaceLog::debug ("Editor ctor: goToURL returned");
+        }
+        catch (const std::exception& e)
+        {
+            SolaceLog::error ("Editor ctor: WebView creation failed (std::exception): "
+                              + juce::String (e.what()));
+            fallbackLabel.setText ("WebView failed to initialize.\n"
+                                   "Please ensure Microsoft Edge WebView2 Runtime is up to date.",
+                                   juce::dontSendNotification);
+            webView.reset();
+        }
+        catch (...)
+        {
+            SolaceLog::error ("Editor ctor: WebView creation failed (unknown exception)");
+            fallbackLabel.setText ("WebView failed to initialize.\n"
+                                   "Please ensure Microsoft Edge WebView2 Runtime is up to date.",
+                                   juce::dontSendNotification);
+            webView.reset();
+        }
     }
     else
     {

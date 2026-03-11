@@ -132,6 +132,7 @@ target_compile_definitions("${PROJECT_NAME}"
     PUBLIC
     JUCE_WEB_BROWSER=1          # Enable WebView support
     JUCE_USE_WIN_WEBVIEW2=1     # Enable WebView2 backend + ResourceProvider on Windows
+    JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING=1 # Prevent WebView2Loader.dll dependency
     JUCE_USE_CURL=0             # No need for CURL
     JUCE_VST3_CAN_REPLACE_VST2=0
 

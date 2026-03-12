@@ -86,9 +86,10 @@ public:
     // ========================================================================
     void setTuningOffset (int octave, int transpose, float cents) noexcept
     {
-        tuningMultiplier = std::pow (2.0, static_cast<double> (octave))
-                         * std::pow (2.0, static_cast<double> (transpose) / 12.0)
-                         * std::pow (2.0, static_cast<double> (cents)     / 1200.0);
+        // ⚡ Bolt: Using std::exp2(x) is significantly faster than std::pow(2.0, x)
+        tuningMultiplier = std::exp2 (static_cast<double> (octave))
+                         * std::exp2 (static_cast<double> (transpose) / 12.0)
+                         * std::exp2 (static_cast<double> (cents)     / 1200.0);
     }
 
     // ========================================================================

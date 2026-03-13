@@ -73,12 +73,12 @@ public:
             return x;
 
         const float k     = drive * 10.0f;   // drive=0→k=0 (transparent), drive=1→k=10 (heavy)
-        const float tanhK = std::tanhf (k);
+        const float tanhK = std::tanh (k);
 
         // Guard: tanhK near zero means k≈0 -- return x (mathematically correct limit).
         if (tanhK < 1e-6f)
             return x;
 
-        return std::tanhf (k * x) / tanhK;
+        return std::tanh (k * x) / tanhK;
     }
 };

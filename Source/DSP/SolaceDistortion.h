@@ -31,7 +31,7 @@
 // Design decisions:
 //   - No state — purely sample-in sample-out. No prepare() needed.
 //   - Static method — instantiated as a value type in PluginProcessor.
-//   - std::tanhf used for float version (avoids implicit double promotion).
+//   - std::tanh used for float version (avoids implicit double promotion).
 //   - Applied per channel independently (L and R) for correct stereo handling.
 //   - Outer bypass guards in PluginProcessor.cpp and SolaceVoice.h skip the
 //     function entirely when drive == 0.0f (free CPU win for the common case).
@@ -73,12 +73,12 @@ public:
             return x;
 
         const float k     = drive * 10.0f;   // drive=0→k=0 (transparent), drive=1→k=10 (heavy)
-        const float tanhK = std::tanhf (k);
+        const float tanhK = std::tanh (k);
 
         // Guard: tanhK near zero means k≈0 -- return x (mathematically correct limit).
         if (tanhK < 1e-6f)
             return x;
 
-        return std::tanhf (k * x) / tanhK;
+        return std::tanh (k * x) / tanhK;
     }
 };

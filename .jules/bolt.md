@@ -1,0 +1,3 @@
+## 2024-05-14 - Optimize base-2 exponential calculations in audio DSP thread
+**Learning:** `std::pow(2.0, x)` is used for pitch and tuning calculations but it is slower than the specialized `std::exp2(x)` function, especially when evaluated per render block in the audio DSP thread.
+**Action:** Replace `std::pow(2.0, x)` with `std::exp2(x)` for base-2 exponential calculations in DSP code to reduce CPU usage.

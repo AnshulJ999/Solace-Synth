@@ -86,9 +86,11 @@ public:
     // ========================================================================
     void setTuningOffset (int octave, int transpose, float cents) noexcept
     {
-        tuningMultiplier = std::pow (2.0, static_cast<double> (octave))
-                         * std::pow (2.0, static_cast<double> (transpose) / 12.0)
-                         * std::pow (2.0, static_cast<double> (cents)     / 1200.0);
+        // Performance optimization: use std::exp2(x) instead of std::pow(2.0, x)
+        // for base-2 exponential calculations in the audio DSP thread.
+        tuningMultiplier = std::exp2 (static_cast<double> (octave))
+                         * std::exp2 (static_cast<double> (transpose) / 12.0)
+                         * std::exp2 (static_cast<double> (cents)     / 1200.0);
     }
 
     // ========================================================================
@@ -125,7 +127,7 @@ public:
     //   multiplier = 1.0                     (no LFO effect -- default)
     //
     // This is cheaper than recalling setFrequency() per block because it avoids
-    // the pow() and division; the oscillator already has the base angleDelta set.
+    // the exp2() and division; the oscillator already has the base angleDelta set.
     // The compiler will see the 1.0 case in the hot loop and may elide the
     // multiply when the target is not a pitch target.
     // ========================================================================

@@ -322,7 +322,7 @@ public:
     // startNote — called by the Synthesiser on each MIDI note-on.
     //
     // All note-start setup happens here (not per-sample). Expensive operations
-    // (pow(), atomic loads, filter mode changes) are all done once at note-on.
+    // (exp2(), atomic loads, filter mode changes) are all done once at note-on.
     // ========================================================================
     void startNote (int midiNoteNumber,
                     float velocity,
@@ -490,7 +490,8 @@ public:
             // so LFO vibrato and velocity pitch are fully independent -- applied
             // multiplicatively in getNextSample(). This is set once at note-on and
             // stays constant for the note's lifetime (velocity doesn't change mid-note).
-            const double velPitchMult = std::pow (2.0, static_cast<double>(velPitchCents) / 1200.0);
+            // Performance optimization: use std::exp2(x) instead of std::pow(2.0, x)
+            const double velPitchMult = std::exp2 (static_cast<double>(velPitchCents) / 1200.0);
             for (int u = 0; u < activeUnisonCount; ++u)
             {
                 unisonVoices[u].osc1.setVelPitchMultiplier (velPitchMult);
@@ -631,11 +632,12 @@ public:
         const bool lfoToFilterRes    = (lfoTarget1 == 7 || lfoTarget2 == 7 || lfoTarget3 == 7);
 
         // LFO pitch: compute multiplier once (both osc targets share same lfoValue).
-        // getCurrentValue() does NOT advance the phase, so the single pow() is correct.
+        // getCurrentValue() does NOT advance the phase, so the single exp2() is correct.
         if (lfoToOsc1Pitch || lfoToOsc2Pitch)
         {
             const double semi = static_cast<double> (lfo.getCurrentValue() * lfoAmount * kLFOPitchSemi);
-            const double mult = std::pow (2.0, semi / 12.0);
+            // Performance optimization: use std::exp2(x) instead of std::pow(2.0, x)
+            const double mult = std::exp2 (semi / 12.0);
             for (int u = 0; u < activeUnisonCount; ++u)
             {
                 if (lfoToOsc1Pitch) unisonVoices[u].osc1.setLFOPitchMultiplier (mult);
@@ -879,7 +881,8 @@ private:
         // Normalise to [-1.0, +1.0]. JUCE uses 0-16383 with centre at 8192.
         const double normalised = (static_cast<double> (wheelValue) - 8192.0) / 8192.0;
         const double semitones  = normalised * static_cast<double> (kPitchBendRange);
-        const double multiplier = std::pow (2.0, semitones / 12.0);
+        // Performance optimization: use std::exp2(x) instead of std::pow(2.0, x)
+        const double multiplier = std::exp2 (semitones / 12.0);
 
         for (int u = 0; u < activeUnisonCount; ++u)
         {

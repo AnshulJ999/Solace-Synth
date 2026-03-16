@@ -1,0 +1,3 @@
+## 2026-03-13 - [Use exp2 instead of pow(2, x) for base-2 exponentials]
+**Learning:** In the audio DSP thread, using `std::pow(2.0, x)` is significantly slower than using the specialized base-2 exponential function `std::exp2(x)`. This codebase computes base-2 exponents frequently to calculate frequency multipliers from semitones and cents.
+**Action:** Replace all instances of `std::pow(2.0, x)` with `std::exp2(x)` throughout the DSP codebase (`SolaceOscillator.h` and `SolaceVoice.h`).

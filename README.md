@@ -1,6 +1,6 @@
-# Solace Synth
+# Solace - A Substractive Soft Synth
 
-A free, open-source polyphonic software synthesizer — available as a **VST3 plugin** and **standalone application**.
+A free, open-source polyphonic soft synthesizer — available as a **VST3 plugin** and **standalone application**.
 
 Built from scratch in C++ with [JUCE 8](https://juce.com/), featuring a modern WebView-based UI designed in Figma and implemented in HTML/CSS/JS.
 

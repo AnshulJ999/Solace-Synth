@@ -129,5 +129,5 @@ JS usage: `logTrace()`, `logDebug()`, `logInfo()`, `logWarn()`, `logError()` in 
 - **New APVTS parameters** must be added to `createParameterLayout()` in `PluginProcessor.cpp` before any code references them.
 - **Source file globbing:** `CMakeLists.txt` uses `GLOB` to pick up all `*.cpp` and `*.h` in `Source/`. New files in `Source/` are automatically included in the build after reconfiguring CMake (`cmake -B build`). Files in `Source/DSP/` are included via a separate glob.
 - **Em dash (—):** Does not render in JUCE's default font. Use plain dashes in any C++ string that appears as JUCE text.
-- **Plugin window:** Currently fixed size (Phase 5). Phase 7 will add `setResizable(true, false)` + `setResizeLimits()`. CSS must use relative units (`%`, `fr`) to scale correctly.
-- **UI files for release:** Currently served from disk via `SOLACE_DEV_UI_PATH`. Before shipping, must be embedded via `juce_add_binary_data()`.
+- **Plugin window:** Currently fixed at 1280x720. Resizable window planned via CSS `transform: scale()` refactor (see `.agent/plans/phase3-scale-refactor-plan.md`).
+- **UI files:** Embedded via `juce_add_binary_data()` in Release builds. Debug builds fall back to disk via `SOLACE_DEV_UI_PATH` (controlled by `SOLACE_ENABLE_DEV_UI_FALLBACK`).

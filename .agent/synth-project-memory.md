@@ -1,31 +1,33 @@
 # Solace Synth — Project Memory
 
+> **AI Agent Protocol:** Before editing this file, read the rules at `.agent/rules/memory-update-protocol.md`.
+> Key rules: (1) Read full header before editing. (2) Search for all mentions of an item before updating — no contradictions allowed. (3) Phase logs are frozen history — don't edit completed phases. (4) Mark resolved items as `✅ RESOLVED` everywhere, not just in one place.
+
 **Created:** 2026-03-08
-**Last Updated:** 2026-03-21 (Phase 7.5: standalone binary packaging + final SVG assets + LFO discrepancy audit)
-**Status:** Active — All DSP phases 6.1-6.9 + 6.8b + pitch bend/mod wheel COMPLETE. Phase 7 UI 7.1-7.5 (including dropdowns, faders, and icons) COMPLETE. **Standalone Packaging (Binary Data Embedding) is now COMPLETE and portable.** 
-**Next Focus:** Preset system (GUI + file management) and final UI/UX polishing.
-**Pending Decisions:** LFO target list reconciliation (see discrepancies section).
-
-
-BUILD WAS VERIFIED as of 2026-03-11
+**Last Updated:** 2026-03-21 (cleanup pass: fixed contradictions, updated V1 scope, marked resolved items)
+**Status:** Active — All DSP phases 6.1-6.9 + 6.8b + pitch bend/mod wheel COMPLETE. Phase 7 UI 7.1-7.5 COMPLETE. Standalone packaging (BinaryData embedding) COMPLETE.
+**Next Focus:** Preset system (GUI + file management), resizable window (CSS `transform: scale()` refactor), and final UI/UX polishing.
+**Build:** Last verified 2026-03-11. Build must succeed cleanly before committing.
 
 ---
 
----
+### Quick Status Notes
 
-**Pending item:** LFO target list in `main.js` does NOT match Vision Document (Nabeel's answer 5). Discrepancy found: Code has split Osc Pitch and missing Distortion/Mix/AmpAttack targets. Verification needed to finalize V1 list.
+**LFO targets:** Current 8-target list (None/FilterCutoff/Osc1Pitch/Osc2Pitch/Osc1Level/Osc2Level/AmpLevel/FilterRes) is fine for now. Missing targets from Vision Doc (Distortion, OscMix, AmpAttack, MasterVol) will be added in a future pass — backward-compatible APVTS int range extension.
 
-**Standalone Packaging:** COMPLETED (2026-03-21) — `juce_add_binary_data()` implemented in CMake and used in `PluginEditor.cpp`. The EXE is now portable and can be shared without the local repo path.
+**Standalone packaging:** COMPLETE — `juce_add_binary_data()` in CMake + `loadEmbeddedResource()` in PluginEditor. Debug builds fall back to disk via `SOLACE_ENABLE_DEV_UI_FALLBACK`. Release builds serve embedded assets only.
 
-**SVG icons:** COMPLETED — Final SVG assets (logo, waveforms, UI buttons) have been exported/added and integrated into the `UI/assets/icons/` folder.
+**SVG icons:** COMPLETE — Final assets in `UI/assets/icons/`.
 
-**Master Distortion:** REFINED — Fixed the "volume jump" bug at low drive settings by updating the mapping formula to be mathematically transparent at `drive=0`. Output is now smooth and "organic" across the entire range.
+**Master distortion:** REFINED — Volume-jump bug at drive=0 fixed. Transparent passthrough at zero.
 
-**Next Major Step:** **Preset System.** While JUCE handles state persistence (DAW save/load), we need a custom GUI and file management system (Preset Browser) to allow users to save/load `.solace` patches.
+**Logging guards:** NOT YET DONE — `SolaceLog::` calls run unconditionally in all builds. Pre-release task: wrap in `#if SOLACE_LOGGING_ENABLED` or `JUCE_DEBUG`. Low priority until distribution. Jules PR #5 has a ready implementation to cherry-pick.
 
-**Ctrl+drag fine fader control:** PENDING — deferred from Phase 7.5. Marked for a later pass.
+**Jules PR audit:** `.agent/plans/jules-PR-audit-by-gemini.md` — 13 PRs analyzed. Key cherry-pick candidates: logging guards (#5), `exp2` optimization (#13), unit testing infrastructure (#2/#3), masterVolume pointer caching (#7). PR #1 rejected (targets stale Phase 5 code).
 
-**UI plan:** `.agent/plans/Phase-7-UI-Master-Plan.md` — this is the authoritative merged plan. `.agent/plans/Standalone-Packaging-Plan.md` covers the portable standalone handoff path. Old files (`Phase 7 — UI Roadmap.md`, `Phase-7.4-Pixel-Perfect-Audit.md`) are kept as references only.
+**Ctrl+drag fine fader control:** PENDING — deferred from Phase 7.5.
+
+**UI plan:** `.agent/plans/Phase-7-UI-Master-Plan.md` is the authoritative merged plan. Old files kept as references only.
 
 ---
 
@@ -56,8 +58,8 @@ A free, open-source polyphonic soft synthesizer. Being built by Anshul (backend/
 
 | Person | Role |
 |---|---|
-| **Anshul** | Owns the repo. Backend/DSP: C++ audio engine, voice management, DSP, parameter bridge |
-| **Friend (designer)** | UI/UX design in Figma. If WebView UI selected: also owns HTML/CSS/JS frontend |
+| **Anshul** | Owns the repo. Does everything: C++ audio engine, DSP, bridge, UI/CSS/JS, packaging, all decisions. Sole active contributor. |
+| **Nabeel (designer)** | Original UI/UX design in Figma. Provided initial mockups, design tokens, and vision document. Not actively contributing code — Anshul handles all implementation including UI. |
 
 ---
 
@@ -98,51 +100,58 @@ A free, open-source polyphonic soft synthesizer. Being built by Anshul (backend/
 |---|---|
 | Oscillator 1 | Waveform selector (arrows), Octave, Transpose, Tuning slider |
 | Oscillator 2 | Waveform selector (arrows), Octave, Transpose, Tuning slider |
-| Osc Mix | Osc 1 level slider, Osc 2 level slider |
+| Osc Mix | Single crossfader (0=Osc1 only, 1=Osc2 only) |
 | Amplifier Envelope | Attack, Decay, Sustain, Release sliders |
 | Master | Level slider |
 | Filter | Cutoff slider, Resonance slider |
 | Filter Configuration | Filter Type (LP 24dB, etc. — arrow selector), Filter ADSR (Attack, Decay, Sustain, Release) |
 | LFO | Waveform selector, Rate slider, Amount slider, 3 assignable target dropdowns |
-| Voicing | No. of Voices (arrow selector, default 16), Unison (arrow selector, default 3), Velocity Range slider, 2 Velocity Mod Target dropdowns |
+| Voicing | No. of Voices (arrow selector, 1-16), Unison (arrow selector, 1-8), Velocity Range slider, 3 Velocity Mod Target dropdowns |
 
 ---
 
 ## 🗺️ Proposed V1 / V2 Scope
 
-### V1 — MVP / Portfolio-Ready
+### V1 — MVP / Portfolio-Ready (actual implementation)
 ```
-├── 2 Oscillators (Sine, Saw, Square, Triangle + Noise)
-├── Osc Mix (crossfade / level sliders)
-├── Amplifier ADSR + Master Level
-├── Filter: LP12 / LP24 / HP12 (State Variable Filter)
-├── Filter ADSR
-├── 1 LFO (Sine, Saw, Square, Triangle)
-│   └── 3 assignable targets (from a defined fixed list)
-├── Polyphony: 1–16 voices (configurable)
-├── Unison: 1–4 voices + basic detune
-├── Velocity → Amp Level (standard)
-├── Velocity → 1 other assignable target
-└── Standalone + VST3 on Windows
+├── 2 Oscillators (Sine, Saw, Square, Triangle) — Noise deferred to V2
+├── Osc Mix (single crossfader, 0=Osc1, 1=Osc2)
+├── Amplifier ADSR + Master Level + Master Distortion (tanh soft-clip)
+├── Filter: LP12 / LP24 / HP12 (LadderFilter, per-voice)
+├── Filter ADSR + bipolar depth
+├── 1 LFO (Sine, Saw, Square, Triangle, S&H) — per-voice, free-running
+│   └── 3 assignable targets (8-target enum, more targets planned)
+├── Polyphony: 1–16 voices (configurable, steal mode)
+├── Unison: 1–8 voices + detune + stereo spread (dual-filter architecture)
+├── Velocity: 3 assignable mod target slots (8-target enum)
+├── Pitch Bend (±2 semitones) + Mod Wheel (CC#1 → LFO amount)
+├── Preset system (save/load + factory bank) ← NEXT FOCUS
+├── Standalone + VST3 on Windows (embedded UI, portable)
+└── Resizable window (CSS transform:scale() refactor planned)
 ```
 
 ### V2 — Nice-To-Haves (post V1 stable)
 ```
-├── More filter types (BP, Notch)
-├── Portamento / Glide
-├── Preset system (save/load + factory bank)
+├── Noise waveform (per-voice PRNG)
+├── More filter types (BP, Notch, HP24, BP24)
+├── Portamento / Glide (polyphonic = non-trivial)
+├── PolyBLEP anti-aliased oscillators
 ├── MIDI CC learn / mapping
 ├── Cross-platform (Mac AU, Linux LV2)
-└── More LFO waveforms and targets
+├── More LFO waveforms and targets
+├── Configurable pitch bend range
+├── Organic/warmer distortion option
+├── Dark theme
+├── ADSR visualizer, oscilloscope
+└── Mod wheel right-click → map to any param
 ```
 
-### Open Spec Gaps (need decisions before implementation)
-- **Waveforms:** Not yet explicitly listed — standard set: Sine, Triangle, Sawtooth, Square, Pulse, Noise
-- **Filter HP:** Vision doc says "maybe" — suggest including LP12/LP24/HP12 in V1 (trivial with State Variable Filter)
-- **LFO target list:** **RECONCILIATION PENDING.** Currently 8 targets (0-7): None, FilterCutoff, Osc1Pitch, Osc2Pitch, Osc1Level, Osc2Level, AmpLevel, FilterRes. (Discrepancy found vs Vision Doc, pending final Nabeel review).
-- **Velocity mod target list:** **RESOLVED/COMPLETE.** 8 targets (0-7): None, AmpLevel, AmpAttack, FilterCutoff, FilterResonance, Distortion, OscPitch, OscMix.
-- **"Computer-friendly UI":** Does this imply an onscreen keyboard? Needs clarification
-- **Portamento complexity:** In polyphonic mode this is non-trivial — should be V2, not V1
+### Open Spec Gaps (status)
+- ~~**Waveforms:**~~ ✅ RESOLVED: Sine, Saw, Square, Triangle in V1. Noise deferred to V2.
+- ~~**Filter HP:**~~ ✅ RESOLVED: LP12/LP24/HP12 via LadderFilter. LP24 default.
+- **LFO target list:** Current 8 targets work fine for now. Missing Vision Doc targets (Distortion, OscMix, AmpAttack, MasterVol) will be added later — backward-compatible.
+- ~~**Velocity mod target list:**~~ ✅ RESOLVED: 8 targets (0-7): None, AmpLevel, AmpAttack, FilterCutoff, FilterResonance, Distortion, OscPitch, OscMix.
+- **Portamento:** Firmly V2 — polyphonic glide is non-trivial.
 
 ---
 
@@ -252,8 +261,7 @@ Anshul rebuilds plugin → Full test in DAW → Feedback to friend → Repeat
 - `juce::Random` re-seeded per-instance in constructor: default `juce::Random()` uses seed=1 for all instances; without re-seeding, all S&H sequences would be identical across voices
 
 **kVoiceGain:**
-- Now: `0.15f` static (V1 acceptable with mixed velocities)
-- Phase 6.7: replace with `1.0f / sqrt(voiceCount * unisonCount)` dynamic normalisation
+- ✅ RESOLVED in Phase 6.7: replaced static `0.15f` with dynamic `kBaseVoiceGain / sqrt(activeUnisonCount)`. `kBaseVoiceGain = 0.15 * sqrt(2)` to maintain backward-compatible mono output level.
 
 ### Confirmed-Clean Architecture
 
@@ -405,7 +413,7 @@ An AI-first "vibe-coding" framework for building JUCE plugins. Provides structur
 - **Audio thread safety:** No logging or I/O on audio thread. `parameterChanged()` bounces everything to message thread via `callAsync`.
 - **Logger class:** `Source/SolaceLogger.h` — custom `juce::Logger` subclass with 3 `FileLogger` instances
 - **Usage:** `SolaceLog::trace()`, `SolaceLog::debug()`, `SolaceLog::info()`, `SolaceLog::warn()`, `SolaceLog::error()`
-- **Pre-release TODO:** Wrap all `SolaceLog::` calls in `#ifdef SOLACE_LOGGING_ENABLED` or `JUCE_DEBUG` guard before shipping. Logging is dev-only infrastructure.
+- **Pre-release TODO:** Wrap all `SolaceLog::` calls in `#if SOLACE_LOGGING_ENABLED` guard before shipping. Jules PR #5 has a ready implementation. Anshul uses a single-build workflow (no separate Debug/Release), so the approach needs to accommodate that.
 - **COPY_PLUGIN_AFTER_BUILD:** FALSE (requires admin for C:\Program Files\Common Files\VST3)
 - **Known Issue:** Em dash (—) doesn't render in JUCE's default font — use plain dashes in JUCE text
 - **Initialization Plan:** `.agent/plans/Solace Synth — Initialization Plan.md`
@@ -503,16 +511,20 @@ An AI-first "vibe-coding" framework for building JUCE plugins. Provides structur
 - [x] **Standalone Packaging** — COMPLETE
 
 ### Pre-Release Backlog (do before shipping)
-- [ ] Conditional logging guard (`SOLACE_LOGGING_ENABLED` or `JUCE_DEBUG`)
+- [ ] Conditional logging guard (`SOLACE_LOGGING_ENABLED` or `JUCE_DEBUG`) — Jules PR #5 has ready implementation
 - [ ] Multi-instance logger safety (currently global `setCurrentLogger`)
-- [ ] Embed UI files via `juce_add_binary_data()` instead of disk path
-- [ ] Full Figma UI implementation
+- [x] ~~Embed UI files via `juce_add_binary_data()`~~ — DONE (CMakeLists.txt + PluginEditor.cpp)
+- [ ] Resizable window (CSS `transform: scale()` refactor — plan at `.agent/plans/phase3-scale-refactor-plan.md`)
+- [ ] Preset system (save/load GUI + `.solace` file format)
+- [ ] `exp2` optimization cherry-pick from Jules PR #13
+- [ ] `masterVolume` pointer caching (Jules PR #7)
+- [ ] `PLUGIN_CODE "Ss01"` — replace with unique code before public release
 
 ### Pending — Spec Gaps (need decisions before DSP implementation)
 - [x] **Waveform list:** Sine, Saw, Square, Triangle in V1. **Noise deferred to V2** (per-voice PRNG complexity).
 - [x] **Filter in V1:** LP12, LP24, HP12 using `juce::dsp::LadderFilter`. **LP24 is the default** (matches Figma design).
 - [x] **LFO target list:** None, FilterCutoff, Osc1Pitch, Osc2Pitch, Osc1Level, Osc2Level, AmpLevel, FilterResonance (8 targets, 0-7).
-- [x] **Velocity mod target list:** None, AmpLevel, AmpAttack, FilterCutoff, FilterResonance (5 targets, 0-4).
+- [x] **Velocity mod target list:** ✅ Expanded in 6.8b to 8 targets (0-7): None, AmpLevel, AmpAttack, FilterCutoff, FilterResonance, Distortion, OscPitch, OscMix.
 - [x] **Osc Mix:** Single vertical crossfader (`oscMix`, 0.0=Osc1 only, 1.0=Osc2 only, 0.5=equal blend). Confirmed by user. **Not** two separate level faders.
 - [x] **Osc2 defaults:** Waveform=Square (index 2), Octave=1 (one octave above Osc1). Confirmed from Figma screenshot.
 - [x] **Both oscillators get tuning params:** `osc1Octave`, `osc1Transpose`, `osc1Tuning` added in 6.2. `osc2Octave`, `osc2Transpose`, `osc2Tuning` in 6.5.
@@ -520,9 +532,9 @@ An AI-first "vibe-coding" framework for building JUCE plugins. Provides structur
 - [x] **Plugin window:** Resizable (`setResizable(true, false)` + `setResizeLimits()`). CSS uses relative units. Fallback: 3 size presets.
 - [x] **UI theme:** Light / white background, orange accent sliders. Dark theme is a V2 nice-to-have.
 - [x] **LFO scope: per-voice, free-running.** Confirmed by Nabeel. Each `SolaceVoice` owns its own `SolaceLFO`. LFO runs continuously from voice allocation — do NOT reset phase in `startNote()`. This produces organic drift when playing chords (each voice's LFO is at a different phase).
-- [ ] **Filter Env Depth** — NOT in Figma design (confirmed 2026-03-09 by Anshul). Hidden in HTML (`hidden` attr on `#filter-env-depth-fader`). DO NOT surface this unless Nabeel explicitly adds it to the design. AI agents must not add it without approval.
-- [ ] **unisonDetune / unisonSpread** — confirmed PENDING. Not to be added to UI until designer decides. No controls in HTML. Do not add without approval.
-- [ ] **Plugin title in UI:** \"Solace Soft Synth\" (Figma) vs \"Solace Synth\" (shorter)? Ask designer.
+- [ ] **Filter Env Depth** — Hidden in HTML (`hidden` attr). Do NOT surface without explicit Anshul approval.
+- [ ] **unisonDetune / unisonSpread** — No UI controls yet. Pending design decision by Anshul.
+- [ ] **Plugin title in UI:** "Solace Soft Synth" (Figma) vs "Solace Synth" — pending Anshul decision.
 
 ### ✅ SVG Icon Status — FINALIZED
 `UI/assets/icons/` now contains final SVG assets for the logo, waveforms, and UI navigation buttons. Placeholders have been replaced.
@@ -530,8 +542,7 @@ An AI-first "vibe-coding" framework for building JUCE plugins. Provides structur
 **Note:** The Figma MCP tool is no longer needed for asset discovery as the local icons folder is now the source of truth.
 
 ### ⚠️ Agent Rule: Confirm Design Decisions With Anshul, Not AI Peers
-Do NOT implement features suggested solely by Claude Code/Codex reviews without Anshul's explicit approval. Example: `filterEnvDepth` was added based on Claude Code's review, then had to be hidden. Claude Code reviews are input, not authority.
-- [ ] **Plugin title in UI:** "Solace Soft Synth" (Figma) vs "Solace Synth" (shorter)? Ask designer.
+Do NOT implement features suggested solely by Claude Code/Codex reviews without Anshul's explicit approval. Example: `filterEnvDepth` was added based on Claude Code's review, then had to be hidden. AI reviews are input, not authority. Anshul is the sole decision-maker — not Nabeel, not AI agents.
 
 ### Pending — Implementation (after Phase 5)
 - [x] **Phase 6.1: Amp ADSR** — COMPLETE (2026-03-10)
@@ -639,9 +650,9 @@ Do NOT implement features suggested solely by Claude Code/Codex reviews without 
   - **✅ HIGH BUG FIXED (2026-03-11):** `SolaceSynthesiser::noteOn()` was a no-op. Fixed by replacing it with `findFreeVoice()` + `findVoiceToSteal()` overrides that restrict the searchable voice pool to `[0, voiceLimit)`. Now inactive voices beyond the cap are never touched by JUCE's allocator. The simplistic `noteOn()` pre-count approach failed because JUCE only triggers stealing when ALL voices are occupied -- a cap of 4 with voices 5-16 free means JUCE uses a free voice and ignores the count.
   - **✅ LOW FIXED (2026-03-11):** `jassert(params.voiceCount != nullptr)` replaced with a clarifying comment explaining it's not functionally required by SolaceVoice (it's read by SolaceSynthesiser in processBlock). jassert kept for pointer validity only.
   - **✅ LOW FIXED (2026-03-11):** Stale signal-flow comment (Phase 6.6 era) rewritten to describe the dual-filter, preFiltL/R, velModCutoffHz/velModRes, and mono fold-down architecture.
-  - **⚠️ OPEN DESIGN QUESTION — needs Nabeel (2026-03-11):**
-    - **Velocity-to-level semantic:** Current behavior: when AmpLevel is NOT in either target slot, `velocityScale = velocity` (level always scales with MIDI velocity). When AmpLevel IS targeted, `velocityScale = lerp(1.0, velocity, velRange)`. This means velocity always affects level unless AmpLevel is targeted AND velocityRange=0. Codex/Claude Code flag this as inconsistent: the documented intent was that AmpLevel is the routing \"gate\" for level sensitivity. Anshul's preference: keep current behavior (feels intuitive). Nabeel should confirm the exact UX intent before V1 release.
-    - **Velocity mod target list mismatch:** Vision Document (Nabeel, line 55-63) lists 8 velocity targets: Osc Pitch, Osc Tuning, Amp Attack, Filter Cutoff, Filter Resonance, Distortion, Master Volume, Osc Mix. Current implementation has only 4 (None, AmpLevel, AmpAttack, FilterCutoff, FilterResonance -- 5 enum values total). **The full list from the vision doc needs to be reconciled with the implementation.** This is a V1.x concern -- adding more targets is backward-compatible (APVTS int range extension). Flagged for Nabeel review.
+  - **✅ RESOLVED in Phase 6.8b (2026-03-12):**
+    - **Velocity-to-level semantic:** Fixed. When AmpLevel is in no target slot, `velocityScale = 1.0f` (flat volume). When targeted, scales with velocity * range. Confirmed as intended behavior.
+    - **Velocity mod target list:** Expanded to 8 targets (0-7) in Phase 6.8b, matching Vision Doc intent. Done.
 - [x] **Phase 6.9: Master Distortion** — COMPLETE (2026-03-11)
   - **`SolaceDistortion.h`** — new stateless module, single static inline method.
   - **Formula:** `tanh(k * x) / tanh(k)`, where `k = 1.0f + drive * 9.0f`. At drive=0: k=1, output ≈ linear (tanh(x)/tanh(1) is 1.31x scaling -- noted below). At drive=1: k=10, heavy saturation. tanh(k) normalisation prevents loudness jump.
@@ -849,18 +860,13 @@ Since `dev-nabeel` only contains `UI/` changes, this is always safe — no audio
 
 ## ❓ Open Questions
 
-1. ~~Final project name?~~ → **RESOLVED: Solace Synth**
-2. ~~WebView vs native JUCE?~~ → **RESOLVED: WebView confirmed**
-3. ~~JUCE license?~~ → **RESOLVED: Starter (free commercial), project license deferred**
-4. ~~JUCE inclusion method?~~ → **RESOLVED: CMake FetchContent**
-5. ~~Waveform list?~~ → **RESOLVED: Sine/Saw/Square/Triangle in V1; Noise deferred**
-6. ~~Filter HP in V1?~~ → **RESOLVED: LP12/LP24/HP12 via LadderFilter; LP24 is default**
-7. ~~Osc Mix: crossfader or two levels?~~ → **RESOLVED: single vertical crossfader (`oscMix`, 0.0=Osc1 only, 1.0=Osc2 only)**
-8. ~~LFO scope: per-voice or global?~~ → **RESOLVED: per-voice, free-running** (confirmed by Nabeel)
-9. **Does Nabeel know HTML/CSS?** Somewhat — he's practically new to coding. Relies on Antigravity IDE. He owns `UI/` only; never touches `Source/`.
-10. **Plugin title:** "Solace Soft Synth" (Figma) or "Solace Synth"? Confirm with designer
-11. **Portamento:** Polyphonic glide is complex — firmly V2
-12. **Preset system:** APVTS is the foundation. **NEXT FOCUS:** Implementation of `.solace` preset files and browser UI.
+All major architecture/design questions are resolved. Remaining:
+
+1. **Plugin title:** "Solace Soft Synth" (Figma) vs "Solace Synth" — pending Anshul decision
+2. **filterEnvDepth UI:** Hidden. Surface only if Anshul explicitly wants it.
+3. **unisonDetune / unisonSpread UI:** No controls yet. Pending Anshul design decision.
+4. **Logging strategy for release:** Single build workflow — need to decide best approach for conditional logging without maintaining separate Debug/Release builds.
+5. **Preset system architecture:** APVTS foundation exists. Need to design `.solace` file format and browser UI.
 
 ---
 

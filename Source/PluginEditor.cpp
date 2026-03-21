@@ -175,9 +175,13 @@ SolaceSynthEditor::SolaceSynthEditor (SolaceSynthProcessor& p)
                 self->midiKeyboard.grabKeyboardFocus();
         });
 
-    // Set window size
+    // Resizable window — clamp()-based CSS adapts to viewport changes naturally.
+    setResizable (true, true);
+    setResizeLimits (640, 360, 2560, 1440);
+
+    // Default window size — 720p, same aspect ratio as before.
     setSize (1280, 720);
-    SolaceLog::info ("Editor ctor: finished, window size set to 1280x720 (720p)");
+    SolaceLog::info ("Editor ctor: finished, window size set to 1280x720 (resizable)");
 }
 
 // ============================================================================

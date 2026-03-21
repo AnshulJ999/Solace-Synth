@@ -77,7 +77,7 @@ public:
 private:
     juce::AudioProcessorValueTreeState& apvts;
     std::vector<PresetInfo> presets;
-    int currentIndex = 0;       // default: Init (index 0)
+    int currentIndex = 0;       // default: Default (index 0)
     bool isModified = false;
     bool loadingPreset = false;  // guard: true during loadPreset to suppress isModified
 

@@ -19,13 +19,8 @@ ICON_BIG/ICON_SMALL wired to `Assets/icon.png` in CMakeLists.txt.
 
 **Goal:** Two zero-risk performance improvements.
 
-**Change 1 — `exp2` (from Jules PR #13):**
-Replace `std::pow(2.0, x)` with `std::exp2(x)` in:
-- `SolaceOscillator.h` — tuning offset calculation
-- `SolaceVoice.h` — LFO pitch modulation, pitch bend, velocity pitch
-- Anywhere else `pow(2.0, ...)` appears in DSP code
-
-These are mathematically identical but `exp2` is hardware-optimized for base-2.
+**Change 1 — `exp2` (from Jules PR #13):** ✅ DONE (already in codebase)
+All `std::pow(2.0, x)` replaced with `std::exp2(x)` in SolaceOscillator.h and SolaceVoice.h.
 
 **Change 2 — masterVolume pointer caching (from Jules PR #7):** ✅ DONE (2026-03-21)
 All three processBlock parameter lookups cached: `cachedMasterVolume`, `cachedMasterDistortion`, `cachedVoiceCount`.
@@ -201,7 +196,7 @@ Before tagging v1.0.0:
 
 ```
 8.1a  App Icon ──────────────────── ✅ DONE
-8.1b  exp2 optimization ────────── 10 min (masterVol cache ✅ DONE)
+8.1b  exp2 + masterVol cache ───── ✅ DONE
 8.2   Preset System ────────────── 2-3 sessions  ← MAIN WORK / NEXT
 8.3   Resizable Window ─────────── ✅ DONE
 8.4   CI/CD (GitHub Actions) ───── 1-2 hours

@@ -516,7 +516,7 @@ An AI-first "vibe-coding" framework for building JUCE plugins. Provides structur
 - [x] ~~Embed UI files via `juce_add_binary_data()`~~ — DONE (CMakeLists.txt + PluginEditor.cpp)
 - [x] ~~Resizable window~~ — ✅ DONE (2026-03-21). C++ `setResizable(true, true)` + `setResizeLimits(640, 360, 2560, 1440)`. CSS clamp() handles adaptation. Window size persisted via ValueTree properties in `resized()` with `constructionComplete` guard.
 - [ ] Preset system (save/load GUI + `.solace` file format)
-- [ ] `exp2` optimization cherry-pick from Jules PR #13
+- [x] ~~`exp2` optimization (Jules PR #13)~~ — ✅ DONE (already in codebase, all `std::pow(2.0,x)` replaced with `std::exp2(x)`)
 - [x] ~~`masterVolume` pointer caching (Jules PR #7)~~ — ✅ DONE (2026-03-21). Also cached `masterDistortion` and `voiceCount`.
 - [x] ~~`PLUGIN_CODE "Ss01"`~~ — ✅ DONE (2026-03-21). Changed to `"Slce"` by Anshul.
 

@@ -81,22 +81,17 @@ private:
     bool isModified = false;
     bool loadingPreset = false;  // guard: true during loadPreset to suppress isModified
 
-    // --- Factory preset definitions ---
-    struct FactoryPresetDef
-    {
-        const char* name;
-        const char* author;
-        std::vector<std::pair<juce::String, float>> params;  // only overrides vs defaults
-    };
-
-    static std::vector<FactoryPresetDef> getFactoryPresetDefs();
-
     // --- File I/O ---
     juce::File getUserPresetDirectory() const;
     void ensureUserDirectoryExists() const;
     bool writePresetFile (const juce::File& file, const juce::String& name,
                           const juce::String& author);
     bool readPresetFile (const juce::File& file, std::vector<std::pair<juce::String, float>>& outParams,
+                         juce::String& outName, juce::String& outAuthor);
+
+    // Parse a .solace XML string (used for embedded factory presets from BinaryData)
+    bool parsePresetXml (const juce::String& xmlText,
+                         std::vector<std::pair<juce::String, float>>& outParams,
                          juce::String& outName, juce::String& outAuthor);
 
     // Apply a set of parameter values (used by both factory and user preset loading)

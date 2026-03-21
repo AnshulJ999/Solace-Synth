@@ -76,7 +76,7 @@ class PresetBrowser {
                 this.currentIndex = data.index ?? 0;
                 this.currentIsFactory = data.isFactory ?? true;
                 if (this.presetName) {
-                    this.presetName.textContent = data.name ?? "Init";
+                    this.presetName.textContent = data.name ?? "Default";
                 }
                 this._updateManagementButtons();
             }
@@ -251,25 +251,32 @@ class PresetBrowser {
         const modalError  = this.modal.querySelector(".preset-modal-error");
 
         if (modalTitle)  modalTitle.textContent = title;
-        if (modalInput)  modalInput.value = defaultValue;
         if (modalOk)     modalOk.textContent = confirmLabel;
         if (modalError)  modalError.textContent = "";
 
         this.modalOverlay.classList.add("visible");
         this.modal.classList.add("visible");
 
-        // Focus input
-        requestAnimationFrame(() => modalInput?.focus());
-
-        // Clean up old listeners
+        // Clean up old listeners by cloning all interactive elements.
+        // Without this, each _showModal() call adds a NEW keydown/click
+        // listener to the same DOM node — after N opens, Enter fires N
+        // stale callbacks (potentially from different modal sessions).
+        const newInput  = modalInput?.cloneNode(true);
         const newCancel = modalCancel?.cloneNode(true);
         const newOk     = modalOk?.cloneNode(true);
+        modalInput?.replaceWith(newInput);
         modalCancel?.replaceWith(newCancel);
         modalOk?.replaceWith(newOk);
 
+        // Set value AFTER cloning (cloneNode copies the default, not current value)
+        if (newInput) newInput.value = defaultValue;
+
+        // Focus input
+        requestAnimationFrame(() => newInput?.focus());
+
         newCancel?.addEventListener("click", () => this._closeModal());
         newOk?.addEventListener("click", () => {
-            const val = modalInput?.value?.trim();
+            const val = newInput?.value?.trim();
             if (!val) {
                 if (modalError) modalError.textContent = "Name cannot be empty.";
                 return;
@@ -278,7 +285,7 @@ class PresetBrowser {
         });
 
         // Enter key submits
-        modalInput?.addEventListener("keydown", (e) => {
+        newInput?.addEventListener("keydown", (e) => {
             if (e.key === "Enter") {
                 e.preventDefault();
                 newOk?.click();
@@ -342,26 +349,27 @@ class PresetBrowser {
         const modalError  = this.modal.querySelector(".preset-modal-error");
 
         if (modalTitle)  modalTitle.textContent = `Delete "${currentPreset.name}"?`;
-        if (modalInput)  modalInput.style.display = "none";
         if (modalOk)     modalOk.textContent = "Delete";
         if (modalError)  modalError.textContent = "This cannot be undone.";
 
         this.modalOverlay.classList.add("visible");
         this.modal.classList.add("visible");
 
+        // Clone all interactive elements to discard stale listeners
+        const newInput  = modalInput?.cloneNode(true);
         const newCancel = modalCancel?.cloneNode(true);
         const newOk     = modalOk?.cloneNode(true);
+        modalInput?.replaceWith(newInput);
         modalCancel?.replaceWith(newCancel);
         modalOk?.replaceWith(newOk);
 
-        newCancel?.addEventListener("click", () => {
-            if (modalInput) modalInput.style.display = "";
-            this._closeModal();
-        });
+        // Hide input for delete confirmation (restored by _closeModal)
+        if (newInput) newInput.style.display = "none";
+
+        newCancel?.addEventListener("click", () => this._closeModal());
 
         newOk?.addEventListener("click", async () => {
             await SolaceBridge.deletePreset(this.currentIndex);
-            if (modalInput) modalInput.style.display = "";
             this._closeModal();
         });
     }

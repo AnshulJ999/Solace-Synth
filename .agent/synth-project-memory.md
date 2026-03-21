@@ -4,9 +4,9 @@
 > Key rules: (1) Read full header before editing. (2) Search for all mentions of an item before updating — no contradictions allowed. (3) Phase logs are frozen history — don't edit completed phases. (4) Mark resolved items as `✅ RESOLVED` everywhere, not just in one place.
 
 **Created:** 2026-03-08
-**Last Updated:** 2026-03-21 (Preset system v1 implemented + 13-bug fix pass. Factory presets as files migration pending.)
-**Status:** Active — All DSP phases 6.1-6.9 + 6.8b + pitch bend/mod wheel COMPLETE. Phase 7 UI 7.1-7.5 COMPLETE. Standalone packaging (BinaryData embedding) COMPLETE. Phase 8 in progress — preset system core implemented and bug-fixed.
-**Next Focus:** Phase 8 continued. Priority: fix modal Enter-listener accumulation bug → factory presets as `.solace` files → CI/CD → unit tests → remaining UI polish.
+**Last Updated:** 2026-03-21 (Preset system COMPLETE: 13-bug fix pass + factory presets as embedded `.solace` files + modal listener fix.)
+**Status:** Active — All DSP phases 6.1-6.9 + 6.8b + pitch bend/mod wheel COMPLETE. Phase 7 UI 7.1-7.5 COMPLETE. Standalone packaging COMPLETE. Preset system COMPLETE.
+**Next Focus:** Phase 8 continued. Priority: CI/CD → unit tests → remaining UI polish → V1 release.
 **Build:** Last verified 2026-03-21. Build must succeed cleanly before committing.
 
 ---
@@ -127,7 +127,7 @@ A free, open-source polyphonic soft synthesizer. Being built by Anshul (backend/
 ├── Unison: 1–8 voices + detune + stereo spread (dual-filter architecture)
 ├── Velocity: 3 assignable mod target slots (8-target enum)
 ├── Pitch Bend (±2 semitones) + Mod Wheel (CC#1 → LFO amount)
-├── Preset system (save/load + factory bank) ✅ DONE — factory file migration pending
+├── Preset system (save/load + factory bank) ✅ DONE
 ├── Standalone + VST3 on Windows (embedded UI, portable)
 └── Resizable window ✅ (clamp()-based CSS + C++ setResizable, size persisted)
 ```
@@ -518,8 +518,8 @@ An AI-first "vibe-coding" framework for building JUCE plugins. Provides structur
 - [x] ~~Embed UI files via `juce_add_binary_data()`~~ — DONE (CMakeLists.txt + PluginEditor.cpp)
 - [x] ~~Resizable window~~ — ✅ DONE (2026-03-21). C++ `setResizable(true, true)` + `setResizeLimits(640, 360, 2560, 1440)`. CSS clamp() handles adaptation. Window size persisted via ValueTree properties in `resized()` with `constructionComplete` guard.
 - [x] ~~Preset system (save/load GUI + `.solace` file format)~~ — ✅ DONE (2026-03-21). `SolacePresetManager` C++ class + `preset-browser.js` UI + bridge extensions. 10 factory presets (hardcoded in C++ — migration to `.solace` files pending). User presets saved to `Documents/Solace Synth/Presets/User/`. Hierarchical dropdown (Default → Factory → User). Save/Save As/Rename/Delete with modal dialogs. Modified indicator (`*` suffix). Last-used preset persisted via ValueTree. 13-bug fix pass applied (rename file delete, isModified race condition, Default naming, delete fallback, modal input restore, error feedback, name disambiguation, nav return values, logger init order, dead code removal, bridge header).
-- [ ] Preset system: migrate factory presets from hardcoded C++ to `.solace` files embedded via `juce_add_binary_data()` (portability requirement — no installer)
-- [ ] Preset system: fix modal Enter-listener accumulation bug (stale keydown handlers pile up across modal opens — Codex flagged 2026-03-21)
+- [x] ~~Preset system: migrate factory presets from hardcoded C++ to `.solace` files embedded via `juce_add_binary_data()`~~ — ✅ DONE (2026-03-21). 10 factory preset files in `Assets/Presets/Factory/`. `SolaceFactoryPresetData` BinaryData namespace. `FactoryPresetDef` struct and `getFactoryPresetDefs()` removed. Anyone can create/edit `.solace` files; rebuild embeds changes.
+- [x] ~~Preset system: fix modal Enter-listener accumulation bug~~ — ✅ DONE (2026-03-21). Modal input element now cloned alongside buttons in both `_showModal()` and `_showDeleteConfirm()` to discard stale keydown listeners.
 - [x] ~~`exp2` optimization (Jules PR #13)~~ — ✅ DONE (already in codebase, all `std::pow(2.0,x)` replaced with `std::exp2(x)`)
 - [x] ~~`masterVolume` pointer caching (Jules PR #7)~~ — ✅ DONE (2026-03-21). Also cached `masterDistortion` and `voiceCount`.
 - [x] ~~`PLUGIN_CODE "Ss01"`~~ — ✅ DONE (2026-03-21). Changed to `"Slce"` by Anshul.

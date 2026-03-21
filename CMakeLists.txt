@@ -130,6 +130,23 @@ juce_add_binary_data(SolaceUIAssets
 )
 
 # ============================================================================
+# Embedded factory presets
+# ============================================================================
+# Factory presets are .solace XML files in Assets/Presets/Factory/.
+# They are embedded via BinaryData so the plugin is fully portable (no installer).
+# Anyone can create/edit these files; rebuild embeds the changes.
+file(GLOB FactoryPresetFiles
+    CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/Assets/Presets/Factory/*.solace"
+)
+
+juce_add_binary_data(SolaceFactoryPresets
+    NAMESPACE SolaceFactoryPresetData
+    HEADER_NAME SolaceFactoryPresetData.h
+    SOURCES ${FactoryPresetFiles}
+)
+
+# ============================================================================
 # Preprocessor definitions
 # ============================================================================
 target_compile_definitions("${PROJECT_NAME}"
@@ -167,6 +184,7 @@ target_include_directories("${PROJECT_NAME}" PRIVATE "${CMAKE_CURRENT_SOURCE_DIR
 target_link_libraries("${PROJECT_NAME}"
     PRIVATE
     SolaceUIAssets
+    SolaceFactoryPresets
     juce_audio_utils         # Includes audio_basics, audio_devices, audio_formats, audio_processors
     juce_dsp                 # DSP classes (oscillators, filters, etc.)
     juce_gui_basics          # Core GUI

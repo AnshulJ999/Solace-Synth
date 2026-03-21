@@ -1,5 +1,6 @@
 #include "SolacePresetManager.h"
 #include "SolaceLogger.h"
+#include <SolaceFactoryPresetData.h>
 
 // ============================================================================
 // Constructor
@@ -13,152 +14,31 @@ SolacePresetManager::SolacePresetManager (juce::AudioProcessorValueTreeState& a)
 }
 
 // ============================================================================
-// Factory preset definitions
-//
-// Each entry lists only the parameters that differ from createParameterLayout()
-// defaults. Unlisted parameters keep their default values.
+// Parse preset XML from string (for embedded BinaryData factory presets)
 // ============================================================================
-std::vector<SolacePresetManager::FactoryPresetDef> SolacePresetManager::getFactoryPresetDefs()
+bool SolacePresetManager::parsePresetXml (
+    const juce::String& xmlText,
+    std::vector<std::pair<juce::String, float>>& outParams,
+    juce::String& outName, juce::String& outAuthor)
 {
-    return {
-        // 0: Default — all defaults (empty override list)
-        { "Default", "Solace", {} },
+    auto xml = juce::XmlDocument::parse (xmlText);
+    if (xml == nullptr || ! xml->hasTagName ("SolacePreset"))
+        return false;
 
-        // 1: Fat Bass — thick low end
-        { "Fat Bass", "Solace", {
-            { "osc1Waveform", 1.0f },   // Saw
-            { "osc2Waveform", 1.0f },   // Saw
-            { "osc2Octave", 0.0f },
-            { "oscMix", 0.5f },
-            { "filterType", 1.0f },     // LP24
-            { "filterCutoff", 800.0f },
-            { "filterResonance", 0.2f },
-            { "ampAttack", 0.005f },
-            { "ampDecay", 0.2f },
-            { "ampSustain", 0.7f },
-            { "ampRelease", 0.15f },
-            { "unisonCount", 4.0f },
-            { "unisonDetune", 15.0f },
-            { "unisonSpread", 0.4f },
-        }},
+    outName = xml->getStringAttribute ("name", "");
+    outAuthor = xml->getStringAttribute ("author", "Unknown");
 
-        // 2: Pluck — short percussive
-        { "Pluck", "Solace", {
-            { "osc1Waveform", 1.0f },   // Saw
-            { "filterCutoff", 5000.0f },
-            { "filterEnvDepth", 0.8f },
-            { "filterEnvAttack", 0.001f },
-            { "filterEnvDecay", 0.3f },
-            { "filterEnvSustain", 0.0f },
-            { "ampAttack", 0.001f },
-            { "ampDecay", 0.4f },
-            { "ampSustain", 0.0f },
-            { "ampRelease", 0.1f },
-        }},
+    outParams.clear();
+    for (auto* paramEl : xml->getChildWithTagNameIterator ("Param"))
+    {
+        auto id = paramEl->getStringAttribute ("id");
+        auto value = static_cast<float> (paramEl->getDoubleAttribute ("value", 0.0));
 
-        // 3: Warm Pad — evolving texture
-        { "Warm Pad", "Solace", {
-            { "osc1Waveform", 3.0f },   // Triangle
-            { "osc2Waveform", 0.0f },   // Sine
-            { "oscMix", 0.6f },
-            { "ampAttack", 0.8f },
-            { "ampDecay", 0.5f },
-            { "ampSustain", 0.7f },
-            { "ampRelease", 1.5f },
-            { "filterCutoff", 3000.0f },
-            { "filterResonance", 0.15f },
-            { "lfoTarget1", 1.0f },     // FilterCutoff
-            { "lfoRate", 0.5f },
-            { "lfoAmount", 0.3f },
-        }},
+        if (id.isNotEmpty())
+            outParams.emplace_back (id, value);
+    }
 
-        // 4: Lead — cutting mono-ish
-        { "Lead", "Solace", {
-            { "osc1Waveform", 2.0f },   // Square
-            { "filterType", 1.0f },     // LP24
-            { "filterCutoff", 4000.0f },
-            { "filterResonance", 0.35f },
-            { "ampAttack", 0.005f },
-            { "ampDecay", 0.1f },
-            { "ampSustain", 0.9f },
-            { "ampRelease", 0.15f },
-            { "masterDistortion", 0.15f },
-        }},
-
-        // 5: Supersaw — classic trance
-        { "Supersaw", "Solace", {
-            { "osc1Waveform", 1.0f },   // Saw
-            { "osc2Waveform", 1.0f },   // Saw
-            { "osc2Octave", 0.0f },
-            { "oscMix", 0.5f },
-            { "unisonCount", 7.0f },
-            { "unisonDetune", 25.0f },
-            { "unisonSpread", 0.8f },
-            { "filterCutoff", 8000.0f },
-            { "filterResonance", 0.1f },
-            { "ampAttack", 0.01f },
-            { "ampRelease", 0.3f },
-        }},
-
-        // 6: Keys — electric piano
-        { "Keys", "Solace", {
-            { "osc1Waveform", 0.0f },   // Sine
-            { "osc2Waveform", 3.0f },   // Triangle
-            { "osc2Octave", 1.0f },
-            { "oscMix", 0.4f },
-            { "ampAttack", 0.005f },
-            { "ampDecay", 0.6f },
-            { "ampSustain", 0.4f },
-            { "ampRelease", 0.3f },
-            { "filterCutoff", 6000.0f },
-            { "filterEnvDepth", 0.4f },
-            { "filterEnvDecay", 0.5f },
-        }},
-
-        // 7: Brass — synth brass stab
-        { "Brass", "Solace", {
-            { "osc1Waveform", 1.0f },   // Saw
-            { "osc2Waveform", 1.0f },   // Saw
-            { "osc2Octave", 0.0f },
-            { "osc2Transpose", 7.0f },
-            { "oscMix", 0.5f },
-            { "ampAttack", 0.08f },
-            { "ampSustain", 0.8f },
-            { "filterCutoff", 2000.0f },
-            { "filterEnvDepth", 0.6f },
-            { "filterEnvAttack", 0.06f },
-            { "filterEnvDecay", 0.4f },
-            { "filterEnvSustain", 0.3f },
-            { "unisonCount", 2.0f },
-            { "unisonDetune", 10.0f },
-        }},
-
-        // 8: Sub — deep sub bass
-        { "Sub", "Solace", {
-            { "osc1Waveform", 0.0f },   // Sine
-            { "oscMix", 0.0f },      // Osc1 only
-            { "filterType", 1.0f },     // LP24
-            { "filterCutoff", 400.0f },
-            { "ampAttack", 0.005f },
-            { "ampDecay", 0.1f },
-            { "ampSustain", 1.0f },
-            { "ampRelease", 0.1f },
-        }},
-
-        // 9: Dirty Lead — distorted
-        { "Dirty Lead", "Solace", {
-            { "osc1Waveform", 1.0f },   // Saw
-            { "filterCutoff", 6000.0f },
-            { "filterEnvDepth", 0.5f },
-            { "filterEnvAttack", 0.001f },
-            { "filterEnvDecay", 0.2f },
-            { "ampAttack", 0.005f },
-            { "ampSustain", 0.8f },
-            { "masterDistortion", 0.6f },
-            { "unisonCount", 2.0f },
-            { "unisonDetune", 8.0f },
-        }},
-    };
+    return true;
 }
 
 // ============================================================================
@@ -173,27 +53,48 @@ void SolacePresetManager::rebuildPresetList()
 {
     presets.clear();
 
-    // --- Factory presets: "Default" first, then remaining sorted alphabetically ---
-    auto factoryDefs = getFactoryPresetDefs();
+    // --- Factory presets from embedded BinaryData (.solace files) ---
+    // Parse each embedded resource to extract name/author for the list.
+    std::vector<PresetInfo> factoryPresets;
+
+    for (int i = 0; i < SolaceFactoryPresetData::namedResourceListSize; ++i)
+    {
+        int dataSize = 0;
+        const auto* data = SolaceFactoryPresetData::getNamedResource (
+            SolaceFactoryPresetData::namedResourceList[i], dataSize);
+
+        if (data == nullptr || dataSize == 0)
+            continue;
+
+        juce::String xmlText (juce::CharPointer_UTF8 (reinterpret_cast<const char*> (data)),
+                              static_cast<size_t> (dataSize));
+
+        juce::String name, author;
+        std::vector<std::pair<juce::String, float>> dummyParams;
+
+        if (parsePresetXml (xmlText, dummyParams, name, author) && name.isNotEmpty())
+        {
+            PresetInfo info;
+            info.name = name;
+            info.author = author;
+            info.isFactory = true;
+            factoryPresets.push_back (info);
+        }
+    }
 
     // Sort factory presets alphabetically, but keep "Default" at the front
-    std::sort (factoryDefs.begin(), factoryDefs.end(),
-        [] (const FactoryPresetDef& a, const FactoryPresetDef& b) {
-            // "Default" always sorts first
-            bool aIsDefault = juce::String (a.name).equalsIgnoreCase ("Default");
-            bool bIsDefault = juce::String (b.name).equalsIgnoreCase ("Default");
+    std::sort (factoryPresets.begin(), factoryPresets.end(),
+        [] (const PresetInfo& a, const PresetInfo& b) {
+            bool aIsDefault = a.name.equalsIgnoreCase ("Default");
+            bool bIsDefault = b.name.equalsIgnoreCase ("Default");
             if (aIsDefault != bIsDefault) return aIsDefault;
-            return juce::String (a.name).compareIgnoreCase (juce::String (b.name)) < 0;
+            return a.name.compareIgnoreCase (b.name) < 0;
         });
 
-    for (const auto& def : factoryDefs)
+    for (auto& info : factoryPresets)
     {
-        PresetInfo info;
-        info.name = def.name;
-        info.author = def.author;
-        info.isFactory = true;
         info.listIndex = static_cast<int> (presets.size());
-        presets.push_back (info);
+        presets.push_back (std::move (info));
     }
 
     // --- User presets (from Documents folder, sorted alphabetically) ---
@@ -265,40 +166,58 @@ bool SolacePresetManager::loadPreset (int index)
     // Set loading guard — suppresses isModified during bulk parameter sets
     loadingPreset = true;
 
+    // Reset to defaults first, then apply preset values.
+    // This ensures any params missing from the file get their defaults.
+    resetToDefaults();
+
+    std::vector<std::pair<juce::String, float>> paramValues;
+    juce::String parsedName, parsedAuthor;
+
     if (preset.isFactory)
     {
-        // Factory preset: reset to defaults first, then apply overrides
-        resetToDefaults();
-
-        // Find the matching factory def and apply its parameter overrides
-        auto factoryDefs = getFactoryPresetDefs();
-        for (const auto& def : factoryDefs)
+        // Factory preset: find matching embedded BinaryData resource by name
+        bool found = false;
+        for (int i = 0; i < SolaceFactoryPresetData::namedResourceListSize; ++i)
         {
-            if (juce::String (def.name) == preset.name)
+            int dataSize = 0;
+            const auto* data = SolaceFactoryPresetData::getNamedResource (
+                SolaceFactoryPresetData::namedResourceList[i], dataSize);
+
+            if (data == nullptr || dataSize == 0)
+                continue;
+
+            juce::String xmlText (juce::CharPointer_UTF8 (reinterpret_cast<const char*> (data)),
+                                  static_cast<size_t> (dataSize));
+
+            if (parsePresetXml (xmlText, paramValues, parsedName, parsedAuthor)
+                && parsedName == preset.name)
             {
-                applyParameterValues (def.params);
+                found = true;
                 break;
             }
+
+            paramValues.clear();
+        }
+
+        if (! found)
+        {
+            SolaceLog::error ("PresetManager: factory preset not found in BinaryData: " + preset.name);
+            loadingPreset = false;
+            return false;
         }
     }
     else
     {
-        // User preset: read from .solace file
-        std::vector<std::pair<juce::String, float>> paramValues;
-        juce::String name, author;
-
-        if (! readPresetFile (preset.file, paramValues, name, author))
+        // User preset: read from .solace file on disk
+        if (! readPresetFile (preset.file, paramValues, parsedName, parsedAuthor))
         {
             SolaceLog::error ("PresetManager: failed to read preset file: " + preset.file.getFullPathName());
             loadingPreset = false;
             return false;
         }
-
-        // Reset to defaults first, then apply file values
-        // This ensures any params missing from the file get their defaults
-        resetToDefaults();
-        applyParameterValues (paramValues);
     }
+
+    applyParameterValues (paramValues);
 
     currentIndex = index;
     isModified = false;
@@ -324,7 +243,7 @@ bool SolacePresetManager::loadPresetByName (const juce::String& name)
 }
 
 // ============================================================================
-// Reset to defaults (Init)
+// Reset to defaults (Default preset values)
 // ============================================================================
 void SolacePresetManager::resetToDefaults()
 {

@@ -11,21 +11,9 @@
 
 ## 8.1 — Quick Wins (low effort, high polish)
 
-### 8.1a — App Icon (ICO)
+### 8.1a — App Icon (ICO) — ✅ DONE (prior session)
 
-**Goal:** Replace the generic JUCE icon on the standalone EXE with the Solace Synth logo.
-
-**Steps:**
-1. Convert `UI/assets/icons/SolaceSynthLogo.svg` to a multi-resolution `.ico` file (16x16, 32x32, 48x48, 256x256). Use a tool like RealFaviconGenerator, CloudConvert, or Inkscape (File → Export → Windows Icon).
-2. Place the `.ico` in the project root or a new `Assets/` folder.
-3. Add to `CMakeLists.txt` in the `juce_add_plugin()` call:
-   ```cmake
-   ICON_BIG "${CMAKE_SOURCE_DIR}/Assets/SolaceSynthIcon.ico"
-   ICON_SMALL "${CMAKE_SOURCE_DIR}/Assets/SolaceSynthIcon.ico"
-   ```
-4. Rebuild. Verify the EXE and taskbar show the correct icon.
-
-**Effort:** 15 minutes.
+ICON_BIG/ICON_SMALL wired to `Assets/icon.png` in CMakeLists.txt.
 
 ### 8.1b — DSP Micro-Optimizations (Jules PR #13 + #7)
 
@@ -39,18 +27,10 @@ Replace `std::pow(2.0, x)` with `std::exp2(x)` in:
 
 These are mathematically identical but `exp2` is hardware-optimized for base-2.
 
-**Change 2 — masterVolume pointer caching (from Jules PR #7):**
-In `PluginProcessor.h`, add a cached pointer:
-```cpp
-const std::atomic<float>* cachedMasterVolume = nullptr;
-```
-In the constructor, after APVTS is created:
-```cpp
-cachedMasterVolume = apvts.getRawParameterValue("masterVolume");
-```
-In `processBlock()`, replace the string lookup with the cached pointer.
+**Change 2 — masterVolume pointer caching (from Jules PR #7):** ✅ DONE (2026-03-21)
+All three processBlock parameter lookups cached: `cachedMasterVolume`, `cachedMasterDistortion`, `cachedVoiceCount`.
 
-**Effort:** 15 minutes total. Zero risk — same output, just faster.
+**Remaining effort:** `exp2` change only — 10 minutes.
 
 ---
 
@@ -117,20 +97,16 @@ JUCE's `apvts.copyState().toXmlString()` gives us the APVTS state. We wrap it wi
 
 ---
 
-## 8.3 — Resizable Window (CSS Scale Refactor)
+## 8.3 — Resizable Window — ✅ DONE (2026-03-21)
 
-**Goal:** Plugin window can be freely resized while maintaining exact Figma proportions.
+Implemented differently than originally planned. Instead of `transform: scale()` + fixed pixels, kept the existing `clamp()` CSS which adapts to viewport changes naturally.
 
-**Plan:** Already documented in `.agent/plans/phase3-scale-refactor-plan.md`. Summary:
+**What was done:**
+- C++: `setResizable(true, true)` + `setResizeLimits(640, 360, 2560, 1440)` in PluginEditor
+- Window size persistence: saved to APVTS ValueTree via `resized()` with `constructionComplete` guard, restored in editor constructor
+- Default: 1280×720 (matches original)
 
-1. Replace all CSS `clamp()`/`vh`/`vw` with fixed Figma pixel values
-2. Add `transform: scale(factor)` on `.solace-root` in JS, computed from `window.innerWidth / 1440`
-3. Enable `setResizable(true, false)` + `setResizeLimits(720, 512, 2880, 2048)` in C++
-4. Verify dropdown popups work correctly at non-1.0 scale factors
-
-**Prerequisite:** Design should be stable (no major layout changes pending).
-
-**Effort:** One focused session (2-3 hours).
+**Why not transform:scale():** Replacing clamp() values with Figma pixel values + scale produced a worse-looking UI (truncated text, wrong proportions). The clamp() approach works well and required minimal changes.
 
 ---
 
@@ -209,8 +185,8 @@ Before tagging v1.0.0:
 
 - [ ] All factory presets created and tested
 - [ ] App icon (ICO) in place
-- [ ] Plugin window resizable and scaling correctly
-- [ ] `PLUGIN_CODE` changed from `"Ss01"` to a unique value
+- [x] Plugin window resizable and scaling correctly — DONE (clamp CSS + setResizable)
+- [x] `PLUGIN_CODE` changed to `"Slce"` — DONE
 - [ ] CI builds producing clean artifacts
 - [ ] README updated with installation instructions
 - [ ] License chosen and applied
@@ -224,13 +200,13 @@ Before tagging v1.0.0:
 ## Order of Execution
 
 ```
-8.1a  App Icon ──────────────────── 15 min   ← START HERE
-8.1b  exp2 + masterVol cache ───── 15 min
-8.2   Preset System ────────────── 2-3 sessions  ← MAIN WORK
-8.3   Resizable Window ─────────── 2-3 hours
+8.1a  App Icon ──────────────────── ✅ DONE
+8.1b  exp2 optimization ────────── 10 min (masterVol cache ✅ DONE)
+8.2   Preset System ────────────── 2-3 sessions  ← MAIN WORK / NEXT
+8.3   Resizable Window ─────────── ✅ DONE
 8.4   CI/CD (GitHub Actions) ───── 1-2 hours
 8.5   Unit Tests ───────────────── 2-3 hours
-8.6   UI Polish items ──────────── as needed
+8.6   UI Polish items ──────────── ongoing (fader heights, logo, alignment done)
 8.7   Pre-Release Checklist ────── final pass
 ```
 

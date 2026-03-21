@@ -4,10 +4,10 @@
 > Key rules: (1) Read full header before editing. (2) Search for all mentions of an item before updating — no contradictions allowed. (3) Phase logs are frozen history — don't edit completed phases. (4) Mark resolved items as `✅ RESOLVED` everywhere, not just in one place.
 
 **Created:** 2026-03-08
-**Last Updated:** 2026-03-21 (cleanup pass: fixed contradictions, updated V1 scope, marked resolved items)
-**Status:** Active — All DSP phases 6.1-6.9 + 6.8b + pitch bend/mod wheel COMPLETE. Phase 7 UI 7.1-7.5 COMPLETE. Standalone packaging (BinaryData embedding) COMPLETE.
-**Next Focus:** Phase 8 — V1 Release Roadmap (`.agent/plans/Phase 8 — V1 Release Roadmap.md`). Priority: app icon → DSP micro-opts → preset system → resizable window → CI/CD → unit tests.
-**Build:** Last verified 2026-03-11. Build must succeed cleanly before committing.
+**Last Updated:** 2026-03-21 (Phase 8 progress: resizable window, window size persistence, parameter caching, UI alignment fixes)
+**Status:** Active — All DSP phases 6.1-6.9 + 6.8b + pitch bend/mod wheel COMPLETE. Phase 7 UI 7.1-7.5 COMPLETE. Standalone packaging (BinaryData embedding) COMPLETE. Phase 8 in progress.
+**Next Focus:** Phase 8 — V1 Release Roadmap (`.agent/plans/Phase 8 — V1 Release Roadmap.md`). Priority: preset system → CI/CD → unit tests → remaining UI polish.
+**Build:** Last verified 2026-03-21. Build must succeed cleanly before committing.
 
 ---
 
@@ -127,7 +127,7 @@ A free, open-source polyphonic soft synthesizer. Being built by Anshul (backend/
 ├── Pitch Bend (±2 semitones) + Mod Wheel (CC#1 → LFO amount)
 ├── Preset system (save/load + factory bank) ← NEXT FOCUS
 ├── Standalone + VST3 on Windows (embedded UI, portable)
-└── Resizable window (CSS transform:scale() refactor planned)
+└── Resizable window ✅ (clamp()-based CSS + C++ setResizable, size persisted)
 ```
 
 ### V2 — Nice-To-Haves (post V1 stable)
@@ -233,7 +233,7 @@ Anshul rebuilds plugin → Full test in DAW → Feedback to friend → Repeat
 | # | File | Issue | Plan |
 |---|------|-------|------|
 | 5 | `SolaceFilter.h` | Cutoff hard-clamped to 20,000 Hz -- safe at 44.1kHz+ but unstable if sample rate < 40kHz | V2: `min(20000.0f, sampleRate * 0.45f)` dynamic clamp in `prepare()` |
-| 6 | `CMakeLists.txt` | `PLUGIN_CODE "Ss01"` -- collision risk in large-studio DAW scans | Pre-release: UUID-derived unique 4-char code |
+| 6 | `CMakeLists.txt` | ~~`PLUGIN_CODE "Ss01"`~~ ✅ RESOLVED 2026-03-21: changed to `"Slce"` | Done |
 | 7 | `SolaceLogger.h` | Multi-instance: concurrent log file writes | Pre-release: instance-stamped filenames |
 | 8 | `PluginProcessor.cpp` | `masterVolume` via `buffer.applyGain()` once per block -- zippers under rapid DAW automation | Phase 6.9: `juce::LinearSmoothedValue<float>` per-sample gain |
 
@@ -514,11 +514,11 @@ An AI-first "vibe-coding" framework for building JUCE plugins. Provides structur
 - [ ] Conditional logging guard (`SOLACE_LOGGING_ENABLED` or `JUCE_DEBUG`) — Jules PR #5 has ready implementation
 - [ ] Multi-instance logger safety (currently global `setCurrentLogger`)
 - [x] ~~Embed UI files via `juce_add_binary_data()`~~ — DONE (CMakeLists.txt + PluginEditor.cpp)
-- [ ] Resizable window (CSS `transform: scale()` refactor — plan at `.agent/plans/phase3-scale-refactor-plan.md`)
+- [x] ~~Resizable window~~ — ✅ DONE (2026-03-21). C++ `setResizable(true, true)` + `setResizeLimits(640, 360, 2560, 1440)`. CSS clamp() handles adaptation. Window size persisted via ValueTree properties in `resized()` with `constructionComplete` guard.
 - [ ] Preset system (save/load GUI + `.solace` file format)
 - [ ] `exp2` optimization cherry-pick from Jules PR #13
-- [ ] `masterVolume` pointer caching (Jules PR #7)
-- [ ] `PLUGIN_CODE "Ss01"` — replace with unique code before public release
+- [x] ~~`masterVolume` pointer caching (Jules PR #7)~~ — ✅ DONE (2026-03-21). Also cached `masterDistortion` and `voiceCount`.
+- [x] ~~`PLUGIN_CODE "Ss01"`~~ — ✅ DONE (2026-03-21). Changed to `"Slce"` by Anshul.
 
 ### Pending — Spec Gaps (need decisions before DSP implementation)
 - [x] **Waveform list:** Sine, Saw, Square, Triangle in V1. **Noise deferred to V2** (per-voice PRNG complexity).

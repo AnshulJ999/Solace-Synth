@@ -21,13 +21,17 @@ Full preset system: save, load, browse, rename, delete, and cycle through preset
 <?xml version="1.0"?>
 <SolacePreset name="Fat Bass" author="Solace" version="1">
   <APVTS>
-    <!-- Full APVTS ValueTree XML state (from apvts.copyState().createXml()) -->
-    <!-- This captures ALL 35+ parameters in their current denormalized values -->
+    <!-- APVTS parameter state only (UI/session metadata stripped) -->
+    <!-- Generated from apvts.copyState().createXml() with non-sound properties removed -->
   </APVTS>
 </SolacePreset>
 ```
 
 **Why XML over JSON:** JUCE's ValueTree serializes natively to XML. Using XML means we call `apvts.copyState().createXml()` to save and `ValueTree::fromXml()` to load -- zero custom parsing. JSON would require manual parameter-by-parameter serialization.
+
+**CRITICAL: Sound-only serialization.** The APVTS ValueTree also contains UI/session metadata (`lastEditorWidth`, `lastEditorHeight`, `lastPresetName`). These MUST be stripped before writing to a `.solace` file. On load, only parameter state is restored -- UI properties are preserved from the current session, not overwritten by the preset.
+
+Implementation: `writePresetFile()` copies the state, removes known non-sound properties, then serializes. `loadPreset()` merges only parameter children into the current state, leaving UI properties untouched.
 
 **Metadata fields:**
 - `name` -- display name (also used as filename: `Fat Bass.solace`)
@@ -94,6 +98,13 @@ public:
     void loadNextPreset();
     void loadPreviousPreset();
 
+    // --- Init (hardcoded, file-independent) ---
+    void resetToDefaults();      // set all params to createParameterLayout() defaults
+
+    // --- Modified state ---
+    bool getIsModified() const;
+    void setModified (bool modified);
+
     // --- Lifecycle ---
     void scanPresets();          // rebuild list from factory + user directory
     juce::String getLastUsedPresetName() const;
@@ -104,6 +115,7 @@ private:
     std::vector<PresetInfo> presets;         // factory first, then user, alphabetical within
     int currentIndex = -1;                  // -1 = no preset loaded (init state)
     juce::String lastUsedPresetName;
+    bool isModified = false;                // true after any param change post-load
 
     juce::File getUserPresetDirectory() const;
     void ensureUserDirectoryExists() const;
@@ -139,8 +151,8 @@ private:
 ```
 
 **State persistence -- last used preset:**
-- `getStateInformation()`: save `lastUsedPresetName` as a ValueTree property (alongside `lastEditorWidth`/`Height`)
-- `setStateInformation()`: restore it, then call `presetManager.loadPresetByName(name)` to reload the preset
+- `getStateInformation()`: `lastPresetName` is already in the ValueTree (written on every preset load). Serialized automatically with `apvts.copyState()`.
+- `setStateInformation()`: `replaceState()` restores the full APVTS state including `lastPresetName`. PresetManager reads this property and sets `currentIndex` for display. **Do NOT re-load the `.solace` file** -- the APVTS state already contains the correct parameter values (including any user tweaks made after loading the preset).
 
 **Why not use JUCE's program API (`getNumPrograms`/`setCurrentProgram`):** The program API is designed for DAW-managed preset lists. It doesn't support user presets, categories, or file-based management. Most modern plugins (Serum, Vital, Surge) ignore the program API and implement their own preset system, which is what we're doing.
 
@@ -175,15 +187,14 @@ Register in `createWebViewOptions()`:
 User clicks preset in dropdown
   -> JS calls SolaceBridge.loadPreset(index)
   -> C++ PresetManager reads .solace file / BinaryData
-  -> C++ calls apvts.replaceState(presetValueTree)
-  -> APVTS fires parameterChanged for every parameter
-  -> Editor's parameterChanged listener bounces to message thread
-  -> sendAllParametersToJS() syncs everything to the WebView
+  -> C++ strips UI metadata, merges parameter state into current APVTS
+  -> C++ explicitly calls sendAllParametersToJS() for bulk sync
   -> C++ emits currentPresetChanged event with new name
-  -> JS updates preset-name label
+  -> C++ resets isModified flag to false
+  -> JS updates preset-name label (no asterisk)
 ```
 
-Note: `apvts.replaceState()` triggers `parameterChanged` for all parameters automatically. The existing `syncAllParameters` path handles this. No special preset-load sync needed.
+**Explicit bulk sync after load:** After restoring preset state, the Editor explicitly calls `sendAllParametersToJS()` to push all parameter values to JS in one batch. This is more reliable than depending on 35+ individual `parameterChanged` callbacks bouncing through `callAsync`. The per-parameter listener path still works for ongoing automation/UI changes -- bulk sync is only for preset loads.
 
 ---
 
@@ -346,9 +357,30 @@ This creates a separate binary data target for presets (keeps UI assets separate
 
 **Important distinction:** We don't re-load the `.solace` file on state restoration. The APVTS state already contains the correct parameter values. We only need the preset name so the UI shows which preset is active. If the user tweaked parameters after loading a preset, those tweaks are preserved in the APVTS state.
 
-### Modified state display:
+### Modified state indicator:
 
-If the user changes any parameter after loading a preset, the display could show `"Fat Bass *"` (with asterisk) to indicate unsaved changes. This is a nice-to-have -- defer if it adds complexity.
+After loading a preset, if the user changes any parameter, the display shows `"Fat Bass *"` (asterisk appended) to indicate unsaved changes.
+
+**Implementation:**
+- `PresetManager` holds a `bool isModified = false` flag
+- On preset load: set `isModified = false`
+- On any parameter change (via the existing APVTS listener): set `isModified = true`, emit `currentPresetChanged` with updated name + `*`
+- On save: set `isModified = false`, emit `currentPresetChanged` with clean name
+- The flag is NOT persisted -- on DAW restore, the preset name shows clean (the tweaked state IS the "saved" state from the DAW's perspective)
+
+**Behavior matrix:**
+
+| Action | Display | isModified |
+|--------|---------|-----------|
+| Load "Fat Bass" | `Fat Bass` | false |
+| Tweak cutoff | `Fat Bass *` | true |
+| Save | `Fat Bass` | false |
+| Save As "My Bass" | `My Bass` | false |
+| Load factory, tweak, close DAW, reopen | `Fat Bass` | false (DAW state is authoritative) |
+
+**"Save" on a modified factory preset:** Acts as "Save As" -- opens name dialog pre-filled with factory name. Factory presets are never overwritten.
+
+**"Save" on a modified user preset:** Overwrites the user preset file with current state. Resets `isModified` to false.
 
 ---
 
@@ -389,12 +421,13 @@ If the user changes any parameter after loading a preset, the display could show
 - Factory presets: Save/Save As creates a user copy. Rename/Delete disabled.
 - **Test:** Full CRUD flow for user presets
 
-### Step 6: Polish and edge cases
-- "Modified" indicator (`*`) on preset name after parameter change (optional)
-- Handle edge cases: duplicate names, invalid characters in filenames, empty name
-- Keyboard shortcuts: could consider Ctrl+S = Save, but defer for now
+### Step 6: Modified indicator + polish
+- Wire `isModified` flag in PresetManager: set true on any parameter change, false on load/save
+- Emit `currentPresetChanged` with `*` suffix when modified
+- JS updates `#preset-name` to show/hide asterisk
+- Handle edge cases: duplicate names, invalid characters in filenames, empty name, leading/trailing spaces
 - Ensure dropdown closes on click-outside, Escape key
-- Test with DAW: verify preset name persists across DAW project save/load
+- Test with DAW: verify preset name persists across DAW project save/load, modified flag resets correctly
 
 ---
 
@@ -402,16 +435,25 @@ If the user changes any parameter after loading a preset, the display could show
 
 | Scenario | Behavior |
 |----------|----------|
-| User clicks "Save" on a factory preset | Treated as "Save As" -- opens name dialog, saves to User/ |
+| User clicks "Save" on a factory preset | Treated as "Save As" -- opens name dialog (pre-filled with factory name), saves to User/ |
+| User clicks "Save" on a modified user preset | Overwrites the user preset file, resets modified indicator |
 | User clicks "Delete" on a factory preset | Button disabled / greyed out for factory presets |
 | User clicks "Rename" on a factory preset | Button disabled / greyed out for factory presets |
-| Duplicate preset name on save | Prompt: "A preset named X already exists. Overwrite?" |
+| Duplicate preset name on save (within User) | Prompt: "A preset named X already exists. Overwrite?" |
+| User preset has same name as factory preset | Allowed -- they are in separate categories (Factory/User), both visible |
 | Invalid filename characters | Strip `< > : " / \ | ? *` from name before saving |
+| Leading/trailing spaces in name | Trimmed automatically |
 | Empty preset name | Reject, keep modal open with error message |
-| Preset file missing on load | Remove from list, show brief error, scan presets |
-| User manually adds .solace files to folder | Picked up on next scan (scan on window open) |
-| Parameter changed after preset load | Optional: show `*` next to name. APVTS state diverges from file. |
-| "Init" preset | Always available. Loads `createParameterLayout()` defaults. |
+| Preset file missing on load | Remove from list, show brief error, rescan presets |
+| User manually adds .solace files to folder | Picked up on next scan (scan on editor open) |
+| Parameter changed after preset load | Show `*` next to name (e.g. `Fat Bass *`). isModified = true. |
+| "Init" preset | Always available. Hardcoded in C++ via `resetToDefaults()` -- programmatically sets all parameters to their `createParameterLayout()` defaults. Does NOT depend on a file. Even if all preset files are deleted, Init always works. |
+
+### Name collision rules:
+- **Factory vs User:** Separate namespaces. A user preset CAN have the same display name as a factory preset. No shadowing -- both remain visible in their respective dropdown categories.
+- **Within User:** Duplicate names prompt "Overwrite?" confirmation. Case-insensitive comparison on Windows (NTFS is case-insensitive).
+- **Filename derivation:** Display name = filename (minus `.solace` extension). `Fat Bass` -> `Fat Bass.solace`.
+- **Case-only renames:** Allowed -- rename "fat bass" to "Fat Bass" overwrites the same file (Windows is case-insensitive but case-preserving).
 
 ---
 

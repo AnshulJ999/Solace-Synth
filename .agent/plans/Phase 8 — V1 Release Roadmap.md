@@ -25,7 +25,7 @@ All `std::pow(2.0, x)` replaced with `std::exp2(x)` in SolaceOscillator.h and So
 **Change 2 — masterVolume pointer caching (from Jules PR #7):** ✅ DONE (2026-03-21)
 All three processBlock parameter lookups cached: `cachedMasterVolume`, `cachedMasterDistortion`, `cachedVoiceCount`.
 
-**Remaining effort:** `exp2` change only — 10 minutes.
+**Status:** Both changes complete. No remaining effort.
 
 ---
 

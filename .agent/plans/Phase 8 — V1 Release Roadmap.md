@@ -29,66 +29,52 @@ All three processBlock parameter lookups cached: `cachedMasterVolume`, `cachedMa
 
 ---
 
-## 8.2 — Preset System
+## 8.2 — Preset System — ✅ DONE (2026-03-21)
 
 **Goal:** Users can save, load, browse, and manage named presets. Ships with factory presets.
 
-### Architecture
+### Implementation (actual)
 
-**File format:** `.solace` files = APVTS XML state + metadata header.
+**File format:** `.solace` XML files with flat parameter list:
 ```xml
 <?xml version="1.0"?>
-<SolacePreset name="Fat Bass" author="Anshul" version="1">
-  <APVTS>
-    <!-- JUCE APVTS XML state dump -->
-  </APVTS>
+<SolacePreset name="Fat Bass" author="Solace" version="1">
+  <Param id="osc1Waveform" value="1"/>
+  <Param id="filterCutoff" value="800"/>
+  <!-- ... all 36 APVTS params ... -->
 </SolacePreset>
 ```
 
-JUCE's `apvts.copyState().toXmlString()` gives us the APVTS state. We wrap it with name/author/version metadata.
-
 **Storage locations:**
-- Factory presets: embedded via BinaryData (ship with the plugin, read-only)
-- User presets: `{user documents}/Solace Synth/Presets/` (or platform-appropriate path)
+- Factory presets: `.solace` files in `Assets/Presets/Factory/`, embedded via `juce_add_binary_data()` (`SolaceFactoryPresetData` namespace). Editable XML — rebuild embeds changes.
+- User presets: `Documents/Solace Synth/Presets/User/` (created on first save)
 
 ### C++ Side
 
-**New class: `SolacePresetManager` (Source/SolacePresetManager.h/.cpp)**
-- `savePreset(name, apvts)` — serialize APVTS state + metadata to `.solace` XML file
-- `loadPreset(file, apvts)` — parse `.solace` file, call `apvts.replaceState()`
-- `getFactoryPresets()` — return list from embedded BinaryData
-- `getUserPresets()` — scan user preset directory
-- `deletePreset(file)` — remove a user preset file
-- `getUserPresetDirectory()` — create if needed, return path
+**`SolacePresetManager` (Source/SolacePresetManager.h/.cpp):**
+- `saveUserPreset(name)`, `loadPreset(index)`, `loadPresetByName(name)`
+- `renameUserPreset(index, newName)`, `deleteUserPreset(index)`
+- `loadNextPreset()`, `loadPreviousPreset()`, `resetToDefaults()`
+- `scanPresets()` / `rebuildPresetList()` — iterates BinaryData + user directory
+- `parsePresetXml()` — parses `.solace` XML from string (for embedded factory presets)
+- `saveToState()` / `restoreFromState()` — persists last preset name + isFactory in ValueTree
 
-**Bridge extension:**
-- JS → C++: `savePreset(name)`, `loadPreset(index)`, `deletePreset(index)`, `getPresetList()`
-- C++ → JS: `presetListChanged([{name, isFactory, path}...])`, `currentPresetChanged(name)`
+**Bridge:** 8 JS→C++ functions + 4 C++→JS events (see `bridge.js` header comment).
 
 ### JS Side
 
-**Preset browser panel** — could be:
-- A dropdown/overlay in the header bar (where the Menu button placeholder is)
-- Shows factory presets (read-only) and user presets
-- Save button, rename, delete for user presets
-- Current preset name displayed in the header
+**`UI/components/preset-browser.js`:**
+- Hierarchical dropdown: Default (standalone) → Factory → User
+- Save / Save As / Rename / Delete with modal dialogs
+- Modified indicator (`*` suffix), prev/next navigation
+- Management buttons disabled for factory presets
 
-### Factory Presets (create 8-12)
+### Factory Presets (10 shipped)
 
-| Name | Character | Key Settings |
-|------|-----------|-------------|
-| Init | Clean default | Sine, no filter env, no unison |
-| Fat Bass | Thick low end | Saw, LP24 cutoff 800Hz, unison 4, detune 15 |
-| Pluck | Short percussive | Saw, filter env fast A/D, sustain 0 |
-| Pad | Evolving texture | Triangle+Sine, slow attack, LFO→cutoff |
-| Lead | Cutting mono-ish | Square, LP24 cutoff 3kHz, resonance 0.4 |
-| Supersaw | Classic trance | Saw, unison 8, detune 25, spread 0.8 |
-| Keys | Electric piano feel | Sine+Triangle, medium attack, filter env |
-| Brass | Synth brass | Saw, filter env medium, unison 2 |
-| Sub | Deep sub bass | Sine only, LP24 low cutoff |
-| Dirty Lead | Distorted | Saw, distortion 0.6, filter env fast |
+Default, Fat Bass, Pluck, Warm Pad, Lead, Supersaw, Keys, Brass, Sub, Dirty Lead.
 
-**Effort:** This is the largest item. Estimate 2-3 focused sessions.
+### Bug fixes applied (13 total)
+Rename file safety, isModified race condition (deferred callAsync), Default naming, delete fallback, modal input restore, error feedback, name disambiguation, nav return values, logger init order, dead code removal, bridge header update, modal Enter-listener accumulation fix, resetToDefaults ordering (parse before modify).
 
 ---
 
@@ -178,8 +164,8 @@ These are smaller items that improve the user experience:
 
 Before tagging v1.0.0:
 
-- [ ] All factory presets created and tested
-- [ ] App icon (ICO) in place
+- [x] All factory presets created and tested — 10 factory presets shipped (2026-03-21)
+- [x] App icon (ICO) in place — DONE (8.1a)
 - [x] Plugin window resizable and scaling correctly — DONE (clamp CSS + setResizable)
 - [x] `PLUGIN_CODE` changed to `"Slce"` — DONE
 - [ ] CI builds producing clean artifacts
@@ -197,7 +183,7 @@ Before tagging v1.0.0:
 ```
 8.1a  App Icon ──────────────────── ✅ DONE
 8.1b  exp2 + masterVol cache ───── ✅ DONE
-8.2   Preset System ────────────── 2-3 sessions  ← MAIN WORK / NEXT
+8.2   Preset System ────────────── ✅ DONE
 8.3   Resizable Window ─────────── ✅ DONE
 8.4   CI/CD (GitHub Actions) ───── 1-2 hours
 8.5   Unit Tests ───────────────── 2-3 hours

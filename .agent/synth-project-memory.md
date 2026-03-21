@@ -4,9 +4,9 @@
 > Key rules: (1) Read full header before editing. (2) Search for all mentions of an item before updating — no contradictions allowed. (3) Phase logs are frozen history — don't edit completed phases. (4) Mark resolved items as `✅ RESOLVED` everywhere, not just in one place.
 
 **Created:** 2026-03-08
-**Last Updated:** 2026-03-21 (Preset system COMPLETE: 13-bug fix pass + factory presets as embedded `.solace` files + modal listener fix.)
-**Status:** Active — All DSP phases 6.1-6.9 + 6.8b + pitch bend/mod wheel COMPLETE. Phase 7 UI 7.1-7.5 COMPLETE. Standalone packaging COMPLETE. Preset system COMPLETE.
-**Next Focus:** Phase 8 continued. Priority: CI/CD → unit tests → remaining UI polish → V1 release.
+**Last Updated:** 2026-03-21 (Memory consistency pass: fixed stale references across all project files. Preset system, resizable window, factory presets all confirmed DONE.)
+**Status:** Active — All DSP phases 6.1-6.9 + 6.8b + pitch bend/mod wheel COMPLETE. Phase 7 UI 7.1-7.5 COMPLETE. Standalone packaging COMPLETE. Preset system COMPLETE (13-bug fix pass + factory presets as embedded `.solace` files + modal listener fix). Resizable window COMPLETE.
+**Next Focus:** Phase 8.4 CI/CD → 8.5 unit tests → 8.6 UI polish → 8.7 pre-release checklist → V1 release.
 **Build:** Last verified 2026-03-21. Build must succeed cleanly before committing.
 
 ---
@@ -517,7 +517,7 @@ An AI-first "vibe-coding" framework for building JUCE plugins. Provides structur
 - [ ] Multi-instance logger safety (currently global `setCurrentLogger`)
 - [x] ~~Embed UI files via `juce_add_binary_data()`~~ — DONE (CMakeLists.txt + PluginEditor.cpp)
 - [x] ~~Resizable window~~ — ✅ DONE (2026-03-21). C++ `setResizable(true, true)` + `setResizeLimits(640, 360, 2560, 1440)`. CSS clamp() handles adaptation. Window size persisted via ValueTree properties in `resized()` with `constructionComplete` guard.
-- [x] ~~Preset system (save/load GUI + `.solace` file format)~~ — ✅ DONE (2026-03-21). `SolacePresetManager` C++ class + `preset-browser.js` UI + bridge extensions. 10 factory presets (hardcoded in C++ — migration to `.solace` files pending). User presets saved to `Documents/Solace Synth/Presets/User/`. Hierarchical dropdown (Default → Factory → User). Save/Save As/Rename/Delete with modal dialogs. Modified indicator (`*` suffix). Last-used preset persisted via ValueTree. 13-bug fix pass applied (rename file delete, isModified race condition, Default naming, delete fallback, modal input restore, error feedback, name disambiguation, nav return values, logger init order, dead code removal, bridge header).
+- [x] ~~Preset system (save/load GUI + `.solace` file format)~~ — ✅ DONE (2026-03-21). `SolacePresetManager` C++ class + `preset-browser.js` UI + bridge extensions. 10 factory presets as `.solace` XML files in `Assets/Presets/Factory/`, embedded via `juce_add_binary_data()` (`SolaceFactoryPresetData` namespace). User presets saved to `Documents/Solace Synth/Presets/User/`. Hierarchical dropdown (Default → Factory → User). Save/Save As/Rename/Delete with modal dialogs. Modified indicator (`*` suffix). Last-used preset persisted via ValueTree. 13-bug fix pass applied (rename file delete, isModified race condition, Default naming, delete fallback, modal input restore, error feedback, name disambiguation, nav return values, logger init order, dead code removal, bridge header).
 - [x] ~~Preset system: migrate factory presets from hardcoded C++ to `.solace` files embedded via `juce_add_binary_data()`~~ — ✅ DONE (2026-03-21). 10 factory preset files in `Assets/Presets/Factory/`. `SolaceFactoryPresetData` BinaryData namespace. `FactoryPresetDef` struct and `getFactoryPresetDefs()` removed. Anyone can create/edit `.solace` files; rebuild embeds changes.
 - [x] ~~Preset system: fix modal Enter-listener accumulation bug~~ — ✅ DONE (2026-03-21). Modal input element now cloned alongside buttons in both `_showModal()` and `_showDeleteConfirm()` to discard stale keydown listeners.
 - [x] ~~`exp2` optimization (Jules PR #13)~~ — ✅ DONE (already in codebase, all `std::pow(2.0,x)` replaced with `std::exp2(x)`)
@@ -678,7 +678,7 @@ Do NOT implement features suggested solely by Claude Code/Codex reviews without 
     - `ampRelease`, `filterEnvRelease`: skew=0.3 (longer range, more skew needed)
     - `lfoRate`: already had skew=0.3 ✅
   - **Organic distortion:** The tanh mapping was refined (2026-03-21) to ensure transparent passthrough at zero drive. This provides the "warmth" required without the volume-jump artifacts. Resolved for V1.
-- [ ] Phase 7: Full Figma UI implementation
+- [x] Phase 7: Full Figma UI implementation
   - [x] **Phase 7.5: Dropdown Popup + Fader UX + DSP Pitch Bend + Mod Wheel** — COMPLETE (2026-03-12)
 
     **UI — Dropdown (full rewrite, `UI/components/dropdown.js`):**
@@ -734,7 +734,7 @@ Do NOT implement features suggested solely by Claude Code/Codex reviews without 
     - ✅ Fixed P2 pitch wheel: switched from global atomic to JUCE parameter (simpler + more correct).
     - ℹ️ Doc misnomer: `Osc1Pitch` in C++ comments should be `OscPitch` (both oscs shift). Low priority cleanup — does not affect runtime.
 
-- [ ] GitHub Actions CI + pluginval
+- [ ] Phase 8.4: GitHub Actions CI + pluginval
 
 ---
 

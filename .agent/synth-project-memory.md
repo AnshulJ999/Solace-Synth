@@ -6,7 +6,7 @@
 **Created:** 2026-03-08
 **Last Updated:** 2026-03-21 (cleanup pass: fixed contradictions, updated V1 scope, marked resolved items)
 **Status:** Active — All DSP phases 6.1-6.9 + 6.8b + pitch bend/mod wheel COMPLETE. Phase 7 UI 7.1-7.5 COMPLETE. Standalone packaging (BinaryData embedding) COMPLETE.
-**Next Focus:** Preset system (GUI + file management), resizable window (CSS `transform: scale()` refactor), and final UI/UX polishing.
+**Next Focus:** Phase 8 — V1 Release Roadmap (`.agent/plans/Phase 8 — V1 Release Roadmap.md`). Priority: app icon → DSP micro-opts → preset system → resizable window → CI/CD → unit tests.
 **Build:** Last verified 2026-03-11. Build must succeed cleanly before committing.
 
 ---

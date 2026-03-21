@@ -346,7 +346,7 @@ html, body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     flex: 1;
     min-width: 0;
 }
@@ -376,10 +376,9 @@ html, body {
     gap: var(--space-lg);
     flex: 1;
     align-items: flex-start;
+    justify-content: center;
     min-height: 0;
     flex-wrap: nowrap;
-    /* No overflow:hidden here — sub-section clips the boundary.
-       overflow:hidden here would silently clip items that just barely overflow. */
 }
 
 /* Oscillator controls — dead class, osc sections now use .osc-grid.
@@ -718,6 +717,7 @@ html, body {
     gap: var(--space-xl);
     flex: 1;
     align-items: flex-start;
+    justify-content: center;
 }
 
 /* ============================================================================
@@ -749,6 +749,7 @@ html, body {
     gap: var(--space-lg);
     flex: 1;
     align-items: flex-start;
+    justify-content: center;
 }
 
 /* ============================================================================

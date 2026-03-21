@@ -5,6 +5,7 @@
 #include <juce_dsp/juce_dsp.h>
 #include <atomic>
 #include "SolaceLogger.h"
+#include "SolacePresetManager.h"
 #include "DSP/SolaceVoice.h"
 #include "DSP/SolaceSound.h"
 #include "DSP/SolaceDistortion.h"
@@ -207,6 +208,9 @@ public:
     // The UI reads/writes parameters through this tree.
     juce::AudioProcessorValueTreeState& getAPVTS() { return apvts; }
 
+    // --- Preset Manager ---
+    SolacePresetManager& getPresetManager() { return presetManager; }
+
     // --- MIDI Keyboard State (for on-screen keyboard in the Editor) ---
     // Lives in the Processor so the audio thread can call
     // processNextMidiBuffer() safely. MidiKeyboardState is thread-safe.
@@ -215,6 +219,9 @@ public:
 private:
     // Parameter tree — defines all automatable parameters
     juce::AudioProcessorValueTreeState apvts;
+
+    // Preset manager — handles save/load/browse/manage
+    SolacePresetManager presetManager;
 
     // MIDI keyboard state — shared between Editor (UI thread) and processBlock (audio thread).
     // Thread-safe: MidiKeyboardState uses an internal lock for cross-thread access.

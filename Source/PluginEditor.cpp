@@ -265,6 +265,63 @@ juce::WebBrowserComponent::Options SolaceSynthEditor::createWebViewOptions()
                     juce::WebBrowserComponent::NativeFunctionCompletion completion)
             {
                 handleLog (args, std::move (completion));
+            })
+
+        // --- Preset bridge functions ---
+        .withNativeFunction ("getPresetList",
+            [this] (const juce::Array<juce::var>& args,
+                    juce::WebBrowserComponent::NativeFunctionCompletion completion)
+            {
+                handleGetPresetList (args, std::move (completion));
+            })
+
+        .withNativeFunction ("loadPreset",
+            [this] (const juce::Array<juce::var>& args,
+                    juce::WebBrowserComponent::NativeFunctionCompletion completion)
+            {
+                handleLoadPreset (args, std::move (completion));
+            })
+
+        .withNativeFunction ("savePreset",
+            [this] (const juce::Array<juce::var>& args,
+                    juce::WebBrowserComponent::NativeFunctionCompletion completion)
+            {
+                handleSavePreset (args, std::move (completion));
+            })
+
+        .withNativeFunction ("saveAsPreset",
+            [this] (const juce::Array<juce::var>& args,
+                    juce::WebBrowserComponent::NativeFunctionCompletion completion)
+            {
+                handleSaveAsPreset (args, std::move (completion));
+            })
+
+        .withNativeFunction ("renamePreset",
+            [this] (const juce::Array<juce::var>& args,
+                    juce::WebBrowserComponent::NativeFunctionCompletion completion)
+            {
+                handleRenamePreset (args, std::move (completion));
+            })
+
+        .withNativeFunction ("deletePreset",
+            [this] (const juce::Array<juce::var>& args,
+                    juce::WebBrowserComponent::NativeFunctionCompletion completion)
+            {
+                handleDeletePreset (args, std::move (completion));
+            })
+
+        .withNativeFunction ("nextPreset",
+            [this] (const juce::Array<juce::var>& args,
+                    juce::WebBrowserComponent::NativeFunctionCompletion completion)
+            {
+                handleNextPreset (args, std::move (completion));
+            })
+
+        .withNativeFunction ("prevPreset",
+            [this] (const juce::Array<juce::var>& args,
+                    juce::WebBrowserComponent::NativeFunctionCompletion completion)
+            {
+                handlePrevPreset (args, std::move (completion));
             });
 }
 
@@ -387,7 +444,11 @@ void SolaceSynthEditor::handleUiReady (
     // Send the current state of all parameters to JS
     sendAllParametersToJS();
 
-    SolaceLog::info ("UI ready complete - all parameters synced to JS");
+    // Send preset list and current preset to JS
+    emitPresetListChanged();
+    emitCurrentPresetChanged();
+
+    SolaceLog::info ("UI ready complete - all parameters and preset info synced to JS");
     completion (juce::var (true));
 }
 
@@ -480,8 +541,207 @@ void SolaceSynthEditor::parameterChanged (const juce::String& parameterID, float
             SolaceLog::trace ("APVTS parameterChanged: " + parameterID
                 + " newValue=" + juce::String (newValue, 4));
             self->sendParameterToJS (parameterID, newValue);
+
+            // Mark preset as modified (unless we're in the middle of loading a preset)
+            auto& pm = self->processorRef.getPresetManager();
+            if (! pm.isCurrentlyLoading() && ! pm.getIsModified())
+            {
+                pm.setModified (true);
+                self->emitCurrentPresetChanged();
+            }
         }
     });
+}
+
+// ============================================================================
+// Preset Bridge Handlers
+// ============================================================================
+
+juce::var SolaceSynthEditor::buildPresetListVar() const
+{
+    auto& pm = processorRef.getPresetManager();
+    juce::Array<juce::var> list;
+
+    for (const auto& p : pm.getPresetList())
+    {
+        auto* obj = new juce::DynamicObject();
+        obj->setProperty ("name",      p.name);
+        obj->setProperty ("author",    p.author);
+        obj->setProperty ("isFactory", p.isFactory);
+        obj->setProperty ("index",     p.listIndex);
+        list.add (juce::var (obj));
+    }
+
+    return juce::var (list);
+}
+
+void SolaceSynthEditor::emitPresetListChanged()
+{
+    if (webView == nullptr || ! webViewReady) return;
+    webView->emitEventIfBrowserIsVisible ("presetListChanged", buildPresetListVar());
+}
+
+void SolaceSynthEditor::emitCurrentPresetChanged()
+{
+    if (webView == nullptr || ! webViewReady) return;
+
+    auto& pm = processorRef.getPresetManager();
+    auto* obj = new juce::DynamicObject();
+    obj->setProperty ("name",       pm.getDisplayName());
+    obj->setProperty ("index",      pm.getCurrentPresetIndex());
+    obj->setProperty ("isModified", pm.getIsModified());
+    obj->setProperty ("isFactory",  pm.getCurrentPresetIndex() >= 0
+                                    && pm.getCurrentPresetIndex() < static_cast<int> (pm.getPresetList().size())
+                                    && pm.getPresetList()[static_cast<size_t> (pm.getCurrentPresetIndex())].isFactory);
+
+    webView->emitEventIfBrowserIsVisible ("currentPresetChanged", juce::var (obj));
+}
+
+void SolaceSynthEditor::handleGetPresetList (
+    const juce::Array<juce::var>& /*args*/,
+    juce::WebBrowserComponent::NativeFunctionCompletion completion)
+{
+    completion (buildPresetListVar());
+}
+
+void SolaceSynthEditor::handleLoadPreset (
+    const juce::Array<juce::var>& args,
+    juce::WebBrowserComponent::NativeFunctionCompletion completion)
+{
+    if (args.isEmpty())
+    {
+        completion (juce::var (false));
+        return;
+    }
+
+    int index = static_cast<int> (args[0]);
+    auto& pm = processorRef.getPresetManager();
+    bool ok = pm.loadPreset (index);
+
+    if (ok)
+    {
+        // Explicit bulk sync after preset load
+        sendAllParametersToJS();
+        emitCurrentPresetChanged();
+    }
+
+    completion (juce::var (ok));
+}
+
+void SolaceSynthEditor::handleSavePreset (
+    const juce::Array<juce::var>& args,
+    juce::WebBrowserComponent::NativeFunctionCompletion completion)
+{
+    if (args.isEmpty())
+    {
+        completion (juce::var (false));
+        return;
+    }
+
+    auto name = args[0].toString();
+    auto& pm = processorRef.getPresetManager();
+    bool ok = pm.saveUserPreset (name);
+
+    if (ok)
+    {
+        emitPresetListChanged();
+        emitCurrentPresetChanged();
+    }
+
+    completion (juce::var (ok));
+}
+
+void SolaceSynthEditor::handleSaveAsPreset (
+    const juce::Array<juce::var>& args,
+    juce::WebBrowserComponent::NativeFunctionCompletion completion)
+{
+    // saveAs is the same as save — creates or overwrites a user preset
+    handleSavePreset (args, std::move (completion));
+}
+
+void SolaceSynthEditor::handleRenamePreset (
+    const juce::Array<juce::var>& args,
+    juce::WebBrowserComponent::NativeFunctionCompletion completion)
+{
+    if (args.size() < 2)
+    {
+        completion (juce::var (false));
+        return;
+    }
+
+    int index = static_cast<int> (args[0]);
+    auto newName = args[1].toString();
+    auto& pm = processorRef.getPresetManager();
+    bool ok = pm.renameUserPreset (index, newName);
+
+    if (ok)
+    {
+        emitPresetListChanged();
+        emitCurrentPresetChanged();
+    }
+
+    completion (juce::var (ok));
+}
+
+void SolaceSynthEditor::handleDeletePreset (
+    const juce::Array<juce::var>& args,
+    juce::WebBrowserComponent::NativeFunctionCompletion completion)
+{
+    if (args.isEmpty())
+    {
+        completion (juce::var (false));
+        return;
+    }
+
+    int index = static_cast<int> (args[0]);
+    auto& pm = processorRef.getPresetManager();
+    bool ok = pm.deleteUserPreset (index);
+
+    if (ok)
+    {
+        emitPresetListChanged();
+        emitCurrentPresetChanged();
+    }
+
+    completion (juce::var (ok));
+}
+
+void SolaceSynthEditor::handleNextPreset (
+    const juce::Array<juce::var>& /*args*/,
+    juce::WebBrowserComponent::NativeFunctionCompletion completion)
+{
+    auto& pm = processorRef.getPresetManager();
+    int idx = pm.loadNextPreset();
+
+    if (idx >= 0)
+    {
+        sendAllParametersToJS();
+        emitCurrentPresetChanged();
+    }
+
+    auto* obj = new juce::DynamicObject();
+    obj->setProperty ("name",  pm.getDisplayName());
+    obj->setProperty ("index", idx);
+    completion (juce::var (obj));
+}
+
+void SolaceSynthEditor::handlePrevPreset (
+    const juce::Array<juce::var>& /*args*/,
+    juce::WebBrowserComponent::NativeFunctionCompletion completion)
+{
+    auto& pm = processorRef.getPresetManager();
+    int idx = pm.loadPreviousPreset();
+
+    if (idx >= 0)
+    {
+        sendAllParametersToJS();
+        emitCurrentPresetChanged();
+    }
+
+    auto* obj = new juce::DynamicObject();
+    obj->setProperty ("name",  pm.getDisplayName());
+    obj->setProperty ("index", idx);
+    completion (juce::var (obj));
 }
 
 // ============================================================================

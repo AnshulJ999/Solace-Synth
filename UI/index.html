@@ -35,12 +35,19 @@
         </div>
 
         <div class="top-controls">
+            <div class="preset-management">
+                <button class="preset-mgmt-btn" id="btn-preset-delete" title="Delete">Delete</button>
+                <button class="preset-mgmt-btn" id="btn-preset-rename" title="Rename">Rename</button>
+                <button class="preset-mgmt-btn" id="btn-preset-save" title="Save">Save</button>
+                <button class="preset-mgmt-btn preset-mgmt-btn--primary" id="btn-preset-save-as" title="Save As">Save As</button>
+            </div>
+
             <div class="preset-selector" role="group" aria-label="Preset selector">
                 <button class="preset-nav-btn" id="btn-preset-prev" aria-label="Previous preset">
                     <img src="assets/icons/btn-left.svg" alt="" aria-hidden="true">
                 </button>
                 <div class="preset-dropdown" id="preset-dropdown" role="button" tabindex="0" aria-label="Current preset">
-                    <span class="preset-dropdown-label" id="preset-name">Initial Preset</span>
+                    <span class="preset-dropdown-label" id="preset-name">Init</span>
                 </div>
                 <button class="preset-nav-btn" id="btn-preset-next" aria-label="Next preset">
                     <img src="assets/icons/btn-right.svg" alt="" aria-hidden="true">
@@ -237,6 +244,18 @@
 
 </div><!-- /solace-root -->
 
+<!-- Preset Modal (Save As / Rename / Delete confirm) -->
+<div class="preset-modal-overlay" id="preset-modal-overlay"></div>
+<div class="preset-modal" id="preset-modal">
+    <div class="preset-modal-title">Save Preset</div>
+    <input type="text" class="preset-modal-input" placeholder="Preset name" maxlength="64" spellcheck="false">
+    <div class="preset-modal-error"></div>
+    <div class="preset-modal-buttons">
+        <button class="preset-modal-cancel">Cancel</button>
+        <button class="preset-modal-ok">Save</button>
+    </div>
+</div>
+
 <!-- Debug Panel (Ctrl+Shift+D) -->
 <div class="debug-panel" id="debug-panel" role="log" aria-label="Debug log" aria-live="off">
     <div class="debug-panel-title">BRIDGE DEBUG LOG — Ctrl+Shift+D to close</div>
@@ -248,6 +267,7 @@
 <script src="components/arrow-selector.js"></script>
 <script src="components/waveform-selector.js"></script>
 <script src="components/dropdown.js"></script>
+<script src="components/preset-browser.js"></script>
 <script src="main.js"></script>
 
 </body>

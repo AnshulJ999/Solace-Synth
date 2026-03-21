@@ -8,7 +8,8 @@ SolaceSynthProcessor::SolaceSynthProcessor()
     : AudioProcessor (BusesProperties()
                         // Synth: no audio input, stereo output
                         .withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
-      apvts (*this, nullptr, "PARAMETERS", createParameterLayout())
+      apvts (*this, nullptr, "PARAMETERS", createParameterLayout()),
+      presetManager (apvts)
 {
     // Set up multi-level file logging
     // Log files: %TEMP%/SolaceSynth/ (trace.log, debug.log, info.log)
@@ -593,6 +594,11 @@ void SolaceSynthProcessor::setStateInformation (const void* data, int sizeInByte
         if (xmlState->hasTagName (apvts.state.getType()))
         {
             apvts.replaceState (juce::ValueTree::fromXml (*xmlState));
+
+            // Restore preset identity (name + index) for display.
+            // Do NOT re-load the .solace file — the APVTS state already
+            // contains the correct parameter values (including user tweaks).
+            presetManager.restoreFromState();
         }
     }
 }

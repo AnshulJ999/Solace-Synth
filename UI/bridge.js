@@ -110,6 +110,18 @@ const SolaceBridge = (() => {
     }
 
     // ========================================================================
+    // JS -> C++: Preset operations
+    // ========================================================================
+    function getPresetList()             { return callNativeFunction("getPresetList"); }
+    function loadPreset(index)           { return callNativeFunction("loadPreset", index); }
+    function savePreset(name)            { return callNativeFunction("savePreset", name); }
+    function saveAsPreset(name)          { return callNativeFunction("saveAsPreset", name); }
+    function renamePreset(index, name)   { return callNativeFunction("renamePreset", index, name); }
+    function deletePreset(index)         { return callNativeFunction("deletePreset", index); }
+    function nextPreset()                { return callNativeFunction("nextPreset"); }
+    function prevPreset()                { return callNativeFunction("prevPreset"); }
+
+    // ========================================================================
     // C++ -> JS: Listen for parameter changes
     // ========================================================================
     function onParameterChanged(paramId, callback) {
@@ -117,6 +129,20 @@ const SolaceBridge = (() => {
             parameterListeners.set(paramId, []);
         }
         parameterListeners.get(paramId).push(callback);
+    }
+
+    // ========================================================================
+    // C++ -> JS: Preset event listeners
+    // ========================================================================
+    const presetListListeners = [];
+    const presetChangedListeners = [];
+
+    function onPresetListChanged(callback) {
+        presetListListeners.push(callback);
+    }
+
+    function onCurrentPresetChanged(callback) {
+        presetChangedListeners.push(callback);
     }
 
     // ========================================================================
@@ -153,6 +179,16 @@ const SolaceBridge = (() => {
                 });
             }
         });
+
+        // Listen for preset list changes (after save/delete/rename)
+        window.__JUCE__.backend.addEventListener("presetListChanged", (data) => {
+            presetListListeners.forEach(cb => cb(data));
+        });
+
+        // Listen for current preset changes (after load/cycle/modify)
+        window.__JUCE__.backend.addEventListener("currentPresetChanged", (data) => {
+            presetChangedListeners.forEach(cb => cb(data));
+        });
     }
 
     // ========================================================================
@@ -177,6 +213,17 @@ const SolaceBridge = (() => {
         log,
         onParameterChanged,
         isJuceAvailable,
-        get isConnected() { return isConnected; }
+        get isConnected() { return isConnected; },
+        // Preset operations
+        getPresetList,
+        loadPreset,
+        savePreset,
+        saveAsPreset,
+        renamePreset,
+        deletePreset,
+        nextPreset,
+        prevPreset,
+        onPresetListChanged,
+        onCurrentPresetChanged,
     };
 })();

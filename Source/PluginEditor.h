@@ -72,6 +72,29 @@ private:
     void handleLog (const juce::Array<juce::var>& args,
                     juce::WebBrowserComponent::NativeFunctionCompletion completion);
 
+    // --- Preset bridge handlers ---
+    void handleGetPresetList (const juce::Array<juce::var>& args,
+                              juce::WebBrowserComponent::NativeFunctionCompletion completion);
+    void handleLoadPreset (const juce::Array<juce::var>& args,
+                           juce::WebBrowserComponent::NativeFunctionCompletion completion);
+    void handleSavePreset (const juce::Array<juce::var>& args,
+                           juce::WebBrowserComponent::NativeFunctionCompletion completion);
+    void handleSaveAsPreset (const juce::Array<juce::var>& args,
+                             juce::WebBrowserComponent::NativeFunctionCompletion completion);
+    void handleRenamePreset (const juce::Array<juce::var>& args,
+                             juce::WebBrowserComponent::NativeFunctionCompletion completion);
+    void handleDeletePreset (const juce::Array<juce::var>& args,
+                             juce::WebBrowserComponent::NativeFunctionCompletion completion);
+    void handleNextPreset (const juce::Array<juce::var>& args,
+                           juce::WebBrowserComponent::NativeFunctionCompletion completion);
+    void handlePrevPreset (const juce::Array<juce::var>& args,
+                           juce::WebBrowserComponent::NativeFunctionCompletion completion);
+
+    // --- Preset bridge helpers ---
+    juce::var buildPresetListVar() const;
+    void emitPresetListChanged();
+    void emitCurrentPresetChanged();
+
     // --- APVTS Listener (for automation/preset changes) ---
     void parameterChanged (const juce::String& parameterID, float newValue) override;
 

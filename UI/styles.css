@@ -218,6 +218,195 @@ html, body {
     white-space: nowrap;
 }
 
+/* Preset management buttons (Delete, Rename, Save, Save As) */
+.preset-management {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.preset-mgmt-btn {
+    font-family: var(--font-ui);
+    font-size: clamp(10px, 1.1vw, 13px);
+    font-weight: 500;
+    padding: 4px 8px;
+    border: var(--card-border);
+    border-radius: 4px;
+    background: var(--color-bg);
+    color: var(--color-text-dark);
+    cursor: pointer;
+    transition: background 0.12s ease, opacity 0.12s ease;
+    white-space: nowrap;
+}
+
+.preset-mgmt-btn:hover:not(:disabled)  { background: var(--color-border); }
+.preset-mgmt-btn:disabled              { opacity: 0.4; cursor: default; }
+.preset-mgmt-btn--primary              { font-weight: 700; }
+
+/* ======================================================================
+   Preset hierarchical dropdown menu
+   ====================================================================== */
+.preset-menu {
+    position: fixed;
+    z-index: 1000;
+    background: var(--color-bg);
+    border: var(--card-border);
+    border-radius: var(--card-radius);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    padding: 4px 0;
+    min-width: 120px;
+}
+
+.preset-menu-category {
+    position: relative;
+}
+
+.preset-menu-category-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 12px;
+    font-family: var(--font-ui);
+    font-size: clamp(11px, 1.2vw, 14px);
+    font-weight: 600;
+    color: var(--color-text-dark);
+    cursor: default;
+    transition: background 0.1s ease;
+}
+
+.preset-menu-category-label:hover { background: var(--color-border); }
+
+.preset-menu-arrow {
+    font-size: 8px;
+    margin-left: 8px;
+    opacity: 0.5;
+}
+
+.preset-menu-submenu {
+    display: none;
+    position: fixed;
+    z-index: 1001;
+    background: var(--color-bg);
+    border: var(--card-border);
+    border-radius: var(--card-radius);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    padding: 4px 0;
+    min-width: 140px;
+}
+
+.preset-menu-submenu--visible { display: block; }
+
+.preset-menu-item {
+    padding: 5px 14px;
+    font-family: var(--font-ui);
+    font-size: clamp(11px, 1.2vw, 14px);
+    font-weight: 400;
+    color: var(--color-text-dark);
+    cursor: pointer;
+    transition: background 0.1s ease;
+    white-space: nowrap;
+}
+
+.preset-menu-item:hover            { background: var(--color-border); }
+.preset-menu-item--active           { font-weight: 700; color: var(--color-accent); }
+.preset-menu-item--empty            { opacity: 0.4; cursor: default; font-style: italic; }
+
+/* ======================================================================
+   Preset modal (Save As / Rename / Delete confirmation)
+   ====================================================================== */
+.preset-modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.preset-modal-overlay.visible { display: block; }
+
+.preset-modal {
+    display: none;
+    position: fixed;
+    z-index: 2001;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--color-bg);
+    border: var(--card-border);
+    border-radius: var(--card-radius);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+    padding: 20px 24px;
+    min-width: 280px;
+    max-width: 400px;
+}
+
+.preset-modal.visible { display: block; }
+
+.preset-modal-title {
+    font-family: var(--font-ui);
+    font-size: clamp(14px, 1.4vw, 18px);
+    font-weight: 700;
+    color: var(--color-text-dark);
+    margin-bottom: 12px;
+}
+
+.preset-modal-input {
+    width: 100%;
+    padding: 8px 10px;
+    font-family: var(--font-ui);
+    font-size: clamp(12px, 1.2vw, 15px);
+    border: var(--card-border);
+    border-radius: 4px;
+    background: var(--color-bg);
+    color: var(--color-text-dark);
+    outline: none;
+    box-sizing: border-box;
+}
+
+.preset-modal-input:focus { border-color: var(--color-accent); }
+
+.preset-modal-error {
+    font-family: var(--font-ui);
+    font-size: clamp(10px, 1vw, 12px);
+    color: #d44;
+    min-height: 16px;
+    margin-top: 6px;
+}
+
+.preset-modal-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 14px;
+}
+
+.preset-modal-cancel,
+.preset-modal-ok {
+    font-family: var(--font-ui);
+    font-size: clamp(11px, 1.1vw, 14px);
+    font-weight: 600;
+    padding: 6px 16px;
+    border: var(--card-border);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.12s ease;
+}
+
+.preset-modal-cancel {
+    background: var(--color-bg);
+    color: var(--color-text-dark);
+}
+
+.preset-modal-cancel:hover { background: var(--color-border); }
+
+.preset-modal-ok {
+    background: var(--color-accent);
+    color: white;
+    border-color: var(--color-accent);
+}
+
+.preset-modal-ok:hover { opacity: 0.85; }
+
 /* Menu button */
 .menu-btn {
     display: flex;

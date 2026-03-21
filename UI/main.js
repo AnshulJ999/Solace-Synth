@@ -267,6 +267,9 @@
         // unisonDetune + unisonSpread: deliberately NOT mounted — no UI controls in V1 (engine-only by design).
         // C++ APVTS params exist; bridge silently skips them on syncAllParameters (no registered listeners = no-op). This is correct.
 
+        // --- Preset Browser ---
+        new PresetBrowser();
+
         logDebug("All components mounted");
     };
 

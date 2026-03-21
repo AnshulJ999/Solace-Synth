@@ -175,16 +175,18 @@ SolaceSynthEditor::SolaceSynthEditor (SolaceSynthProcessor& p)
                 self->midiKeyboard.grabKeyboardFocus();
         });
 
-    // Resizable window — clamp()-based CSS adapts to viewport changes naturally.
-    setResizable (true, true);
-    setResizeLimits (640, 360, 2560, 1440);
-
-    // Restore last saved window size from the APVTS ValueTree, or default to 1280x720.
-    // These properties are persisted automatically via getStateInformation/setStateInformation.
+    // Read saved size BEFORE setResizable — setResizable/setResizeLimits trigger
+    // resized() which would overwrite the ValueTree with pre-setSize junk dimensions.
     auto& state = processorRef.getAPVTS().state;
     const int savedW = state.getProperty ("lastEditorWidth",  1280);
     const int savedH = state.getProperty ("lastEditorHeight", 720);
+
+    // Resizable window — clamp()-based CSS adapts to viewport changes naturally.
+    setResizable (true, true);
+    setResizeLimits (640, 360, 2560, 1440);
     setSize (savedW, savedH);
+
+    constructionComplete = true;
     SolaceLog::info ("Editor ctor: finished, window size set to "
                      + juce::String (savedW) + "x" + juce::String (savedH) + " (resizable)");
 }
@@ -509,6 +511,18 @@ void SolaceSynthEditor::paint (juce::Graphics& g)
 // ============================================================================
 void SolaceSynthEditor::resized()
 {
+    // Persist current size on every resize so getStateInformation() always
+    // has the latest dimensions — the standalone wrapper serializes state
+    // before the editor destructor runs, so we can't rely on the dtor alone.
+    // Guard: skip during construction when setResizable/setResizeLimits trigger
+    // resized() before setSize() has been called with the correct dimensions.
+    if (constructionComplete)
+    {
+        auto& state = processorRef.getAPVTS().state;
+        state.setProperty ("lastEditorWidth",  getWidth(),  nullptr);
+        state.setProperty ("lastEditorHeight", getHeight(), nullptr);
+    }
+
     auto bounds = getLocalBounds();
 
     // Reserve the bottom strip for the MIDI keyboard

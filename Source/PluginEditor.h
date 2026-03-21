@@ -55,6 +55,11 @@ private:
     juce::Label fallbackLabel;
     bool webViewReady = false;
 
+    // Guard: prevents resized() from writing junk dimensions to the ValueTree
+    // during construction (setResizable/setResizeLimits trigger resized() before
+    // setSize() is called with the correct dimensions).
+    bool constructionComplete = false;
+
     // --- Bridge: C++ -> JS ---
     void sendParameterToJS (const juce::String& paramId, float value);
     void sendAllParametersToJS();

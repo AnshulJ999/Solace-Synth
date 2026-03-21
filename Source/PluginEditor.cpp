@@ -179,9 +179,14 @@ SolaceSynthEditor::SolaceSynthEditor (SolaceSynthProcessor& p)
     setResizable (true, true);
     setResizeLimits (640, 360, 2560, 1440);
 
-    // Default window size — 720p, same aspect ratio as before.
-    setSize (1280, 720);
-    SolaceLog::info ("Editor ctor: finished, window size set to 1280x720 (resizable)");
+    // Restore last saved window size from the APVTS ValueTree, or default to 1280x720.
+    // These properties are persisted automatically via getStateInformation/setStateInformation.
+    auto& state = processorRef.getAPVTS().state;
+    const int savedW = state.getProperty ("lastEditorWidth",  1280);
+    const int savedH = state.getProperty ("lastEditorHeight", 720);
+    setSize (savedW, savedH);
+    SolaceLog::info ("Editor ctor: finished, window size set to "
+                     + juce::String (savedW) + "x" + juce::String (savedH) + " (resizable)");
 }
 
 // ============================================================================
@@ -189,6 +194,12 @@ SolaceSynthEditor::SolaceSynthEditor (SolaceSynthProcessor& p)
 // ============================================================================
 SolaceSynthEditor::~SolaceSynthEditor()
 {
+    // Persist current window size so next open restores it.
+    // Stored as ValueTree properties — serialized by getStateInformation automatically.
+    auto& state = processorRef.getAPVTS().state;
+    state.setProperty ("lastEditorWidth",  getWidth(),  nullptr);
+    state.setProperty ("lastEditorHeight", getHeight(), nullptr);
+
     // Remove APVTS listeners FIRST to prevent any new async callbacks
     auto& apvts = processorRef.getAPVTS();
     auto params = apvts.processor.getParameters();

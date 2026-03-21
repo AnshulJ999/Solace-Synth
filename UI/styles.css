@@ -142,7 +142,7 @@ html, body {
 }
 
 .logo-monogram {
-    width: clamp(28px, 3.3vw, 50px);
+    width: clamp(36px, 4.2vw, 64px);
     height: auto;
     flex-shrink: 0;
 }
@@ -513,9 +513,9 @@ html, body {
 }
 
 /* Fader height variants (clamp: min / responsive / Figma max) */
-.fader--standard .fader-input { height: clamp(80px,  16vh, 160px); }
+.fader--standard .fader-input { height: clamp(100px, 21vh, 200px); }
 .fader--big      .fader-input { height: clamp(110px, 22vh, 220px); }
-.fader--small    .fader-input { height: clamp(50px,  10vh, 100px); }
+.fader--small    .fader-input { height: clamp(80px,  16vh, 160px); }
 
 /* ============================================================================
  * Arrow Selector  ( < value > )

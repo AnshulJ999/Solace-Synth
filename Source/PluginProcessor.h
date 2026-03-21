@@ -224,9 +224,11 @@ private:
     // All 16 voices are always allocated. voiceLimit is updated each processBlock.
     SolaceSynthesiser synth;
 
-    // Cached parameter pointer — avoids string lookup in processBlock every audio callback.
+    // Cached parameter pointers — avoid string hash lookup in processBlock every audio callback.
     // getRawParameterValue() returns a stable pointer; caching it is a standard JUCE pattern.
-    const std::atomic<float>* cachedMasterVolume = nullptr;
+    const std::atomic<float>* cachedMasterVolume     = nullptr;
+    const std::atomic<float>* cachedMasterDistortion = nullptr;
+    const std::atomic<float>* cachedVoiceCount       = nullptr;
 
     // File-based logger — output goes to %TEMP%/SolaceSynth/ (trace.log, debug.log, info.log)
     std::unique_ptr<SolaceLogger> solaceLogger;

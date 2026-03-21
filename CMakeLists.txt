@@ -16,7 +16,7 @@ set(PRODUCT_NAME "Solace Synth")              # Display name in DAWs (spaces OK)
 set(COMPANY_NAME "Solace")                    # Manufacturer name
 set(BUNDLE_ID "com.solace.solacesynth")       # macOS bundle identifier
 set(PLUGIN_MANUFACTURER_CODE Solc)            # 4-char manufacturer code (first char uppercase)
-set(PLUGIN_CODE Ss01)                         # 4-char unique plugin code (needs one uppercase)
+set(PLUGIN_CODE SolS)                         # 4-char unique plugin code (needs one uppercase)
 
 # Plugin formats to build
 set(FORMATS Standalone VST3)

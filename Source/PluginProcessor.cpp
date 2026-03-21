@@ -92,8 +92,10 @@ SolaceSynthProcessor::SolaceSynthProcessor()
     // incoming note will trigger one of the SolaceVoice instances.
     synth.addSound (new SolaceSound());
 
-    // Cache frequently-used parameter pointer to avoid string lookup in processBlock.
-    cachedMasterVolume = apvts.getRawParameterValue ("masterVolume");
+    // Cache frequently-used parameter pointers to avoid string lookup in processBlock.
+    cachedMasterVolume     = apvts.getRawParameterValue ("masterVolume");
+    cachedMasterDistortion = apvts.getRawParameterValue ("masterDistortion");
+    cachedVoiceCount       = apvts.getRawParameterValue ("voiceCount");
 
     SolaceLog::info ("Synthesiser ready: " + juce::String (numVoices) + " voices, SolaceSound");
 }
@@ -523,7 +525,7 @@ void SolaceSynthProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     // searchable voice pool to [0, voiceLimit). Voices beyond the cap are
     // never touched by the allocator -- steal mode is automatic when all
     // voiceLimit voices are occupied (JUCE picks the oldest/quietest).
-    synth.setVoiceLimit (static_cast<int> (apvts.getRawParameterValue ("voiceCount")->load()));
+    synth.setVoiceLimit (static_cast<int> (cachedVoiceCount->load()));
 
     // --- Render all active voices ---
     // The Synthesiser scans the now-merged midiMessages buffer for events,
@@ -535,7 +537,7 @@ void SolaceSynthProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     // changes with signal level, so it must come before the volume scaling.
     // Process each channel independently (L and R get the same drive, but have
     // different sample values from stereo unison spread, so outputs differ).
-    const float drive = apvts.getRawParameterValue ("masterDistortion")->load();
+    const float drive = cachedMasterDistortion->load();
     if (drive > 0.0f)
     {
         const int numSamples  = buffer.getNumSamples();

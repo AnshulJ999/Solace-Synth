@@ -25,6 +25,38 @@
     "use strict";
 
     // =========================================================================
+    // Uniform UI Scaling (Phase 8.3)
+    //
+    // The CSS is authored at 1440×1020 (Figma reference canvas minus keyboard).
+    // A single transform: scale() on .solace-root shrinks/grows the UI to fit
+    // the actual WebView viewport while preserving exact Figma proportions.
+    // This is the industry-standard approach (Serum, Vital, Surge).
+    // =========================================================================
+    const DESIGN_W = 1440;
+    const DESIGN_H = 1020;
+
+    function applyScale () {
+        const root = document.getElementById('solace-root');
+        if (!root) return;
+
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        const scaleX = vw / DESIGN_W;
+        const scaleY = vh / DESIGN_H;
+        const scale  = Math.min(scaleX, scaleY);
+
+        // Centre the scaled content in the viewport (letterbox if aspect differs)
+        const scaledW = DESIGN_W * scale;
+        const scaledH = DESIGN_H * scale;
+        const offsetX = Math.max(0, (vw - scaledW) / 2);
+        const offsetY = Math.max(0, (vh - scaledH) / 2);
+
+        root.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
+    }
+
+    window.addEventListener('resize', applyScale);
+
+    // =========================================================================
     // Logging
     // =========================================================================
     const LOG = { TRACE: 0, DEBUG: 1, INFO: 2, WARN: 3, ERROR: 4 };
@@ -307,6 +339,9 @@
             logError(`Init failed: ${err.message}`);
             setStatus("error", "error");
         }
+
+        // Apply uniform scaling after all components are mounted
+        applyScale();
     };
 
     if (document.readyState === "loading") {

@@ -46,11 +46,11 @@
        Then set: --font-value: 'NATS', 'Jura', sans-serif; */
     --font-value:   'Jura', sans-serif;
 
-    /* Font sizes — clamp(min, preferred vw/vh based, max) */
-    --text-title:   clamp(22px, 2.6vw, 40px);
-    --text-heading: clamp(13px, 1.5vw, 22px);
-    --text-tag:     clamp(9px,  0.9vw, 13px);
-    --text-value:   clamp(10px, 1.1vw, 16px);
+    /* Font sizes — fixed Figma values (uniform scaling via transform: scale()) */
+    --text-title:   48px;
+    --text-heading: 28px;
+    --text-tag:     15px;
+    --text-value:   20px;
 
     /* Spacing */
     --space-xs:  4px;
@@ -60,28 +60,28 @@
     --space-xl:  24px;
     --space-2xl: 32px;
 
-    /* Root layout */
-    --root-padding-v: clamp(16px, 2.8vh, 32px);
-    --root-padding-h: clamp(20px, 2.6vw, 40px);
-    --root-gap:       clamp(12px, 2.0vh, 20px);
+    /* Root layout — fixed Figma values */
+    --root-padding-v: 40px;
+    --root-padding-h: 48px;
+    --root-gap:       32px;
 
     /* Card */
     --card-radius:    8px;
     --card-border:    1px solid var(--color-border);
     --card-shadow:    0px 1px 1px 0px rgba(0, 0, 0, 0.25);
-    --card-padding-h: clamp(12px, 1.6vw, 24px);
-    --card-padding-v: clamp(12px, 1.8vh, 20px);
-    --card-gap:       clamp(10px, 1.8vh, 18px);
+    --card-padding-h: 24px;
+    --card-padding-v: 24px;
+    --card-gap:       24px;
 
     /* Divider between sub-sections */
-    --divider-margin: clamp(8px, 0.6vw, 12px);
+    --divider-margin: 12px;
 
-    /* Slider */
+    /* Slider — Figma thumb dimensions */
     --slider-track-w:    8px;
-    --slider-thumb-w:    14px;
-    --slider-thumb-h:    18px;
-    --slider-thumb-r:    6px;
-    --slider-thumb-border: 3px;
+    --slider-thumb-w:    20px;
+    --slider-thumb-h:    24px;
+    --slider-thumb-r:    8px;
+    --slider-thumb-border: 4px;
 }
 
 /* ============================================================================
@@ -113,12 +113,13 @@ html, body {
 .solace-root {
     display: flex;
     flex-direction: column;
-    width: 100%;
-    height: 100%;
+    width: 1440px;
+    height: 1020px;
     padding: var(--root-padding-v) var(--root-padding-h);
     gap: var(--root-gap);
     background: var(--color-bg);
     overflow: hidden;
+    transform-origin: top left;
 }
 
 /* ============================================================================
@@ -142,7 +143,7 @@ html, body {
 }
 
 .logo-monogram {
-    width: clamp(28px, 3.3vw, 50px);
+    width: 50px;
     height: auto;
     flex-shrink: 0;
 }
@@ -200,7 +201,7 @@ html, body {
     border: var(--card-border);
     border-radius: 4px;
     padding: var(--space-sm) var(--space-md);
-    min-width: clamp(100px, 16vw, 240px);
+    min-width: 240px;
     cursor: pointer;
     background: var(--color-bg);
     transition: background 0.12s ease;
@@ -254,6 +255,11 @@ html, body {
     flex: 1;
     min-height: 0;
 }
+
+/* Row 1 (Osc + Amp Env + Master): shorter — standard-height faders */
+#row-top    { flex: 4; }
+/* Row 2 (Filter + LFO + Voicing): taller — big faders */
+#row-bottom { flex: 5; }
 
 /* ============================================================================
  * Cards
@@ -339,7 +345,7 @@ html, body {
 
 /* Waveform icon constrained in the osc left column */
 .osc-left-col .waveform-icon {
-    width: clamp(40px, 4.5vw, 72px);
+    width: 72px;
 }
 
 .osc-right-col {
@@ -512,10 +518,10 @@ html, body {
     white-space: nowrap;
 }
 
-/* Fader height variants (clamp: min / responsive / Figma max) */
-.fader--standard .fader-input { height: clamp(80px,  16vh, 160px); }
-.fader--big      .fader-input { height: clamp(110px, 22vh, 220px); }
-.fader--small    .fader-input { height: clamp(50px,  10vh, 100px); }
+/* Fader height variants — fixed Figma values (scaling handled by transform) */
+.fader--standard .fader-input { height: 200px; }
+.fader--big      .fader-input { height: 280px; }
+.fader--small    .fader-input { height: 120px; }
 
 /* ============================================================================
  * Arrow Selector  ( < value > )
@@ -607,7 +613,7 @@ html, body {
 }
 
 .waveform-icon {
-    width: clamp(60px, 8vw, 120px);
+    width: 120px;
     height: auto;
     display: block;
 }
@@ -686,10 +692,10 @@ html, body {
 .lfo-left-col {
     display: flex;
     flex-direction: column;
-    gap: clamp(6px, 1.0vh, 12px);  /* Tightened from card-gap — waveform + 3 dropdowns must fit */
+    gap: 12px;
     flex-shrink: 0;
-    min-width: clamp(110px, 13vw, 180px);
-    max-width: clamp(110px, 13vw, 180px);
+    min-width: 180px;
+    max-width: 180px;
 }
 
 /* ============================================================================
@@ -735,7 +741,7 @@ html, body {
 .voicing-selectors {
     display: flex;
     flex-direction: column;
-    gap: clamp(6px, 1.0vh, 12px);  /* Tightened from 1.8vh — 3 vel-mod target dropdowns must fit */
+    gap: 12px;
     flex: 1;
     min-width: 0;
 }

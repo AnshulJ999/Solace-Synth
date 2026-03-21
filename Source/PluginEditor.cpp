@@ -175,9 +175,15 @@ SolaceSynthEditor::SolaceSynthEditor (SolaceSynthProcessor& p)
                 self->midiKeyboard.grabKeyboardFocus();
         });
 
-    // Set window size
-    setSize (1280, 720);
-    SolaceLog::info ("Editor ctor: finished, window size set to 1280x720 (720p)");
+    // Resizable window — uniform CSS scale() in JS handles proportions.
+    // Constraints: min ~half design canvas, max ~2x design canvas.
+    setResizable (true, true);
+    setResizeLimits (720, 510, 2880, 2040);
+
+    // Default window size — fits comfortably on 1440p monitors with taskbar.
+    // At 1280×900, WebView area is 1280×820, JS computes scale ≈ 0.80.
+    setSize (1280, 900);
+    SolaceLog::info ("Editor ctor: finished, window size set to 1280x900 (resizable)");
 }
 
 // ============================================================================

@@ -18,10 +18,20 @@
  *     - setParameter(paramId, value)  : change a synth parameter
  *     - uiReady()                     : signal that the page has loaded
  *     - log(message)                  : send debug message to C++ console
+ *     - getPresetList()               : request full preset list
+ *     - loadPreset(index)             : load preset by index
+ *     - savePreset(name)              : save/overwrite user preset
+ *     - saveAsPreset(name)            : save as new user preset
+ *     - renamePreset(index, name)     : rename user preset
+ *     - deletePreset(index)           : delete user preset
+ *     - nextPreset()                  : load next preset in list
+ *     - prevPreset()                  : load previous preset in list
  *
  *   C++ -> JS (events via emitEventIfBrowserIsVisible):
  *     - parameterChanged { paramId, value } : single parameter updated
  *     - syncAllParameters [{ paramId, value }, ...] : bulk parameter sync
+ *     - presetListChanged [{ name, author, isFactory, index }, ...] : preset list updated
+ *     - currentPresetChanged { name, index, isModified, isFactory } : active preset changed
  *
  * IMPORTANT: APVTS in C++ is the single source of truth.
  * JS reflects and requests changes, but never "owns" state.

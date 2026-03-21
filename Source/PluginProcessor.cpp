@@ -19,6 +19,10 @@ SolaceSynthProcessor::SolaceSynthProcessor()
     SolaceLog::info ("=== Solace Synth started ===");
     SolaceLog::info ("Log directory: " + solaceLogger->getLogDirectory());
 
+    // Scan presets now that the logger is ready (PresetManager constructor
+    // defers scanning to avoid calling SolaceLog before logger init).
+    presetManager.scanPresets();
+
     // Build the parameter pointer struct. APVTS is fully initialised by this
     // point (it is a member initialised in the initialiser list before the
     // constructor body runs), so getRawParameterValue() is safe here.

@@ -102,9 +102,25 @@ class PresetBrowser {
         menu.className = "preset-menu";
         menu.addEventListener("click", (e) => e.stopPropagation());
 
-        // Split presets into categories
-        const factory = this.presetList.filter(p => p.isFactory);
+        // Split presets into categories: Default (standalone), Factory, User
+        const defaultPreset = this.presetList.find(p => p.isFactory && p.name === "Default");
+        const factory = this.presetList.filter(p => p.isFactory && p.name !== "Default");
         const user    = this.presetList.filter(p => !p.isFactory);
+
+        // Default preset — standalone item at the top
+        if (defaultPreset) {
+            const defaultItem = document.createElement("div");
+            defaultItem.className = "preset-menu-item preset-menu-item--default";
+            if (defaultPreset.index === this.currentIndex) {
+                defaultItem.classList.add("preset-menu-item--active");
+            }
+            defaultItem.textContent = "Default";
+            defaultItem.addEventListener("click", () => {
+                SolaceBridge.loadPreset(defaultPreset.index);
+                this._closeMenu();
+            });
+            menu.appendChild(defaultItem);
+        }
 
         // Factory category
         if (factory.length > 0) {
@@ -273,6 +289,10 @@ class PresetBrowser {
     _closeModal () {
         this.modalOverlay?.classList.remove("visible");
         this.modal?.classList.remove("visible");
+
+        // Restore input field visibility (delete confirm hides it)
+        const modalInput = this.modal?.querySelector(".preset-modal-input");
+        if (modalInput) modalInput.style.display = "";
     }
 
     _showSaveAsModal () {
@@ -281,7 +301,12 @@ class PresetBrowser {
 
         this._showModal("Save Preset As", defaultName, "Save", async (name) => {
             const result = await SolaceBridge.saveAsPreset(name);
-            if (result) this._closeModal();
+            if (result) {
+                this._closeModal();
+            } else {
+                const err = this.modal?.querySelector(".preset-modal-error");
+                if (err) err.textContent = "Failed to save preset.";
+            }
         });
     }
 
@@ -293,7 +318,12 @@ class PresetBrowser {
 
         this._showModal("Rename Preset", currentPreset.name, "Rename", async (name) => {
             const result = await SolaceBridge.renamePreset(this.currentIndex, name);
-            if (result) this._closeModal();
+            if (result) {
+                this._closeModal();
+            } else {
+                const err = this.modal?.querySelector(".preset-modal-error");
+                if (err) err.textContent = "Failed to rename preset.";
+            }
         });
     }
 

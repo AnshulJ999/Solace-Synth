@@ -623,6 +623,20 @@ void SolaceSynthEditor::handleLoadPreset (
         // Explicit bulk sync after preset load
         sendAllParametersToJS();
         emitCurrentPresetChanged();
+
+        // Deferred reset: parameterChanged() callAsync lambdas are still queued
+        // and will set isModified=true when they run (loadingPreset is already
+        // false by then). Enqueue a final callAsync that resets modified state
+        // AFTER all those lambdas have been processed (callAsync is FIFO).
+        auto safeThis = juce::Component::SafePointer<SolaceSynthEditor> (this);
+        juce::MessageManager::callAsync ([safeThis]()
+        {
+            if (auto* self = safeThis.getComponent())
+            {
+                self->processorRef.getPresetManager().setModified (false);
+                self->emitCurrentPresetChanged();
+            }
+        });
     }
 
     completion (juce::var (ok));
@@ -699,8 +713,20 @@ void SolaceSynthEditor::handleDeletePreset (
 
     if (ok)
     {
+        sendAllParametersToJS();
         emitPresetListChanged();
         emitCurrentPresetChanged();
+
+        // Deferred reset (delete may load a fallback preset)
+        auto safeThis = juce::Component::SafePointer<SolaceSynthEditor> (this);
+        juce::MessageManager::callAsync ([safeThis]()
+        {
+            if (auto* self = safeThis.getComponent())
+            {
+                self->processorRef.getPresetManager().setModified (false);
+                self->emitCurrentPresetChanged();
+            }
+        });
     }
 
     completion (juce::var (ok));
@@ -717,6 +743,17 @@ void SolaceSynthEditor::handleNextPreset (
     {
         sendAllParametersToJS();
         emitCurrentPresetChanged();
+
+        // Deferred reset (same pattern as handleLoadPreset)
+        auto safeThis = juce::Component::SafePointer<SolaceSynthEditor> (this);
+        juce::MessageManager::callAsync ([safeThis]()
+        {
+            if (auto* self = safeThis.getComponent())
+            {
+                self->processorRef.getPresetManager().setModified (false);
+                self->emitCurrentPresetChanged();
+            }
+        });
     }
 
     auto* obj = new juce::DynamicObject();
@@ -736,6 +773,17 @@ void SolaceSynthEditor::handlePrevPreset (
     {
         sendAllParametersToJS();
         emitCurrentPresetChanged();
+
+        // Deferred reset (same pattern as handleLoadPreset)
+        auto safeThis = juce::Component::SafePointer<SolaceSynthEditor> (this);
+        juce::MessageManager::callAsync ([safeThis]()
+        {
+            if (auto* self = safeThis.getComponent())
+            {
+                self->processorRef.getPresetManager().setModified (false);
+                self->emitCurrentPresetChanged();
+            }
+        });
     }
 
     auto* obj = new juce::DynamicObject();

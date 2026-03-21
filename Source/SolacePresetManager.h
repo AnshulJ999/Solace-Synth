@@ -105,8 +105,5 @@ private:
     // List management
     void rebuildPresetList();
 
-    // Non-sound properties to strip from preset files
-    static bool isNonSoundProperty (const juce::String& name);
-
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SolacePresetManager)
 };

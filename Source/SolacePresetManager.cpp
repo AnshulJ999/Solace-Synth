@@ -7,7 +7,9 @@
 SolacePresetManager::SolacePresetManager (juce::AudioProcessorValueTreeState& a)
     : apvts (a)
 {
-    scanPresets();
+    // NOTE: scanPresets() is NOT called here because the logger may not be
+    // initialized yet (member init order in Processor). The Processor
+    // constructor calls scanPresets() explicitly after logger setup.
 }
 
 // ============================================================================
@@ -19,8 +21,8 @@ SolacePresetManager::SolacePresetManager (juce::AudioProcessorValueTreeState& a)
 std::vector<SolacePresetManager::FactoryPresetDef> SolacePresetManager::getFactoryPresetDefs()
 {
     return {
-        // 0: Init — all defaults (empty override list)
-        { "Init", "Solace", {} },
+        // 0: Default — all defaults (empty override list)
+        { "Default", "Solace", {} },
 
         // 1: Fat Bass — thick low end
         { "Fat Bass", "Solace", {
@@ -160,16 +162,6 @@ std::vector<SolacePresetManager::FactoryPresetDef> SolacePresetManager::getFacto
 }
 
 // ============================================================================
-// Non-sound properties — stripped from preset files
-// ============================================================================
-bool SolacePresetManager::isNonSoundProperty (const juce::String& name)
-{
-    return name == "lastEditorWidth"
-        || name == "lastEditorHeight"
-        || name == "lastPresetName";
-}
-
-// ============================================================================
 // Scan / rebuild preset list
 // ============================================================================
 void SolacePresetManager::scanPresets()
@@ -181,12 +173,16 @@ void SolacePresetManager::rebuildPresetList()
 {
     presets.clear();
 
-    // --- Factory presets (sorted alphabetically by name) ---
+    // --- Factory presets: "Default" first, then remaining sorted alphabetically ---
     auto factoryDefs = getFactoryPresetDefs();
 
-    // Sort factory presets alphabetically
+    // Sort factory presets alphabetically, but keep "Default" at the front
     std::sort (factoryDefs.begin(), factoryDefs.end(),
         [] (const FactoryPresetDef& a, const FactoryPresetDef& b) {
+            // "Default" always sorts first
+            bool aIsDefault = juce::String (a.name).equalsIgnoreCase ("Default");
+            bool bIsDefault = juce::String (b.name).equalsIgnoreCase ("Default");
+            if (aIsDefault != bIsDefault) return aIsDefault;
             return juce::String (a.name).compareIgnoreCase (juce::String (b.name)) < 0;
         });
 
@@ -242,7 +238,7 @@ juce::String SolacePresetManager::getCurrentPresetName() const
 {
     if (currentIndex >= 0 && currentIndex < static_cast<int> (presets.size()))
         return presets[static_cast<size_t> (currentIndex)].name;
-    return "Init";
+    return "Default";
 }
 
 juce::String SolacePresetManager::getDisplayName() const
@@ -366,8 +362,9 @@ int SolacePresetManager::loadNextPreset()
 {
     if (presets.empty()) return -1;
     int next = (currentIndex + 1) % static_cast<int> (presets.size());
-    loadPreset (next);
-    return next;
+    if (loadPreset (next))
+        return next;
+    return currentIndex;  // return old index on failure
 }
 
 int SolacePresetManager::loadPreviousPreset()
@@ -375,8 +372,9 @@ int SolacePresetManager::loadPreviousPreset()
     if (presets.empty()) return -1;
     int prev = currentIndex - 1;
     if (prev < 0) prev = static_cast<int> (presets.size()) - 1;
-    loadPreset (prev);
-    return prev;
+    if (loadPreset (prev))
+        return prev;
+    return currentIndex;  // return old index on failure
 }
 
 // ============================================================================
@@ -452,25 +450,23 @@ bool SolacePresetManager::renameUserPreset (int index, const juce::String& newNa
     if (! readPresetFile (preset.file, paramValues, oldName, author))
         return false;
 
-    // Write new file with new name
-    // We need to write the current params from the old file, not from APVTS
-    // So we write the old file's content to the new file with updated name
+    // Move the file to the new name
     if (preset.file != newFile)
     {
-        // Delete old file first if renaming (not just case change)
-        preset.file.deleteFile();
-    }
-
-    // Write preset using current APVTS state... actually we want to preserve
-    // the file's original param values. But since we just loaded them into
-    // paramValues, we can reconstruct. However, the simplest approach for rename:
-    // just rename the file and update the XML name attribute.
-    if (! preset.file.moveFileTo (newFile))
-    {
-        // If move failed (e.g., case-only rename on Windows), try copy+delete
-        if (! preset.file.copyFileTo (newFile))
+        if (! preset.file.moveFileTo (newFile))
             return false;
-        preset.file.deleteFile();
+    }
+    else
+    {
+        // Case-only rename on case-insensitive filesystem (Windows) —
+        // moveFileTo would fail because the OS sees src == dst.
+        // Use a temp intermediary to force the rename.
+        auto tempFile = getUserPresetDirectory().getChildFile ("__rename_temp__.solace");
+        if (! preset.file.moveFileTo (tempFile) || ! tempFile.moveFileTo (newFile))
+        {
+            tempFile.deleteFile();  // cleanup on failure
+            return false;
+        }
     }
 
     // Update the name inside the XML
@@ -523,11 +519,25 @@ bool SolacePresetManager::deleteUserPreset (int index)
 
     SolaceLog::info ("PresetManager: deleted preset \"" + preset.name + "\"");
 
+    bool wasCurrentPreset = (index == currentIndex);
+
     rebuildPresetList();
 
-    // If we deleted the current preset, fall back to Init
-    if (currentIndex >= static_cast<int> (presets.size()))
-        currentIndex = 0;
+    if (wasCurrentPreset)
+    {
+        // Deleted the active preset — load the nearest valid one (Default = index 0)
+        int fallbackIndex = juce::jlimit (0, juce::jmax (0, static_cast<int> (presets.size()) - 1), index);
+        loadPreset (fallbackIndex);
+    }
+    else
+    {
+        // Deleted a different preset — just fix currentIndex if it shifted
+        if (index < currentIndex)
+            --currentIndex;
+
+        if (currentIndex >= static_cast<int> (presets.size()))
+            currentIndex = 0;
+    }
 
     saveToState();
     return true;
@@ -547,17 +557,24 @@ void SolacePresetManager::setModified (bool modified)
 void SolacePresetManager::saveToState()
 {
     apvts.state.setProperty ("lastPresetName", getCurrentPresetName(), nullptr);
+
+    // Store isFactory to disambiguate presets with the same name
+    bool isFactory = false;
+    if (currentIndex >= 0 && currentIndex < static_cast<int> (presets.size()))
+        isFactory = presets[static_cast<size_t> (currentIndex)].isFactory;
+    apvts.state.setProperty ("lastPresetIsFactory", isFactory, nullptr);
 }
 
 void SolacePresetManager::restoreFromState()
 {
-    auto savedName = apvts.state.getProperty ("lastPresetName", "Init").toString();
+    auto savedName = apvts.state.getProperty ("lastPresetName", "Default").toString();
+    bool savedIsFactory = static_cast<bool> (apvts.state.getProperty ("lastPresetIsFactory", true));
 
-    // Find the preset by name and set currentIndex (do NOT reload the file —
-    // the APVTS state already has the correct parameter values)
+    // Find the preset by name + isFactory to disambiguate same-name presets
     for (int i = 0; i < static_cast<int> (presets.size()); ++i)
     {
-        if (presets[static_cast<size_t> (i)].name.equalsIgnoreCase (savedName))
+        if (presets[static_cast<size_t> (i)].name.equalsIgnoreCase (savedName)
+            && presets[static_cast<size_t> (i)].isFactory == savedIsFactory)
         {
             currentIndex = i;
             isModified = false;
@@ -566,10 +583,22 @@ void SolacePresetManager::restoreFromState()
         }
     }
 
-    // Preset not found — default to Init
+    // Exact match not found — try name-only fallback
+    for (int i = 0; i < static_cast<int> (presets.size()); ++i)
+    {
+        if (presets[static_cast<size_t> (i)].name.equalsIgnoreCase (savedName))
+        {
+            currentIndex = i;
+            isModified = false;
+            SolaceLog::info ("PresetManager: restored current preset to \"" + savedName + "\" (index " + juce::String (i) + ", isFactory mismatch)");
+            return;
+        }
+    }
+
+    // Preset not found — default to Default (index 0)
     currentIndex = 0;
     isModified = false;
-    SolaceLog::warn ("PresetManager: saved preset \"" + savedName + "\" not found, defaulting to Init");
+    SolaceLog::warn ("PresetManager: saved preset \"" + savedName + "\" not found, defaulting to Default");
 }
 
 // ============================================================================

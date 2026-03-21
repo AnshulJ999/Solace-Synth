@@ -163,13 +163,8 @@ bool SolacePresetManager::loadPreset (int index)
 
     const auto& preset = presets[static_cast<size_t> (index)];
 
-    // Set loading guard — suppresses isModified during bulk parameter sets
-    loadingPreset = true;
-
-    // Reset to defaults first, then apply preset values.
-    // This ensures any params missing from the file get their defaults.
-    resetToDefaults();
-
+    // Parse the preset data BEFORE modifying any synth state.
+    // If parsing fails, the current sound is preserved (no silent reset).
     std::vector<std::pair<juce::String, float>> paramValues;
     juce::String parsedName, parsedAuthor;
 
@@ -202,7 +197,6 @@ bool SolacePresetManager::loadPreset (int index)
         if (! found)
         {
             SolaceLog::error ("PresetManager: factory preset not found in BinaryData: " + preset.name);
-            loadingPreset = false;
             return false;
         }
     }
@@ -212,11 +206,17 @@ bool SolacePresetManager::loadPreset (int index)
         if (! readPresetFile (preset.file, paramValues, parsedName, parsedAuthor))
         {
             SolaceLog::error ("PresetManager: failed to read preset file: " + preset.file.getFullPathName());
-            loadingPreset = false;
             return false;
         }
     }
 
+    // Parse succeeded — now safe to modify synth state.
+    // Set loading guard — suppresses isModified during bulk parameter sets.
+    loadingPreset = true;
+
+    // Reset to defaults first, then apply preset values.
+    // This ensures any params missing from the file get their defaults.
+    resetToDefaults();
     applyParameterValues (paramValues);
 
     currentIndex = index;

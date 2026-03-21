@@ -9,7 +9,8 @@
 // Owns the preset list (factory + user), tracks the current preset and
 // modified state. All file I/O happens on the message thread.
 //
-// Factory presets are defined in code (no external files needed).
+// Factory presets are .solace XML files in Assets/Presets/Factory/, embedded
+// via juce_add_binary_data() at build time (SolaceFactoryPresetData namespace).
 // User presets are .solace XML files in Documents/Solace Synth/Presets/User/.
 //
 // The .solace format stores only synth parameters — UI/session metadata
@@ -54,7 +55,7 @@ public:
     int loadNextPreset();
     int loadPreviousPreset();
 
-    // --- Init (hardcoded, file-independent) ---
+    // --- Reset all parameters to their APVTS default values ---
     void resetToDefaults();
 
     // --- Modified state ---

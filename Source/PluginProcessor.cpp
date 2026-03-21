@@ -92,6 +92,9 @@ SolaceSynthProcessor::SolaceSynthProcessor()
     // incoming note will trigger one of the SolaceVoice instances.
     synth.addSound (new SolaceSound());
 
+    // Cache frequently-used parameter pointer to avoid string lookup in processBlock.
+    cachedMasterVolume = apvts.getRawParameterValue ("masterVolume");
+
     SolaceLog::info ("Synthesiser ready: " + juce::String (numVoices) + " voices, SolaceSound");
 }
 
@@ -545,9 +548,9 @@ void SolaceSynthProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         }
     }
 
-    // --- Apply master volume from APVTS ---
-    // Get the current (possibly automated) value and scale all channels.
-    const float masterVolume = apvts.getRawParameterValue ("masterVolume")->load();
+    // --- Apply master volume from cached pointer ---
+    // Pointer was cached in constructor — avoids string hash lookup every audio callback.
+    const float masterVolume = cachedMasterVolume->load();
 
     for (int channel = 0; channel < getTotalNumOutputChannels(); ++channel)
         buffer.applyGain (channel, 0, buffer.getNumSamples(), masterVolume);

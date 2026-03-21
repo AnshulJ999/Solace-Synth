@@ -66,6 +66,10 @@ juce_add_plugin("${PROJECT_NAME}"
     NEEDS_WEBVIEW2 TRUE       # Required for ResourceProvider + WebView2 backend on Windows
 
     PRODUCT_NAME "${PRODUCT_NAME}"
+
+    # App icon for standalone build
+    ICON_BIG "${CMAKE_SOURCE_DIR}/Assets/icon.png"
+    ICON_SMALL "${CMAKE_SOURCE_DIR}/Assets/icon.png"
 )
 
 # ============================================================================

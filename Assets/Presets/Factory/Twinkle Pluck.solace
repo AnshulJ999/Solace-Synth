@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<SolacePreset name="Twinkle Pluck" author="User" version="1">
+  <Param id="masterVolume" value="0.7999999523162842"/>
+  <Param id="ampAttack" value="0.001000000047497451"/>
+  <Param id="ampDecay" value="0.7000000476837158"/>
+  <Param id="ampSustain" value="0.0"/>
+  <Param id="ampRelease" value="0.1500000059604645"/>
+  <Param id="osc1Waveform" value="1.0"/>
+  <Param id="osc1Octave" value="0.0"/>
+  <Param id="osc1Transpose" value="0.0"/>
+  <Param id="osc1Tuning" value="0.0"/>
+  <Param id="filterCutoff" value="20.0"/>
+  <Param id="filterResonance" value="0.0"/>
+  <Param id="filterType" value="1.0"/>
+  <Param id="filterEnvDepth" value="0.0"/>
+  <Param id="filterEnvAttack" value="0.01000000070780516"/>
+  <Param id="filterEnvDecay" value="5.0"/>
+  <Param id="filterEnvSustain" value="0.0"/>
+  <Param id="filterEnvRelease" value="0.300000011920929"/>
+  <Param id="osc2Waveform" value="0.0"/>
+  <Param id="osc2Octave" value="1.0"/>
+  <Param id="osc2Transpose" value="0.0"/>
+  <Param id="osc2Tuning" value="0.0"/>
+  <Param id="oscMix" value="0.8100000023841858"/>
+  <Param id="lfoWaveform" value="0.0"/>
+  <Param id="lfoRate" value="25.0"/>
+  <Param id="lfoAmount" value="0.02999999932944775"/>
+  <Param id="lfoTarget1" value="3.0"/>
+  <Param id="lfoTarget2" value="0.0"/>
+  <Param id="lfoTarget3" value="0.0"/>
+  <Param id="unisonCount" value="2.0"/>
+  <Param id="unisonDetune" value="0.0"/>
+  <Param id="unisonSpread" value="0.5"/>
+  <Param id="voiceCount" value="16.0"/>
+  <Param id="velocityRange" value="1.0"/>
+  <Param id="velocityModTarget1" value="1.0"/>
+  <Param id="velocityModTarget2" value="3.0"/>
+  <Param id="velocityModTarget3" value="0.0"/>
+  <Param id="masterDistortion" value="0.09999999403953552"/>
+</SolacePreset>

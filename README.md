@@ -4,6 +4,12 @@ A free, open-source polyphonic soft synthesizer — available as a **VST3 plugin
 
 Built from scratch in C++ with [JUCE 8](https://juce.com/), featuring a modern WebView-based UI designed in Figma and implemented in HTML/CSS/JS.
 
+<p align="center">
+  <img src="Screenshots/Current-Figma-Design.jpeg" alt="Figma UI Mockup" width="800" />
+  <br>
+  <em>Figma UI Design</em>
+</p>
+
 ## Features
 
 ### Oscillators
@@ -19,8 +25,8 @@ Built from scratch in C++ with [JUCE 8](https://juce.com/), featuring a modern W
 ### Envelopes & Modulation
 - **Amplifier ADSR** envelope with master level control
 - **Filter ADSR** envelope with configurable depth
-- **LFO** — Sine, Sawtooth, Square waveforms (0.1–50 Hz) with 3 assignable modulation targets
-- **Velocity modulation** — 3 routing slots assignable to Amp Level, Amp Attack, Filter Cutoff, Filter Resonance, or Distortion
+- **LFO** — Sine, Triangle, Sawtooth, Square, and Sample & Hold waveforms (0.01–50 Hz) with 3 assignable modulation targets
+- **Velocity modulation** — 3 routing slots assignable to Amp Level, Amp Attack, Filter Cutoff, Filter Resonance, Distortion, Oscillator Pitch, or Oscillator Mix
 
 ### Polyphony & Unison
 - **Polyphony** — 1–16 configurable voices with voice stealing
@@ -28,13 +34,35 @@ Built from scratch in C++ with [JUCE 8](https://juce.com/), featuring a modern W
 
 ### Performance
 - **Pitch bend** and **mod wheel (CC#1)** support
-- Distortion module (soft/hard clipping with makeup gain)
+- Distortion module (warm `tanh` soft-clipping with transparent passthrough)
 - On-screen MIDI keyboard with computer keyboard mapping
 
 ### UI
 - Modern slider-based interface built with JUCE 8's native WebView integration (WebView2 on Windows)
+- Fully resizable window scaling dynamically with CSS `clamp()`
+- Comprehensive preset system with `.solace` XML files and factory/user banks
 - Designed in Figma and implemented in vanilla HTML/CSS/JS
 - Real-time bidirectional parameter bridge between C++ audio engine and JS frontend
+
+## 📥 Installation
+
+Currently, Solace Synth is available for **Windows** (VST3 and Standalone).
+
+1. Go to the [Releases](../../releases) page and download the latest `Solace-Synth-Win.zip`.
+2. Extract the contents:
+   - **VST3 Plugin:** Copy the `Solace Synth.vst3` folder into your system VST3 directory (typically `C:\Program Files\Common Files\VST3\`).
+   - **Standalone App:** Simply run `Solace Synth.exe` to play the synth without a DAW.
+3. *Note: Solace uses a modern web-based UI. It requires the [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) (which is already installed by default on Windows 11).*
+
+## 🎹 Quick Start
+
+- **Presets:** Click the preset dropdown at the top to explore the included **Factory Presets**, or click "Save" to create your own patches. User presets are safely stored in `Documents/Solace Synth/Presets/User/`.
+- **Resizable UI:** Grab the bottom-right corner of the plugin window to freely scale the interface to perfectly fit your monitor.
+- **On-Screen Keyboard:** Use your mouse or your computer keyboard (A/S/D/F) to play notes directly if you don't have a MIDI controller connected.
+
+---
+
+## 🛠️ For Developers
 
 ## Tech Stack
 
@@ -70,7 +98,7 @@ The built plugin and standalone app will be in `build/SolaceSynth_artefacts/Rele
 
 ### Development Build
 
-Debug builds serve UI files from disk for rapid iteration (`SOLACE_DEV_UI_FALLBACK=1`). Release builds embed all UI assets as binary data.
+Debug builds serve UI files from disk for rapid iteration (`SOLACE_ENABLE_DEV_UI_FALLBACK=1`). Release builds embed all UI assets as binary data.
 
 ## Project Structure
 
@@ -78,6 +106,7 @@ Debug builds serve UI files from disk for rapid iteration (`SOLACE_DEV_UI_FALLBA
 Source/                  C++ audio engine and plugin code
   ├── PluginProcessor    JUCE AudioProcessor + parameter tree (APVTS)
   ├── PluginEditor       WebView host + C++↔JS bridge
+  ├── SolacePresetManager Preset serialization and file management
   ├── SolaceLogger       Debug logging utility
   └── DSP/               Audio DSP modules
       ├── SolaceVoice        Per-voice synthesis engine
@@ -85,7 +114,7 @@ Source/                  C++ audio engine and plugin code
       ├── SolaceFilter       Biquad LP/HP filter
       ├── SolaceADSR         Envelope generator
       ├── SolaceLFO          Low-frequency oscillator
-      ├── SolaceDistortion   Waveshaper (soft/hard clipping)
+      ├── SolaceDistortion   Waveshaper (tanh soft-clipping)
       └── SolaceSound        JUCE SynthesiserSound stub
 
 UI/                      WebView frontend (HTML/CSS/JS)

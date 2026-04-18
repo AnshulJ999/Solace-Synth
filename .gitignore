@@ -58,6 +58,7 @@ Testing/
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+Releases
 
 # --- JUCE build artifacts ---
 *.vst3

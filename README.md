@@ -10,6 +10,23 @@ Built from scratch in C++ with [JUCE 8](https://juce.com/), featuring a modern W
   <em>Figma UI Design</em>
 </p>
 
+## 📥 Installation
+
+Currently, Solace Synth is available for **Windows** (VST3 and Standalone).
+
+1. Go to the [Releases](../../releases) page and download the latest `Solace-Synth-Win.zip`.
+2. Extract the contents:
+   - **VST3 Plugin:** Copy the `Solace Synth.vst3` folder into your system VST3 directory (typically `C:\Program Files\Common Files\VST3\`).
+   - **Standalone App:** Simply run `Solace Synth.exe` to play the synth without a DAW.
+3. *Note: Solace uses a modern web-based UI. It requires the [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) (which is already installed by default on Windows 11).*
+
+## 🎹 Quick Start
+
+- **Presets:** Click the preset dropdown at the top to explore the included **Factory Presets**, or click "Save" to create your own patches. User presets are safely stored in `Documents/Solace Synth/Presets/User/`.
+- **Resizable UI:** Grab the bottom-right corner of the plugin window to freely scale the interface to perfectly fit your monitor.
+- **On-Screen Keyboard:** Use your mouse or your computer keyboard (A/S/D/F) to play notes directly if you don't have a MIDI controller connected.
+
+
 ## Features
 
 ### Oscillators
@@ -43,22 +60,6 @@ Built from scratch in C++ with [JUCE 8](https://juce.com/), featuring a modern W
 - Comprehensive preset system with `.solace` XML files and factory/user banks
 - Designed in Figma and implemented in vanilla HTML/CSS/JS
 - Real-time bidirectional parameter bridge between C++ audio engine and JS frontend
-
-## 📥 Installation
-
-Currently, Solace Synth is available for **Windows** (VST3 and Standalone).
-
-1. Go to the [Releases](../../releases) page and download the latest `Solace-Synth-Win.zip`.
-2. Extract the contents:
-   - **VST3 Plugin:** Copy the `Solace Synth.vst3` folder into your system VST3 directory (typically `C:\Program Files\Common Files\VST3\`).
-   - **Standalone App:** Simply run `Solace Synth.exe` to play the synth without a DAW.
-3. *Note: Solace uses a modern web-based UI. It requires the [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) (which is already installed by default on Windows 11).*
-
-## 🎹 Quick Start
-
-- **Presets:** Click the preset dropdown at the top to explore the included **Factory Presets**, or click "Save" to create your own patches. User presets are safely stored in `Documents/Solace Synth/Presets/User/`.
-- **Resizable UI:** Grab the bottom-right corner of the plugin window to freely scale the interface to perfectly fit your monitor.
-- **On-Screen Keyboard:** Use your mouse or your computer keyboard (A/S/D/F) to play notes directly if you don't have a MIDI controller connected.
 
 ---
 

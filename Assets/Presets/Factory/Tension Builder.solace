@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<SolacePreset name="Tenshion Builder NABK" author="User" version="1">
+<SolacePreset name="Tension Builder" author="User" version="1">
   <Param id="masterVolume" value="0.7999999523162842"/>
   <Param id="ampAttack" value="1.664000153541565"/>
   <Param id="ampDecay" value="5.0"/>

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<SolacePreset name="Warm Pad NABK" author="User" version="1">
+<SolacePreset name="Warm Pad" author="User" version="1">
   <Param id="masterVolume" value="0.7999999523162842"/>
   <Param id="ampAttack" value="0.800000011920929"/>
   <Param id="ampDecay" value="0.5"/>

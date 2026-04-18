@@ -18,7 +18,7 @@ Built from scratch in C++ with [JUCE 8](https://juce.com/), featuring a modern W
 - Adjustable oscillator mix (level blend between Osc 1 and Osc 2)
 
 ### Filter
-- State-variable filter with **LP12, LP24, and HP12** modes
+- Classic Ladder filter with **LP12, LP24, and HP12** modes
 - Cutoff (20 Hz – 20 kHz), resonance, and dedicated filter ADSR envelope
 - Filter envelope depth control with bipolar sweep direction
 
@@ -111,7 +111,7 @@ Source/                  C++ audio engine and plugin code
   └── DSP/               Audio DSP modules
       ├── SolaceVoice        Per-voice synthesis engine
       ├── SolaceOscillator   Waveform generator (phase accumulation)
-      ├── SolaceFilter       Biquad LP/HP filter
+      ├── SolaceFilter       Ladder filter (LP/HP)
       ├── SolaceADSR         Envelope generator
       ├── SolaceLFO          Low-frequency oscillator
       ├── SolaceDistortion   Waveshaper (tanh soft-clipping)

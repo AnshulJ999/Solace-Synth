@@ -84,3 +84,4 @@ packaging/Output/*
 # Misc
 logs
 readme.old
+.agent/rules/topic-memory-rule.md
